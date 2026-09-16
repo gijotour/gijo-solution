@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 업로드 원본 옵션 · 추출본(.md) 관리 (추천안 1개)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안: 업로드 시 "원본도 보관"(기본 꺼짐) 옵션 + 「내 문서」에서 추출본(.md) 관리
+  대상 화면: console.js(콘솔 ＋ 업로드 창구) · client/src/renderer/pages/mydocs.html(내 문서 v4)
+  추천안: 1개만(2026-07-25 확립 원칙 — 판단은 우리가 하고 사용자는 승인/반려만).
+  이 파일은 mockups/ 안에만 존재한다 — 제품 코드(client/·server/)는 전혀 건드리지 않았다.
+
+  ── 지금 코드가 실제로 하는 일 (착수 전 정찰 — 짐작 아님, 파일:줄 확인) ──────────
+  · server/src/engine/memory.ts:1296-1349 `/api/memory/ingest-file` — ⚠ 중요한 정정:
+    이 작업요청 메시지는 "원본을 저장하지 않는다"고 적었지만, 실제 코드를 열어 보니
+    **이미 원본을 조용히·무조건 보관하고 있었다**(1312-1323줄: uploads 폴더에 base64를
+    그대로 파일로 씀). 다만 그 사실을 사용자에게 보여줄 화면이 없고(토글도 배지도 없음),
+    끌 방법도 없다. 즉 지금 문제는 "원본이 안 남는다"가 아니라
+    **"원본이 사용자 모르게 항상 남고, 관리할 자리가 없다"**이다 — 이 시안은 그 반대
+    방향(기본 끔 + 명시적 표시)으로 되돌린다. line 1221의 주석("base64 업로드 문서는
+    서버에 원본이 없다")은 그 위 코드가 바뀌며 낡은 채 남은 것으로 보인다.
+  · server/src/engine/dataset.ts:23 extractDocumentText — scripts/extract_doc.py로
+    텍스트만 추출한다. 그 결과를 **파일(.md)로 남기지 않는다** — LanceDB 조각(청크,
+    800자 단위)으로만 쪼개 저장한다. "원본 대비 추출본"을 사람이 읽을 방법이 없다.
+  · client/src/renderer/pages/memory.html:952-961 loadDsFromDoc — 이미 비슷한 시도가
+    있었다: 조각을 이어붙여 원문처럼 보여준다. 그런데 **상한이 50조각**이라 긴 문서는
+    앞부분만 오고, 화면에 "⚠ 앞 50조각까지만" 이라고 정직하게 실토한다. 이 상한이
+    바로 "조각 재조립으로 때우지 말고 .md를 따로 저장해야 하는" 이유다.
+  · server/src/engine/memory.ts:1131-1142 MemoryDocument — hasSource(원본 경로 기록
+    여부)는 이미 있다. 목록 API 필드 재사용, 새 필드 발명 안 함.
+  · server/src/engine/memory.ts:1474-1496 `/api/memory/document/file` — 원본 base64를
+    이미 내려준다(memory.html의 "원본 열기"가 씀). 다운로드용으로 그대로 재사용 가능.
+  · client/src/renderer/pages/console.js:1729-1831 — 파일 인입 창구는 콘솔 ＋ **하나**
+    (2026-07-27 결정 "파일은 ＋ 한 곳으로"). 새 업로드 다이얼로그를 만들지 않고 이
+    창구에 옵션을 붙인다.
+  · client/src/renderer/pages/mydocs.html — "내 문서" v4(2026-08-21 최신 개편, 사장님
+    "커서·노션처럼"). 🩹 반입 탭 = "＋로 올린 문서의 기록"(752-598줄 그리기 로직).
+    이 시안은 **그 탭의 상세 패널을 확장**한다 — 새 탭·새 창을 만들지 않는다.
+
+  ── 사장님 중간 지시(작업 중 반영) ─────────────────────────────────────────
+  "원본 보관을 켰을 때 원본 파일은 「내 문서」(문서함)에서 보관한다 — 별도 저장소가
+  아니라 내 문서 화면에서 보고·내려받고·관리한다. 추출한 .md와 원본이 같은 「내 문서」
+  항목에 묶여, 그 항목에서 「추출본(.md) 보기/편집」+「원본 보관됨 ↓내려받기」가 함께
+  보인다. 원본 미보관이면 「원본 미보관(추출본만)」 배지."
+  → 당초 검토하던 memory.html(AI 지식 관리 화면) 대신 **mydocs.html(내 문서) 🩹 반입
+    탭**을 두 번째 자리로 확정했다. memory.html은 "위험한 관리 전용 화면"(등급·삭제)
+    역할을 그대로 유지 — 이 시안은 거기 있던 "🗔 AI 지식에서 관리" 버튼은 남겨두고
+    그 옆에 새 것을 더한다(원칙 "보기·올리기는 창구, 위험한 관리는 전용 화면" 유지).
+
+  ── 설계 전 조사(표준·모범사례) ────────────────────────────────────────────
+  1) GDPR 제25조(Data Protection by Design and by Default) — "선택적으로 데이터를 더
+     보관·공유·공개하는 기능이 있다면 그 기본값은 꺼져 있어야 한다. 아무 것도 하지
+     않았을 때 사용자가 얻는 기본값이 가장 보호적이어야 한다." 원본 파일 보관은
+     "필요 없으면 안 남기는" 쪽이 기본이어야 한다는 근거. 폐쇄망 온프렘 제품이라
+     GDPR 직접 적용 대상은 아니지만, 원칙(선택적 보관=기본 끔)은 그대로 차용했다.
+     출처: GDPR Article 25 해설(Imperva, LegalClarity 등 다수 요약 — 2026-08 검색).
+  2) RAG 문서 인입 모범사례 — "추출 품질이 곧 검색 품질(garbage in, garbage out)"이며,
+     "낮은 신뢰도의 추출 결과는 조용히 넣지 말고 검토 표시를 남겨야 한다", "마크다운은
+     제목 구조가 청크 경계와 자연스럽게 맞아 RAG에 적합한 저장 형식"이라는 점이
+     복수 자료에서 공통으로 나온다(Docling/Enterprise RAG 정리, MDConvert 가이드,
+     thedrive.ai 파이프라인 가이드 — 2026-08 검색). → 추출본을 **.md로 고정 저장**하고
+     사람이 고칠 수 있는 창을 두는 이 시안의 방향과 일치.
+  3) 이미 사장님이 검증 지시한 실측: built-in 코퍼스에서 30MB PDF → 1MB .md(28배↓) —
+     .md 보관이 "가볍다"는 주장의 실측 근거(이 실측은 본 작업요청에서 인용, 재검증
+     아님).
+
+  ── 시안 안의 상호작용 정직성 고지 ─────────────────────────────────────────
+  이 페이지의 토글·탭 전환은 **화면 상태만** 보여준다(순수 JS, 네트워크 호출 0건).
+  "저장"·"고치기" 등은 실제 서버에 아무 것도 쓰지 않는다 — 눌러보면 그 사실이 즉시
+  각주로 뜬다. 진짜 동작은 승인 후 구현 단계에서 만든다.
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.6;}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 26px 70px;}
+
+/* ── 머리 ─────────────────────────────────────────────────────────── */
+.hd{margin-bottom:20px;}
+.hd .kicker{display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11.75px;font-weight:800;padding:3px 10px;border-radius:20px;margin-bottom:10px;}
+.hd h1{font-size:21px;font-weight:800;color:#fff;margin-bottom:6px;}
+.hd .sub{font-size:12.5px;color:var(--muted);}
+.honest-ribbon{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.3);border-radius:9px;padding:9px 13px;font-size:12px;color:var(--amber);margin-top:12px;line-height:1.7;}
+
+/* ── 근거·결정 패널(공용) ─────────────────────────────────────────── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+.panel h2{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.panel h2 .n{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;background:rgba(59,130,246,.2);color:var(--blue-light);font-size:11.5px;font-weight:800;}
+.panel p{font-size:12.5px;color:var(--text);margin-bottom:8px;}
+.panel p:last-child{margin-bottom:0;}
+.panel .m{color:var(--muted);}
+.panel ul{margin:6px 0 6px 18px;font-size:12.5px;color:var(--text);}
+.panel li{margin-bottom:5px;line-height:1.65;}
+.panel code{background:rgba(255,255,255,.06);border-radius:4px;padding:1px 5px;font-size:11.5px;color:var(--blue-light);}
+
+table.cmp{width:100%;border-collapse:collapse;font-size:12.25px;margin-top:6px;}
+table.cmp th{text-align:left;padding:8px 10px;background:var(--panel-2);color:var(--muted-2);font-weight:800;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
+table.cmp td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+table.cmp tr:last-child td{border-bottom:none;}
+table.cmp .pick{background:rgba(30,185,128,.07);}
+table.cmp .pick td:first-child{color:var(--teal);font-weight:800;}
+table.cmp .bad{color:var(--muted-2);}
+
+.chk-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--border);}
+.chk-row:last-child{border-bottom:none;}
+.chk-row .ic{flex:0 0 auto;width:20px;text-align:center;font-size:14px;}
+.chk-row b{color:#fff;}
+.chk-row .verdict{font-size:11.5px;font-weight:800;padding:1px 8px;border-radius:20px;margin-left:6px;white-space:nowrap;}
+.v-ok{background:rgba(30,185,128,.15);color:var(--teal);border:1px solid rgba(30,185,128,.4);}
+.v-part{background:rgba(240,160,32,.14);color:var(--amber);border:1px solid rgba(240,160,32,.4);}
+
+.density-note{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+
+/* ── 목업 섹션 공용 프레임 ────────────────────────────────────────── */
+.mock-h{display:flex;align-items:center;gap:10px;margin:30px 0 10px;}
+.mock-h .tag{background:rgba(139,124,240,.14);color:var(--purple);border:1px dashed rgba(139,124,240,.5);font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;}
+.mock-h h2{font-size:15.5px;font-weight:800;color:#fff;}
+.mock-h .src{font-size:11.5px;color:var(--muted-2);}
+.mock-frame{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--bg);}
+.mock-note{font-size:11.5px;color:var(--muted-2);padding:8px 14px;background:var(--panel-2);border-top:1px solid var(--border);}
+
+/* ═══════════════ ① 콘솔 ＋ 업로드 창구 재현 ═══════════════ */
+.cs-shell{background:var(--panel);}
+.cs-body-demo{padding:16px 16px 4px;min-height:60px;font-size:12.25px;color:var(--muted-2);}
+.cs-dock{display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+.cs-dock input{flex:1;background:var(--panel,#30302e);border:1px solid var(--border-strong);border-radius:11px;color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
+.cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel-2);color:var(--muted);border:1px solid var(--border-strong);font-size:17px;line-height:1;cursor:pointer;}
+.cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;flex:0 0 auto;}
+/* 신규 — 원본 보관 토글 칩. 높이 38px로 ＋·입력칸과 맞춰 도크 바 자체 높이는 늘리지 않는다. */
+.src-toggle-chip{flex:0 0 auto;height:38px;display:flex;align-items:center;gap:7px;padding:0 12px;border-radius:11px;background:var(--panel-2);border:1px solid var(--border-strong);cursor:pointer;user-select:none;}
+.src-toggle-chip:hover{border-color:var(--blue);}
+.src-toggle-chip .tog-lbl{font-size:11.75px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.src-toggle-chip.on .tog-lbl{color:var(--amber);}
+/* g-toggle — gijo-ui.css:127-130 그대로 재현(기존 컴포넌트 재사용, 새로 안 만든다) */
+.g-toggle{width:38px;height:22px;border-radius:20px;position:relative;display:inline-block;cursor:pointer;background:var(--muted-2);transition:background .15s;flex:0 0 auto;}
+.g-toggle.g-on{background:var(--teal);}
+.g-toggle .k{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;transition:left .15s;}
+.g-toggle.g-on .k{left:19px;}
+
+.evt-row{margin:0 14px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.evt-row .h{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;}
+.evt-row .h .ic{font-size:14px;}
+.evt-row .h .fn{color:#fff;}
+.evt-row .cm{font-size:12.25px;color:var(--muted);margin-top:5px;line-height:1.6;}
+.evt-row .cm.ok{color:var(--teal);}
+/* 신규 — 업로드 이벤트 카드 안에서만 나오는 안내 한 줄(상시 UI 아님, 이 카드가 뜬 동안만) */
+.evt-hint{font-size:11.25px;color:var(--muted-2);margin-top:5px;line-height:1.6;border-top:1px dashed var(--border);padding-top:6px;}
+.evt-hint b{color:var(--amber);}
+
+/* ═══════════════ ② 내 문서(mydocs.html v4) 재현 ═══════════════ */
+.v4demo{display:flex;height:520px;}
+.v4side{flex:0 0 168px;width:168px;background:var(--panel-2);border-right:1px solid var(--border-strong);padding:5px;overflow:hidden;}
+.v4sh{height:34px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:800;color:#fff;border-bottom:1px solid var(--border);margin:-5px -5px 5px;}
+.v4grouplbl{font-size:10.5px;letter-spacing:.4px;color:var(--muted-2);padding:8px 8px 2px;font-weight:800;}
+.v4node{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;border:none;background:transparent;border-radius:6px;font-size:12px;font-weight:700;color:var(--text);cursor:pointer;text-align:left;}
+.v4node .cnt{margin-left:auto;color:var(--muted-2);font-size:11px;font-weight:700;}
+.v4node.on{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.v4node.on .cnt{color:var(--blue-light);}
+
+.v4main{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;}
+.v4toolbar{height:36px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;font-size:11.75px;color:var(--muted-2);}
+.v4content{flex:1 1 auto;display:flex;min-height:0;}
+.v4list{flex:0 0 330px;width:330px;border-right:1px solid var(--border);overflow-y:auto;}
+.g-rows-head{display:grid;grid-template-columns:1fr 78px 60px 44px;gap:6px;align-items:center;height:26px;padding:0 10px;font-size:10.5px;font-weight:800;color:var(--muted-2);letter-spacing:.4px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);position:sticky;top:0;}
+.g-rows-r{display:grid;grid-template-columns:1fr 78px 60px 44px;gap:6px;align-items:center;height:30px;padding:0 10px;font-size:12px;color:var(--text);cursor:pointer;}
+.g-rows-r:nth-child(even){background:rgba(255,255,255,.025);}
+.g-rows-r:hover{background:rgba(59,130,246,.07);}
+.g-rows-r.sel{background:rgba(59,130,246,.12);box-shadow:inset 3px 0 0 var(--blue);}
+.g-rows-r .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ta-r{text-align:right;}
+.gm2{color:var(--muted-2);}
+
+.v4doc{flex:1 1 auto;overflow-y:auto;padding:14px 16px;}
+.detail .dn{font-weight:800;font-size:13.5px;margin-bottom:4px;color:#fff;}
+.detail .dm{color:var(--muted);line-height:1.6;font-size:12.5px;margin-bottom:10px;}
+.detail .dbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;}
+.detail .dbt button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);padding:4px 10px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.detail .dbt button:hover{color:#fff;border-color:var(--blue);}
+
+/* 신규 — 원본 상태 줄 */
+.src-row{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);flex-wrap:wrap;}
+.src-badge{border-radius:20px;padding:2px 10px;font-size:11.75px;font-weight:800;white-space:nowrap;}
+.src-badge.off{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid rgba(255,255,255,.14);}
+.src-badge.on{background:rgba(30,185,128,.15);color:var(--teal);border:1px solid rgba(30,185,128,.4);}
+.src-row .meta{font-size:11.5px;color:var(--muted-2);}
+.src-row .dlbtn{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:4px 10px;font-size:11.75px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;}
+.src-row .dlbtn:hover{border-color:var(--blue);color:#fff;}
+
+/* 신규 — 추출본(.md) 박스 */
+.md-box{margin-top:10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);overflow:hidden;}
+.md-box-h{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:12px;font-weight:800;color:#fff;border-bottom:1px solid var(--border);}
+.md-box-h .sub{font-weight:400;color:var(--muted-2);font-size:11px;}
+.md-box-h .act{margin-left:auto;display:flex;gap:6px;}
+.md-box-h button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);padding:3px 9px;border-radius:6px;font-size:11.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+.md-box-h button:hover{color:#fff;border-color:var(--blue);}
+.md-prev{padding:10px 12px;font-size:12px;color:var(--text);line-height:1.7;max-height:78px;overflow:hidden;position:relative;}
+.md-prev::after{content:"";position:absolute;left:0;right:0;bottom:0;height:26px;background:linear-gradient(transparent,var(--panel-2));}
+.md-prev h3{font-size:12.5px;color:var(--blue-light);margin-bottom:4px;}
+.md-edit{display:none;padding:10px 12px;}
+.md-edit.on{display:block;}
+.md-edit textarea{width:100%;min-height:120px;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;color:var(--text);font:11.75px/1.7 Consolas,"Cascadia Mono",monospace;padding:9px 10px;outline:none;resize:vertical;}
+.md-edit .warn{font-size:11px;color:var(--muted-2);margin-top:6px;line-height:1.6;}
+.md-edit .warn b{color:var(--amber);}
+.md-edit .btns{display:flex;gap:6px;margin-top:8px;}
+.md-edit .btns button{font-size:11.75px;font-weight:700;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:inherit;}
+.md-edit .save{background:var(--blue);border:none;color:#fff;}
+.md-edit .cancel{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.md-box.editing .md-prev{display:none;}
+.toast{display:none;margin-top:8px;font-size:11.5px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.3);border-radius:7px;padding:6px 10px;}
+.toast.on{display:block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hd">
+    <span class="kicker">✅ 추천 시안 1개 — 판단 완료, 승인/반려만 남음</span>
+    <h1>업로드 「원본도 보관」 옵션(기본 꺼짐) + 「내 문서」 추출본(.md) 관리</h1>
+    <div class="sub">대상: 콘솔 ＋ 업로드 창구(console.js) · 내 문서 🩹 반입 탭(mydocs.html v4) — 제품 코드는 읽기만 했고 이 파일 하나만 새로 썼습니다.</div>
+    <div class="honest-ribbon">⚠ 이 페이지의 토글·"고치기"·"저장" 버튼은 화면 전환만 보여줍니다. 실제 업로드·저장은 하지 않으며, 누르면 그 사실을 각주로 다시 알려 줍니다(가짜 동작 금지 원칙).</div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">1</span>지금 코드가 실제로 하는 일 — 착수 전 확인(짐작 아님)</h2>
+    <p><b>정정 발견</b>: 작업 요청 메시지는 "업로드가 원본을 저장하지 않는다"고 했지만, <code>server/src/engine/memory.ts:1312-1323</code>을 직접 열어 보니 이미 <b>원본을 조용히·무조건</b> <code>INGEST_ROOT/docs/uploads/</code>에 저장하고 있었습니다("예전엔 텍스트만 남기고 원본을 버려 열람이 불가능했다"는 주석과 함께 — 최근에 반대 방향으로 바뀐 것으로 보입니다). 사용자에게 그 사실을 보여줄 배지도, 끌 토글도 없습니다.</p>
+    <p class="m">그래서 이 시안이 실제로 고치는 문제는 두 가지입니다 — <b style="color:#fff">① 사용자 모르게 항상 켜져 있던 「원본 보관」을 기본 꺼짐 + 명시적 표시로 되돌리고</b>, <b style="color:#fff">② 조각(청크, 800자 단위)으로만 흩어져 있던 추출 결과를 사람이 읽을 수 있는 .md 파일로 남긴다.</b></p>
+    <p class="m">기존에도 비슷한 시도가 있었습니다 — <code>memory.html:952-961</code>의 "올린 문서에서 불러오기"는 조각을 이어붙여 원문처럼 보여주지만 <b>상한 50조각</b>이라 긴 문서는 잘립니다(화면이 정직하게 "⚠ 앞 50조각까지만"이라고 실토). 이게 조각 재조립이 아니라 .md를 <b>따로 저장</b>해야 하는 이유입니다.</p>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">2</span>설계 전 조사 — 표준·모범사례 근거</h2>
+    <ul>
+      <li><b>GDPR 제25조(Data Protection by Design and by Default)</b> — 선택적으로 더 보관·공유하는 기능이 있다면 <b>기본값은 가장 보호적이어야</b> 한다는 원칙. 폐쇄망 온프렘 제품이라 직접 적용 대상은 아니지만, "선택적 보관은 기본 꺼짐"이라는 원칙만 차용했습니다.</li>
+      <li><b>RAG 문서 인입 모범사례</b> — "추출 품질이 검색 품질을 그대로 결정한다(garbage in, garbage out)", "저신뢰 추출 결과는 조용히 넣지 말고 검토 표시를 남겨야 한다", "마크다운은 제목 구조가 청크 경계와 맞아 RAG에 적합한 저장 형식"이라는 점이 다수 자료에서 공통으로 나옵니다(Docling/Enterprise RAG 정리, MDConvert 가이드, thedrive.ai 파이프라인 가이드).</li>
+      <li><b>이미 검증된 수치</b>(작업 요청 인용) — built-in 코퍼스 30MB PDF → 1MB .md, <b>28배 감소</b>. ".md 보관이 가볍다"는 이 시안 전제의 실측 근거입니다.</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">3</span>왜 이 안인가 — 다른 길을 왜 안 골랐나</h2>
+    <table class="cmp">
+      <tr><th>안</th><th>내용</th><th>문제</th></tr>
+      <tr><td class="bad">A. 원본 항상 보관(지금 실제 동작)</td><td>업로드마다 원본을 무조건 서버에 남긴다.</td><td>사용자가 모른다 · 끌 수 없다 · 등급(C/S/O)과 무관하게 파일이 계속 쌓인다 · 필요 없는 문서까지 원본이 남아 데이터 최소화 원칙에 어긋난다.</td></tr>
+      <tr><td class="bad">B. 조각(청크)만 유지, .md 없음(과거 방식)</td><td>추출 텍스트는 임베딩 조각으로만 존재.</td><td>사람이 "AI가 실제로 뭘 읽었는지" 통으로 볼 방법이 없다 · 미리보기를 만들려면 조각을 이어붙여야 하는데 50조각 상한에 걸린다(위 근거 3) · 추출이 깨져도 고칠 화면이 없다(반입 신뢰도 문제).</td></tr>
+      <tr class="pick"><td>C. 이 시안 — 추출본은 항상 .md로 저장, 원본은 옵션(기본 꺼짐), 「내 문서」에 통합</td><td>추출 즉시 .md 저장(사람이 보고 고칠 수 있음) · 원본은 사용자가 켜야만 보관 · 원본·추출본을 같은 「내 문서」 항목에서 관리(사장님 지시).</td><td>(포기한 것은 §4에) — 가볍고, 정직하고, 화면이 흩어지지 않는다.</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">4</span>무엇을 포기했나</h2>
+    <ul>
+      <li><b>목록(리스트) 행에 원본 상태 배지를 넣는 안</b> — 포기. <code>.g-rows-r</code> 30px 한 줄에 열을 더 끼우면 문서명이 더 잘립니다. 원본 유무는 문서 하나를 열었을 때(상세 패널)만 보여주기로 했습니다 — 목록 밀도는 그대로 30px입니다.</li>
+      <li><b>업로드마다 모달로 매번 물어보는 안</b> — 포기. 파일을 자주 올리는 화면(콘솔 ＋)에서 매번 팝업이 뜨면 마찰이 큽니다. 대신 상시 토글(기본 꺼짐)로 "설정해 두고 잊는" 방식을 택했습니다.</li>
+      <li><b>원본을 별도 "원본 보관함" 화면으로 신설하는 안</b> — 포기(사장님 지시로 확정). 문서가 흩어져 있던 걸 다시 모은 게 바로 2026-08-20~21 「내 문서」 v4 개편입니다. 원본을 또 다른 자리에 두면 그 통합을 거스릅니다.</li>
+      <li><b>저장하면 자동으로 재임베딩까지 실행하는 안</b> — 포기(이번 범위 밖). .md를 고친 뒤 "재임베딩이 필요합니다"라고 안내만 하고, 실제 재임베딩 트리거는 구현 단계에서 별도로 설계·승인받습니다(자동 실행은 원치 않는 순간에 지식이 바뀔 위험이 있어 신중히 다룰 사안).</li>
+      <li><b>추출 신뢰도 점수를 AI가 먼저 알려주는 안</b> — 포기(이번 범위 밖). 지금 추출기는 신뢰도를 안 줍니다. 이 시안은 "사람이 보고 고칠 수 있는 창"까지만 엽니다 — §6 자가점검에 정직하게 남깁니다.</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">5</span>밀도 숫자 — 늘어난 줄 높이·세로 총합</h2>
+    <table class="cmp">
+      <tr><th>요소</th><th>기존</th><th>변경 후</th><th>증감</th></tr>
+      <tr><td>콘솔 하단 고정 도크(<code>.cs-dock</code>)</td><td>59px<br><span class="bad">(패딩 9+38+12)</span></td><td>59px<br><span class="m">토글 칩을 ＋·입력칸과 같은 38px로 맞춰 끼움</span></td><td style="color:var(--teal);font-weight:800">+0px (0%)</td></tr>
+      <tr><td>업로드 이벤트 카드(1건, <b>일회성</b> — 상시 UI 아님)</td><td>가변(파일명+결과 1~2줄)</td><td>+안내 1줄</td><td>+18px<br><span class="m">한 번 뜨고 사라짐, 상시 화면 두께에 안 들어감</span></td></tr>
+      <tr><td>내 문서 목록 행(<code>.g-rows-r</code>)</td><td>30px</td><td>30px</td><td style="color:var(--teal);font-weight:800">+0px (0%) — 목록 밀도 불변</td></tr>
+      <tr><td>내 문서 상세 패널(<b>문서 선택 시만</b> 나타남)</td><td>≈112px<br><span class="m">(제목+메타 3줄+버튼)</span></td><td>≈278px<br><span class="m">(+원본 배지 줄 28px, +추출본 박스 138px)</span></td><td>+166px (+148%)</td></tr>
+    </table>
+    <div class="density-note">계산 방식: CSS 선언값(패딩·줄높이·폰트크기) 기반 산수이며 브라우저 실측이 아닙니다 — 구현 후 실앱에서 재확인이 필요합니다(측정 수칙). 상세 패널의 증가폭은 비교 대상으로 <code>memory.html</code>의 기존 <code>.dm-detail</code>(등급 선택+삭제 옵션까지 포함하면 400px 이상)보다 <b>여전히 가볍습니다</b> — "상세 화면은 정보를 담는 자리"라는 기존 제품 관례 안에 있습니다.</div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">6</span>제품 원칙 자가점검</h2>
+    <div class="chk-row"><span class="ic">🔍</span><div><b>정직 추출</b> — 사람이 원문과 비교해 고칠 수 있는 "✏ 고치기" 창을 열어 반입 신뢰도를 높였다. 다만 AI가 먼저 "이 추출, 이상해 보입니다"라고 신호를 주는 것은 아직 못한다(추출기가 신뢰도 점수를 안 줌).<span class="verdict v-part">부분 충족</span></div></div>
+    <div class="chk-row"><span class="ic">🗂</span><div><b>문서 허브 일관</b> — 새 창·새 화면 없이 「내 문서」 v4의 기존 스테이지(편집 창)를 그대로 재사용한다. 흩어졌던 문서 접점을 다시 흩지 않는다.<span class="verdict v-ok">충족</span></div></div>
+    <div class="chk-row"><span class="ic">🔒</span><div><b>격리</b> — 이 기능은 personal_docs(개인 문서)가 아니라 회사 지식(공유) 문서 대상이다. 원본 파일이 서버에 남는 한, 열람 등급(C/S/O) 검사를 원본 다운로드에도 똑같이 태워야 등급 통제가 무의미해지지 않는다 — 이 시안은 화면만 그렸고, 구현 시 이 계약을 반드시 지켜야 한다.<span class="verdict v-ok">충족(구현 조건부)</span></div></div>
+    <div class="chk-row"><span class="ic">🪶</span><div><b>가벼움</b> — 기본값이 꺼짐이라 원본이 함부로 안 쌓인다. .md는 원본보다 훨씬 작다(28배↓, 실측 인용).<span class="verdict v-ok">충족</span></div></div>
+  </div>
+
+  <!-- ═══════════════ ① 업로드 순간 ═══════════════ -->
+  <div class="mock-h">
+    <span class="tag">시안 ①</span>
+    <h2>업로드 순간 — 콘솔 ＋ 창구</h2>
+    <span class="src">재현 대상: client/src/renderer/pages/console.js:271-330(도크)·1729-1831(업로드)</span>
+  </div>
+  <div class="mock-frame">
+    <div class="cs-shell">
+      <div class="cs-body-demo" id="csBodyDemo">지시하면 여기서 실시간으로 흐릅니다. 파일은 아래 ＋ 하나로 올립니다 — 자동 분류(취약점·매뉴얼·문서), 애매하면 유형을 물어봅니다.</div>
+
+      <!-- 업로드 이벤트 카드 예시 1건 — 토글 상태에 따라 결과 문구가 바뀐다(시연용) -->
+      <div class="evt-row">
+        <div class="h"><span class="ic">📥</span><span>파일 올리기</span> — <span class="fn">보안취약점_점검_결과서_2026Q3.pdf</span></div>
+        <div class="cm ok" id="evtResult">✓ 텍스트(.md)로 저장 — 42조각 · 취약점 영역 (문서 형식 인식)</div>
+        <div class="evt-hint" id="evtHint">추출한 텍스트(.md)만 저장했습니다 — 가볍고 내용은 그대로입니다. 원본 PDF는 서버에 남지 않았습니다.</div>
+      </div>
+
+      <div class="cs-dock">
+        <button class="cs-plus" title="파일 올리기">＋</button>
+        <!-- 신규: 원본 보관 토글 칩 — g-toggle(gijo-ui.css 기존 컴포넌트) 재사용 -->
+        <span class="src-toggle-chip" id="srcToggleChip" title="다음 업로드부터 원본 파일도 서버에 함께 보관합니다">
+          <span class="g-toggle" id="srcToggle"><span class="k"></span></span>
+          <span class="tog-lbl" id="srcTogLbl">원본 보관 꺼짐</span>
+        </span>
+        <input placeholder="지시를 입력하세요…" disabled>
+        <button class="cs-send" disabled>전송</button>
+      </div>
+    </div>
+    <div class="mock-note">
+      토글 위치는 ＋ 버튼과 같은 38px 줄에 두어 <b>도크 바 높이를 늘리지 않았습니다</b>(§5). 기본값은 꺼짐 — 켜면 칩이 호박색으로 바뀌고, 다음 업로드 결과 카드의 안내 문구도 함께 바뀝니다(아래에서 눌러 보세요).
+      <div style="margin-top:8px"><button onclick="toggleSrc()" style="background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖱 토글 눌러보기(시연)</button></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ② 내 문서 — 🩹 반입 탭 ═══════════════ -->
+  <div class="mock-h">
+    <span class="tag">시안 ②</span>
+    <h2>「내 문서」 — 🩹 반입 탭 · 문서 상세</h2>
+    <span class="src">재현 대상: client/src/renderer/pages/mydocs.html(v4 작업공간, 812-822줄 상세 분기 확장)</span>
+  </div>
+  <div class="mock-frame">
+    <div class="v4demo">
+      <div class="v4side">
+        <div class="v4sh">📁 내 문서</div>
+        <div class="v4grouplbl">내가 쓰는 것</div>
+        <button class="v4node">👤 내 것<span class="cnt">12</span></button>
+        <div class="v4grouplbl">회사가 가진 것</div>
+        <button class="v4node">🏢 회사 지식<span class="cnt">86</span></button>
+        <button class="v4node">📘 제품 안내<span class="cnt">12</span></button>
+        <div class="v4grouplbl">기록</div>
+        <button class="v4node">🎓 학습<span class="cnt">214</span></button>
+        <button class="v4node on">🩹 반입<span class="cnt">7</span></button>
+      </div>
+      <div class="v4main">
+        <div class="v4toolbar">제목·이름으로 좁히기… (필터 전용)</div>
+        <div class="v4content">
+          <div class="v4list">
+            <div class="g-rows-head"><span>올린 문서</span><span>올린 이</span><span>영역</span><span class="ta-r">반입</span></div>
+            <div class="g-rows-r sel" id="rowA" onclick="selectRow('A')">
+              <span class="trunc">📕 보안취약점_점검_결과서_2026Q3.pdf</span>
+              <span class="gm2 trunc">김보안</span><span class="gm2 trunc">취약점</span><span class="ta-r gm2">08-19</span>
+            </div>
+            <div class="g-rows-r" id="rowB" onclick="selectRow('B')">
+              <span class="trunc">📄 제품_비교표_v3.hwpx</span>
+              <span class="gm2 trunc">이담당</span><span class="gm2 trunc">사내규정</span><span class="ta-r gm2">08-17</span>
+            </div>
+            <div class="g-rows-r" style="cursor:default;opacity:.6">
+              <span class="trunc">📄 침해대응_매뉴얼_v2.docx</span>
+              <span class="gm2 trunc">박운영</span><span class="gm2 trunc">위협대응</span><span class="ta-r gm2">08-12</span>
+            </div>
+          </div>
+          <div class="v4doc">
+            <div class="detail" id="detailA">
+              <div class="dn">보안취약점_점검_결과서_2026Q3.pdf</div>
+              <div class="dm">영역 취약점 · 조각 42<br>올린 이 김보안<br>반입 2026-08-19 14:02</div>
+              <div class="dbt"><button>🗔 AI 지식에서 관리(삭제·영역·등급)</button></div>
+
+              <!-- 신규: 원본 상태 — 원본 미보관(추출본만) -->
+              <div class="src-row">
+                <span class="src-badge off">🗄 원본 미보관(추출본만)</span>
+                <span class="meta">가벼움 — 필요하면 이 파일을 다시 올려서 원본을 추가할 수 있습니다</span>
+              </div>
+
+              <!-- 신규: 추출본(.md) 보기/편집 -->
+              <div class="md-box" id="mdBoxA">
+                <div class="md-box-h">📝 추출본(.md) <span class="sub">— AI가 실제로 읽은 내용</span>
+                  <span class="act"><button onclick="startEdit('A')">✏ 고치기</button><button onclick="fakeAction(this,'전체 보기(팝오버 확장)')">👁 전체 보기</button><button onclick="fakeAction(this,'.md 내려받기')">⬇ 내려받기</button></span>
+                </div>
+                <div class="md-prev">
+                  <h3># 보안취약점 점검 결과서 (2026Q3)</h3>
+                  <p>1. 점검 개요 — 대상 자산 128대, 점검 기간 2026-08-01~08-15. 발견된 취약점은 심각 6건, 높음 22건, 중간 51건...</p>
+                </div>
+                <div class="md-edit" id="mdEditA">
+                  <textarea># 보안취약점 점검 결과서 (2026Q3)
+
+1. 점검 개요 — 대상 자산 128대, 점검 기간 2026-08-01~08-15.
+   발견된 취약점은 심각 6건, 높음 22건, 중간 51건...
+
+(추출이 깨진 표·머리글은 여기서 직접 고칠 수 있습니다)</textarea>
+                  <div class="warn">⚠ 이 칸을 고치면 AI가 참고하는 지식(임베딩)도 바뀝니다 — 저장하면 <b>재임베딩이 필요합니다</b>(이 시안에서는 저장 후 안내만 하고, 실제 재임베딩 실행은 구현 단계에서 별도 설계).</div>
+                  <div class="btns"><button class="save" onclick="fakeAction(this,'저장')">💾 저장</button><button class="cancel" onclick="cancelEdit('A')">취소</button></div>
+                </div>
+              </div>
+              <div class="toast" id="toastA"></div>
+            </div>
+
+            <div class="detail" id="detailB" style="display:none">
+              <div class="dn">제품_비교표_v3.hwpx</div>
+              <div class="dm">영역 사내규정 · 조각 9<br>올린 이 이담당<br>반입 2026-08-17 09:41</div>
+              <div class="dbt"><button>🗔 AI 지식에서 관리(삭제·영역·등급)</button></div>
+
+              <!-- 신규: 원본 상태 — 원본 보관됨(사용자가 업로드 시 토글을 켠 경우) -->
+              <div class="src-row">
+                <span class="src-badge on">🗄 원본 보관됨 · HWPX · 1.8MB</span>
+                <button class="dlbtn" onclick="fakeAction(this,'원본 내려받기')">⬇ 원본 내려받기</button>
+              </div>
+
+              <div class="md-box" id="mdBoxB">
+                <div class="md-box-h">📝 추출본(.md) <span class="sub">— AI가 실제로 읽은 내용</span>
+                  <span class="act"><button onclick="startEdit('B')">✏ 고치기</button><button onclick="fakeAction(this,'전체 보기(팝오버 확장)')">👁 전체 보기</button><button onclick="fakeAction(this,'.md 내려받기')">⬇ 내려받기</button></span>
+                </div>
+                <div class="md-prev">
+                  <h3># 제품 비교표 v3</h3>
+                  <p>| 제품 | 가격 | 지원기간 |\n|---|---|---|\n| A | ... (표 추출이 깨져 열이 밀렸습니다 — 아래 「고치기」로 바로잡을 수 있습니다)</p>
+                </div>
+                <div class="md-edit" id="mdEditB">
+                  <textarea>| 제품 | 가격 | 지원기간 |
+|---|---|---|
+| A제품 | 320만원 | 3년 |
+| B제품 | 410만원 | 5년 |
+
+(원본 표가 추출 과정에서 열이 밀렸던 것을 여기서 바로잡았습니다)</textarea>
+                  <div class="warn">⚠ 이 칸을 고치면 AI가 참고하는 지식(임베딩)도 바뀝니다 — 저장하면 <b>재임베딩이 필요합니다</b>.</div>
+                  <div class="btns"><button class="save" onclick="fakeAction(this,'저장')">💾 저장</button><button class="cancel" onclick="cancelEdit('B')">취소</button></div>
+                </div>
+              </div>
+              <div class="toast" id="toastB"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mock-note">
+      왼쪽 목록에서 두 번째 행(제품_비교표_v3.hwpx)을 눌러 보세요 — "원본 미보관" 배지와 "원본 보관됨 + ⬇ 내려받기"가 <b>같은 「내 문서」 항목 안에서</b> 함께 보이는 걸 확인할 수 있습니다(사장님 지시 반영). 세 번째 행은 예시로만 두고 상호작용을 시연하지 않았습니다.
+    </div>
+  </div>
+
+</div>
+<script>
+  // ── 시연 전용 JS. 네트워크 호출 0건 — 화면 상태 전환만 보여준다(정직 고지 그대로). ──
+  var srcOn = false;
+  function toggleSrc() {
+    srcOn = !srcOn;
+    document.getElementById('srcToggle').classList.toggle('g-on', srcOn);
+    document.getElementById('srcToggleChip').classList.toggle('on', srcOn);
+    document.getElementById('srcTogLbl').textContent = srcOn ? '원본 보관 켜짐' : '원본 보관 꺼짐';
+    var res = document.getElementById('evtResult');
+    var hint = document.getElementById('evtHint');
+    if (srcOn) {
+      res.textContent = '✓ 텍스트(.md) + 원본(PDF·4.1MB) 저장 — 42조각 · 취약점 영역';
+      hint.innerHTML = '⚠ <b>원본 PDF도 서버에 함께 보관했습니다</b> — 법적 증빙·재추출용입니다. 「내 문서 › 🩹 반입」에서 언제든 내려받거나 지울 수 있습니다.';
+    } else {
+      res.textContent = '✓ 텍스트(.md)로 저장 — 42조각 · 취약점 영역 (문서 형식 인식)';
+      hint.textContent = '추출한 텍스트(.md)만 저장했습니다 — 가볍고 내용은 그대로입니다. 원본 PDF는 서버에 남지 않았습니다.';
+    }
+  }
+
+  function selectRow(which) {
+    document.getElementById('rowA').classList.toggle('sel', which === 'A');
+    document.getElementById('rowB').classList.toggle('sel', which === 'B');
+    document.getElementById('detailA').style.display = which === 'A' ? '' : 'none';
+    document.getElementById('detailB').style.display = which === 'B' ? '' : 'none';
+  }
+
+  function startEdit(which) {
+    document.getElementById('mdBox' + which).classList.add('editing');
+    document.getElementById('mdEdit' + which).classList.add('on');
+  }
+  function cancelEdit(which) {
+    document.getElementById('mdBox' + which).classList.remove('editing');
+    document.getElementById('mdEdit' + which).classList.remove('on');
+  }
+  function fakeAction(el, label) {
+    var box = el && el.closest ? el.closest('.detail') : null;
+    var toast = box ? box.querySelector('.toast') : null;
+    if (!toast) return;
+    toast.textContent = '(목업) "' + label + '"은 실제로 동작하지 않습니다 — 승인 후 구현 단계에서 서버 API와 연결합니다.';
+    toast.classList.add('on');
+    setTimeout(function () { toast.classList.remove('on'); }, 3200);
+  }
+</script>
+</body>
+</html>

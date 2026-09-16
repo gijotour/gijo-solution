@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 프로 셸 「접는 도킹 패널」 + 가로세로 모니터 대응</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안: GIJO AS 프로 셸에 「접는 패널(도킹)」 옵션 추가 — 가로세로 모니터 대응판
+  작성: gijo-mockup, 2026-08-19 · 산출물: mockups/프로_도킹패널/시안.html (자체완결, 제품 코드 무변경)
+  개정: 최초안(도킹만 다룸) → 사장님 추가 지시(2026-08-19, "가로세로 모니터 고민 같이해줘")로
+        보조 모니터 자동배치·마지막 선택 기억을 핵심 설계축으로 승격. 아래 §4에 최초안과
+        무엇이·왜 바뀌었는지 정직하게 적었다(뒤집은 결정을 숨기지 않는다).
+
+  ── 설계 전 조사 근거 ─────────────────────────────────────────────────────
+  1) D:\Connect AI\프로셸_외부사례조사_2026-08-19.md (gijo-scout, 22패턴 카탈로그)
+     · 지속형 사이드바 — ChatGPT Atlas, help.openai.com/12628199
+     · 사이드카 패널(토글, 숨겨도 백그라운드 유지) — MS Security Copilot, learn.microsoft.com/copilot/security/experiences
+     · Split-pane 아티팩트 — Claude Artifacts, aiuxplayground.com/teardowns/claude/artifacts
+     · 새 창은 "비교·결합·추적" 명확한 이유 있을 때만 — NN/g, nngroup.com/new-browser-windows-and-tabs
+     · 없는 것 상위 1위: "접고 펴는 패널 옵션 부재 — 팝업뿐"(조사문서 ⓑ1) → 이 시안이 메우는 공백.
+  2) 코드 근거(실제 파일, 읽고 인용 — 제품 코드는 읽기만 했다):
+     · client/src/renderer/pages/app.html:299-305 — 표준 셸이 "화면=팝업"을 버리고 탭으로 간 이유.
+     · client/src/renderer/pages/app.html:186-195 — 세로 모니터 스퀴즈 경고: "본문이 660px만
+       남아 표가 깨진다"(같은 뿌리: 56+644+380=1080, 사장님이 실측한 그 값).
+     · client/src/renderer/pages/app.html:201-206 — `.work.console-side` 그리드 실코드:
+       `grid-template-columns:minmax(0,1fr) var(--console-w,380px)` — 화면=유동, 대화=고정.
+       이 시안(개정판)은 이 구조를 **그대로 재사용**한다(새 그리드를 만들지 않는다, §10).
+     · client/src/renderer/pages/app.html:215-219, 293-295, 879-886 — 콘솔을 다시 붙이는
+       기존 어휘 「⇤ 여기로 다시 붙이기」(`#csBackBtn` → `window.gijo.dockConsoleWindow()`).
+       이 시안의 「⇤ 붙이기」는 같은 어휘를 화면에도 재사용한 것이다(새 낱말을 안 만든다).
+     · client/src/main.ts:784-798 — 팝업 창 크기 규칙(popoutBounds). 760px는 제품이 이미 쓰는
+       "화면이 쓸모 있으려면 최소 이 정도" 상수(`Math.max(760,…)` 두 번, `minWidth:700`).
+     · client/src/main.ts:786, 790, 794 — `screen.getAllDisplays()`·`screen.getDisplayMatching()`가
+       **이미 임포트되어 쓰이고 있다**(main.ts:5) — 보조 모니터 자동배치(§10)에 새 의존성이 필요 없다.
+     · client/src/renderer/pages/app.html:820-876 — 「🗔 창」 열린 창 목록(`listWindows`·`focusWindow`).
+       이 시안의 "다른 모니터에 열림 ↗" 표시(§6)가 재사용할 기존 API.
+  3) 외부 표준(수치 근거): Material Design 3 창 크기 등급(compact&lt;600 / medium 600-840 /
+     expanded 840-1200 / large 1200-1600 / extra-large 1600~) — app.html:186-195행이 이미
+     같은 표준을 인용해 썼다. 대화 고정폭 700px은 medium 상단부에 위치(같은 표준 재사용).
+  4) 실측(사장님 데스크, 2026-08-19 추가 지시): 주모니터 **세로 1080×1920** + 보조 **가로 1920×1080**
+     듀얼. 고객 다수는 **가로 1대**(노트북). 세로에서 분할 시 화면644+대화380 둘 다 좁음(원 실패 사례).
+     가로에서 분할 시 대화~700+패널~1150 성립(이 개정판의 밀도 숫자 §5가 이 근사를 정밀화한다).
+
+  ── 이 파일의 상호작용 범위(정직 고지) ──────────────────────────────────────
+  §6 "실제로 눌러보기"는 진짜 제품이 아니다. 자리표시자 화면·가짜 팝업 박스·가짜 두 번째 모니터로
+  동작을 흉내 낸다. 흉내 낸 곳은 모두 "(시연)"이라 표시했다.
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    line-height:1.62;font-size:14px;}
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 26px 90px;}
+  h1{font-size:22px;margin:0 0 6px;}
+  h2{font-size:16.5px;margin:40px 0 12px;padding-top:14px;border-top:1px solid var(--border);color:#fff;}
+  h2 .no{color:var(--blue-light);margin-right:6px;}
+  h3{font-size:13.75px;margin:18px 0 8px;color:var(--muted);}
+  p{margin:0 0 10px;color:var(--text);}
+  .lead{color:var(--muted);font-size:13px;}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;
+    background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);margin-right:6px;}
+  .tag.ok{background:rgba(30,185,128,.16);border-color:rgba(30,185,128,.4);color:var(--teal);}
+  .tag.rev{background:rgba(240,160,32,.16);border-color:rgba(240,160,32,.45);color:var(--amber);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin:12px 0;}
+  .card.warn{border-color:rgba(240,160,32,.45);background:rgba(240,160,32,.07);}
+  .card.good{border-color:rgba(30,185,128,.4);background:rgba(30,185,128,.06);}
+  .card.rev{border-color:rgba(240,160,32,.45);background:rgba(240,160,32,.05);}
+  code, .code{font-family:"Consolas","Cascadia Code",monospace;font-size:12.25px;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:#ffd479;}
+  pre{font-family:"Consolas","Cascadia Code",monospace;font-size:12px;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;color:#cfe8ff;line-height:1.55;}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.75px;}
+  th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top;}
+  th{background:var(--panel-2);color:var(--muted);font-weight:700;font-size:12px;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  ul{margin:6px 0 10px;padding-left:20px;} li{margin:3px 0;}
+  .src{color:var(--muted-2);font-size:11.5px;}
+  .toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.25px;color:var(--muted);margin:14px 0 4px;}
+  .toc a{color:var(--blue-light);text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:900px){.grid2{grid-template-columns:1fr;}}
+
+  /* ── 밀도 바(비례 시각화, 정적) ───────────────────────────────────────── */
+  .bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border-strong);margin:6px 0 2px;}
+  .bar > div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;color:#fff;}
+  .b-rail{background:#4b4b48;}
+  .b-panel{background:#1eb980;color:#062;}
+  .b-chat{background:#3b6a8f;}
+  .b-none{background:repeating-linear-gradient(45deg,rgba(226,72,61,.35),rgba(226,72,61,.35) 6px,rgba(226,72,61,.15) 6px,rgba(226,72,61,.15) 12px);}
+  .barlabel{font-size:11px;color:var(--muted-2);display:flex;justify-content:space-between;margin-bottom:14px;}
+
+  /* ══════════════════════ §6 인터랙티브 데모 ══════════════════════ */
+  .scenario{margin:22px 0 30px;}
+  .scentitle{font-size:13.5px;font-weight:700;color:#fff;margin-bottom:3px;}
+  .scensub{font-size:11.5px;color:var(--muted-2);margin-bottom:12px;}
+  .demorow{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;}
+  .moncap{text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px;}
+  .moncap b{color:#fff;}
+
+  #monA1{width:340px;height:640px;background:var(--panel-2);border:2px solid var(--border-strong);border-radius:8px;
+    position:relative;overflow:hidden;display:flex;flex-direction:column;font-size:12px;}
+  #monA2{width:520px;height:300px;background:var(--panel-2);border:2px dashed var(--border);border-radius:8px;
+    position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;
+    color:var(--muted-2);transition:border-color .3s,background .3s;}
+  #monA2.filled{border:2px solid var(--blue);align-items:stretch;justify-content:stretch;color:var(--text);}
+  #simB{width:900px;height:480px;background:var(--panel-2);border:2px solid var(--border-strong);border-radius:8px;
+    position:relative;overflow:hidden;display:flex;font-size:12px;}
+
+  .srail{flex:0 0 auto;background:var(--panel-2);border-right:1px solid var(--border);display:flex;flex-direction:column;
+    align-items:center;padding:8px 0;gap:5px;}
+  #monA1 .srail{width:20px;flex-direction:row;padding:0 6px;height:26px;border-right:0;border-bottom:1px solid var(--border);}
+  #simB .srail{width:27px;}
+  .srail button{width:20px;height:20px;border-radius:5px;background:transparent;border:1px solid transparent;color:var(--muted);
+    font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+  .srail button:hover{background:rgba(255,255,255,.08);color:#fff;}
+
+  .swork{flex:1 1 auto;display:flex;min-width:0;position:relative;min-height:0;}
+  .schat{flex:1 1 auto;background:var(--panel);display:flex;flex-direction:column;min-width:0;}
+  .schat .chead{padding:6px 10px;font-size:10.5px;color:var(--muted-2);border-bottom:1px solid var(--border);}
+  .schat .cbody{flex:1 1 auto;padding:10px;display:flex;flex-direction:column;gap:6px;overflow:hidden;}
+  .bubble{max-width:88%;padding:6px 9px;border-radius:8px;font-size:10.5px;background:var(--panel-2);color:var(--muted);}
+  .bubble.me{align-self:flex-end;background:rgba(59,130,246,.18);color:#dbeafe;}
+
+  .sdock{flex:1 1 auto;background:var(--panel);border-right:1px solid var(--border-strong);display:none;
+    flex-direction:column;overflow:hidden;min-width:0;}
+  .sdock.on{display:flex;}
+  .sdock .dhead{flex:0 0 auto;height:24px;display:flex;align-items:center;gap:6px;padding:0 8px;
+    background:var(--panel-2);border-bottom:1px solid var(--border);font-size:10.5px;font-weight:700;}
+  .sdock .dhead .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sdock .dhead button{background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);
+    font-size:9.5px;padding:1px 5px;cursor:pointer;font-family:inherit;}
+  .sdock .dhead button:hover{color:#fff;border-color:var(--blue);}
+  .sdock .dbody{flex:1 1 auto;padding:8px;overflow:hidden;background:repeating-linear-gradient(135deg,rgba(255,255,255,.02),rgba(255,255,255,.02) 10px,transparent 10px,transparent 20px);}
+  .sdock .dbody .ph{font-size:9.5px;color:var(--muted-2);margin-bottom:6px;}
+  .phrow{height:8px;background:rgba(255,255,255,.06);border-radius:3px;margin:5px 0;}
+  .phrow.w60{width:60%;} .phrow.w80{width:80%;} .phrow.w40{width:40%;}
+
+  .spal{position:absolute;z-index:5;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);padding:5px;display:none;min-width:190px;}
+  .spal.on{display:block;}
+  .spal .prow{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:5px;cursor:pointer;font-size:10.5px;}
+  .spal .prow:hover{background:rgba(59,130,246,.16);}
+  .spal .prow.dis{opacity:.55;}
+  .spal .ptag{margin-left:auto;font-size:8.75px;color:var(--teal);white-space:nowrap;}
+  .spal .ptag.no{color:var(--red);}
+  .spal .ptag.mem{color:var(--amber);}
+  .spal .phead{font-size:9.5px;color:var(--muted-2);padding:3px 8px 5px;}
+
+  .spop{position:absolute;z-index:8;background:var(--panel);border:2px solid var(--blue);border-radius:8px;
+    box-shadow:0 16px 40px rgba(0,0,0,.6);display:none;flex-direction:column;overflow:hidden;}
+  .spop.on{display:flex;}
+  .spop .phead2{flex:0 0 auto;height:22px;background:var(--panel-2);display:flex;align-items:center;padding:0 8px;
+    font-size:9.5px;font-weight:700;gap:6px;border-bottom:1px solid var(--border);}
+  .spop .phead2 .x2{margin-left:auto;cursor:pointer;color:var(--muted-2);}
+  .spop .phead2 .x2:hover{color:var(--red);}
+  .spop .pbody2{flex:1;padding:8px;font-size:9.5px;color:var(--muted-2);}
+  .spop .predock{margin:0 8px 8px;background:transparent;border:1px solid var(--blue);border-radius:5px;color:var(--blue-light);
+    font-size:9.5px;padding:3px 6px;cursor:pointer;font-family:inherit;}
+  .spop .predock:disabled{opacity:.4;cursor:not-allowed;border-color:var(--muted-2);color:var(--muted-2);}
+
+  .stoast{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:20;background:#111;color:#fff;
+    font-size:10.5px;padding:6px 12px;border-radius:16px;box-shadow:0 6px 16px rgba(0,0,0,.5);opacity:0;
+    transition:opacity .25s;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis;}
+  .stoast.on{opacity:1;}
+
+  .sfold{position:absolute;left:6px;bottom:6px;z-index:6;background:var(--panel);border:1px solid var(--border-strong);
+    border-radius:14px;padding:3px 10px;font-size:10px;color:var(--muted);cursor:pointer;display:none;gap:4px;align-items:center;}
+  .sfold.on{display:flex;}
+  .sfold:hover{color:#fff;border-color:var(--blue);}
+
+  .prefbadge{position:absolute;top:4px;right:6px;z-index:6;font-size:9.5px;color:var(--amber);
+    background:rgba(240,160,32,.12);border:1px solid rgba(240,160,32,.4);border-radius:10px;padding:2px 8px;display:none;}
+  .prefbadge.on{display:block;}
+
+  .demobtn{background:var(--panel-2);border:1px solid var(--border);border-radius:5px;color:var(--muted);
+    font-size:10.5px;padding:3px 8px;cursor:pointer;font-family:inherit;margin:2px;}
+  .demobtn:hover{color:#fff;border-color:var(--blue);}
+  .democtl{margin-top:8px;}
+
+  footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted-2);font-size:11.5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">시안 · 추천 1개</span><span class="tag ok">mockups/프로_도킹패널/시안.html</span><span class="tag rev">가로세로 모니터 대응 개정판</span>
+  <h1>프로 셸 — 「접는 패널(도킹)」 + 가로세로 모니터 대응</h1>
+  <p class="lead">화면(26종)을 항상 별도 창(팝업)으로 여는 지금 방식에, <b>넓은 본창에서는 대화를 가리지 않는 도킹 패널</b>을,
+    <b>좁은 본창(세로 모니터)에서는 팝업을 보조 모니터로 자동 배치</b>하는 것을 더한다. <b>하나의 규칙이 두 고객을 맞춘다</b> —
+    사장님의 세로+가로 듀얼 모니터도, 고객 다수의 노트북 1대도 설정 없이 각자에게 맞게 동작한다.</p>
+
+  <div class="toc">
+    <a href="#s1">① 배경(실측 환경)</a>
+    <a href="#s2">② 핵심 결정(요약)</a>
+    <a href="#s3">③ 규칙 — 도킹·팝업·보조모니터·기억</a>
+    <a href="#s4">④ 왜 이 안인가 · 최초안에서 무엇이 바뀌었나</a>
+    <a href="#s5">⑤ 밀도 숫자(두 시나리오)</a>
+    <a href="#s6">⑥ 실제로 눌러보기(시연)</a>
+    <a href="#s7">⑦ 공존 규칙 · 기술 근거</a>
+    <a href="#s8">⑧ 무엇을 포기했나</a>
+    <a href="#s9">⑨ 제품 원칙 자가점검</a>
+    <a href="#s10">⑩ 구현 참고(메인 에이전트용)</a>
+  </div>
+
+  <!-- ══════════════════════ §1 배경 ══════════════════════ -->
+  <h2 id="s1"><span class="no">①</span>배경(실측 환경)</h2>
+  <div class="card">
+    <p><b>사장님 책상</b> — 주모니터 <b>세로 1080×1920</b> + 보조 <b>가로 1920×1080</b> 듀얼. 본창은 보통 세로 모니터에 있다.
+      <b>고객 다수</b> — 노트북/가로 모니터 <b>1대</b>. 두 환경은 서로 반대다: 사장님은 모니터가 둘이라 "화면을 다른 데로
+      보낼" 여지가 있고, 고객은 모니터가 하나뿐이라 그 여지가 없다.</p>
+    <p>실측: 세로(내부 폭 1024)에서 화면·대화를 나란히 두면 <b>644px + 380px, 둘 다 좁다</b> — 이게 프로 셸이 애초
+      팝업을 택한 이유(app.html:186-195). 반대로 가로(내부 폭 1864)에서는 <b>대화 700 + 패널 1150 정도로 성립</b>한다
+      (사장님 실측 근사치 — §5에서 정밀화).</p>
+  </div>
+
+  <!-- ══════════════════════ §2 핵심 결정 ══════════════════════ -->
+  <h2 id="s2"><span class="no">②</span>핵심 결정(요약)</h2>
+  <div class="card good">
+    <ol style="margin:0;padding-left:20px;">
+      <li><b>안전 하한(절대 규칙)</b> — 본창 내부 폭(창폭−레일56) <b>&lt; 1400px</b>이면 화면은 <b>무조건 팝업</b>이다.
+        이 하한은 사용자의 「기억된 선택」으로도 못 뒤집는다 — 세로 모니터 스퀴즈 재발을 막는 마지막 방어선.</li>
+      <li><b>보조 모니터 자동 배치</b> — 본창이 좁은 디스플레이(세로 등)에 있고 <b>다른 디스플레이가 있으면</b>,
+        팝업은 그 다른 디스플레이(가로 쪽 우선)의 작업영역에 뜬다. 모니터가 하나뿐이면 지금과 동일(같은 화면 절반 분할).</li>
+      <li><b>내부 폭 ≥ 1400px</b>이면 도킹이 기본이다 — 화면(패널)은 <b>유동폭</b>, 대화는 <b>고정 700px</b>
+        (표준 셸의 <code>.work.console-side</code> 그리드를 그대로 재사용, §10). 도킹 슬롯은 1개.</li>
+      <li><b>⧉ 창으로 / ⇤ 붙이기</b>로 언제든 반전할 수 있고, <b>이 반전은 기억된다</b>(안전 하한 위에서만 적용 —
+        폭이 부족해지면 기억이 있어도 팝업으로 되돌아간다).</li>
+      <li><b>"하나의 규칙이 두 고객을 맞춘다"</b> — 사장님(듀얼, 세로 본창)은 무설정으로 세로=대화 전용·화면은
+        보조 가로 모니터에 자동으로 뜬다. 고객(가로 1대)은 무설정으로 도킹이 기본이라 창 관리 부담이 0이다.
+        같은 코드 한 벌, 같은 폭 규칙 하나가 두 경우를 각자 맞게 처리한다 — 프로필을 나누지 않는다.</li>
+    </ol>
+  </div>
+
+  <!-- ══════════════════════ §3 규칙 ══════════════════════ -->
+  <h2 id="s3"><span class="no">③</span>규칙 — 도킹·팝업·보조모니터·기억</h2>
+  <p>☰(Ctrl+K)에서 화면을 고를 때마다 이 순서로 판단한다:</p>
+  <pre>1. 그 화면이 이미 도킹돼 있다            → 그 패널을 강조(포커스)만 한다.
+2. 그 화면이 이미 팝업으로 떠 있다         → 그 창을 포커스한다(기존 동작, 무변경).
+3. 도킹 슬롯이 다른 화면으로 차 있다        → 팝업으로 연다(안내 토스트).
+4. 내부 폭 &lt; 1400px                     → 팝업으로 연다. ★기억이 있어도 이 규칙이 이긴다(안전 하한).
+5. 내부 폭 ≥ 1400px, 기억된 선택 = "팝업"   → 팝업으로 연다(사용자가 마지막에 그렇게 반전했다).
+6. (그 외 — 폭 충분 + 기억 없음 또는 "도킹") → 도킹한다.
+
+  ※ 팝업을 열 때(1~5의 어느 경로든), 본창이 있는 디스플레이가 "좁은" 쪽(내부 폭 &lt;1400 상당)이고
+    다른 디스플레이가 있으면 그 디스플레이(가로 쪽 우선)에 배치한다. 없으면 기존과 동일(같은 화면 절반).</pre>
+  <p class="src">1400px 근거: 대화 고정폭 700(사장님 실측 근사 + MD3 medium 등급 상단) + 화면 최소 유용폭
+    ≈700(경계에서는 팬널·대화가 동률, §5의 경계값 caveat 참조) — 정확히는 main.ts의 기존 상수 760과
+    약간의 여유차가 있어 §8에 캐벗을 남겼다.</p>
+
+  <!-- ══════════════════════ §4 왜 이 안 · 최초안 대비 변경 ══════════════════════ -->
+  <h2 id="s4"><span class="no">④</span>왜 이 안인가 · 최초안에서 무엇이 바뀌었나</h2>
+  <div class="card rev">
+    <p style="margin:0 0 6px;"><b>정직한 정정</b> — 최초안(이 파일의 이전 버전)은 "선택을 기억하면 좁은 모니터에서
+      다시 스퀴즈가 재발한다"는 이유로 <b>기억을 아예 없앴다</b>(모드 C로 분류해 기각). 사장님 지시로 실제 사용 환경
+      (듀얼 모니터, 보조 모니터로 화면을 돌려보낼 수 있음)을 반영하니 그 우려가 <b>다르게 해소된다</b>는 것을 확인했다:</p>
+    <p style="margin:0;">기억이 위험했던 이유는 "폭이 부족해도 기억된 값이 그걸 덮어쓴다"는 데 있었다. 그래서 이번
+      개정은 <b>안전 하한(폭&lt;1400 → 항상 팝업)을 기억보다 우선순위가 높은 절대 규칙으로 못박았다</b> — 기억은 그
+      하한 <b>위에서만</b> 작동한다. 이러면 "기억하되 재발하지 않는다"가 동시에 성립한다. 최초안의 우려 자체는
+      틀리지 않았다(그래서 하한을 없애지 않았다) — 다만 "기억 자체를 금지"가 아니라 "기억의 적용 범위를 좁히는"
+      해법이 있었다는 것을 놓쳤었다.</p>
+  </div>
+  <table>
+    <tr><th style="width:16%">대안</th><th>기각 이유(근거)</th></tr>
+    <tr><td><b>A. 항상 도킹만</b></td>
+      <td>세로 1080에서 56+644+380=1080 스퀴즈 재현(app.html:186-195, 실측과 동일) — 애초 팝업을 택한 이유를
+        정면으로 되살리므로 기각.</td></tr>
+    <tr><td><b>B. 항상 팝업만</b><br><span class="src">(현재 5.27.0)</span></td>
+      <td>업계 최신(사이드카·지속형 사이드바)과 가장 벌어진 지점을 방치. 듀얼 모니터가 있어도 사용자가 매번
+        수동으로 창을 다른 모니터로 끌어야 한다 — 자동배치가 없으면 사장님 환경의 이점을 못 쓴다.</td></tr>
+    <tr><td><b>C. 기억을 아예 안 둔다</b><br><span class="src">(최초안의 결정)</span></td>
+      <td>안전하지만 "⧉ 창으로/⇤ 붙이기"를 매번 눌러야 해서 "마지막 선택을 존중한다"는 상식적 기대를 저버린다.
+        위 정정 카드에서 설명한 대로, <b>하한을 지키면서도 기억할 수 있음</b>을 확인해 폐기.</td></tr>
+    <tr><td><b>D. 안전 하한 + 그 위에서 기억 + 보조모니터 자동배치</b> <span class="tag ok">채택</span></td>
+      <td>A의 재발 위험(하한으로 차단) · B의 업계 격차(도킹+자동배치로 메움) · C의 불편(기억으로 해소)을
+        모두 만족한다. "하나의 규칙이 두 고객을 맞춘다" — 프로필 분기 없이 폭과 디스플레이 배치만 본다.</td></tr>
+  </table>
+
+  <!-- ══════════════════════ §5 밀도 숫자 ══════════════════════ -->
+  <h2 id="s5"><span class="no">⑤</span>밀도 숫자(두 시나리오)</h2>
+
+  <h3>ⓐ 세로 본창(사장님 듀얼 모니터) — 모니터1(본창, 세로 1080폭) + 모니터2(보조, 가로 1920×1080)</h3>
+  <div class="bar">
+    <div class="b-rail" style="width:56px;font-size:9px;">56</div>
+    <div class="b-chat" style="flex:1;">대화 1024px — 모니터1 전체(도킹 없음, 축소 없음)</div>
+  </div>
+  <div class="barlabel"><span>모니터1(내부 폭 1024 &lt; 1400 → 도킹 절대 비활성)</span><span>대화 폭 증감 0px</span></div>
+  <div class="bar">
+    <div class="b-panel" style="width:100%;">화면 팝업 — 모니터2 작업영역 거의 전체(여백 20px씩) ≈ 1880×1000px</div>
+  </div>
+  <div class="barlabel"><span>모니터2는 화면 전용이 된다 — 본창과 겹치지 않음(자동 배치)</span><span>기존(같은 모니터 절반) 대비 화면 폭 +840px 이상</span></div>
+
+  <h3>ⓑ 가로 본창(고객 1대, 예: 1920×1080 단일 모니터) — 도킹 기본</h3>
+  <div class="bar">
+    <div class="b-rail" style="width:56px;">56</div>
+    <div class="b-panel" style="width:598px;">패널(화면) 1164px — 유동</div>
+    <div class="b-chat" style="width:362px;">대화 700px — 고정</div>
+  </div>
+  <div class="barlabel"><span>56(레일) + 1164(패널) + 700(대화) = 1920</span><span>대화 홈(도킹 전, 1864px) 대비 −1164px(−62.4%) — 화면이 늘어난 만큼 대화가 준다</span></div>
+
+  <table>
+    <tr><th>항목</th><th>ⓐ 세로 본창(모니터1)</th><th>ⓐ 화면 팝업(모니터2)</th><th>ⓑ 가로 본창(도킹)</th></tr>
+    <tr><td>디스플레이 폭</td><td class="num">1080px</td><td class="num">1920px</td><td class="num">1920px</td></tr>
+    <tr><td>레일(고정, 무변경)</td><td class="num">56px</td><td class="num">—</td><td class="num">56px</td></tr>
+    <tr><td>내부 폭</td><td class="num">1024px</td><td class="num">—</td><td class="num">1864px</td></tr>
+    <tr><td>1400px 하한 통과</td><td class="num">아니오</td><td class="num">해당없음(별도 창)</td><td class="num">예</td></tr>
+    <tr><td>결과 폭</td><td class="num">대화 1024</td><td class="num">화면 ≈1880</td><td class="num">패널 1164 / 대화 700</td></tr>
+  </table>
+  <div class="card warn">
+    <p style="margin:0;"><b>경계값 caveat(정직 고지)</b> — 정확히 1400 경계에서는 대화 700 고정이면 패널이
+      700px로, main.ts가 이미 쓰는 화면 최소 유효폭 <b>760</b>보다 <b>−60px(−7.9%)</b> 작다. 사장님이 준 수치가
+      "~1400"·"~700"으로 근사값이라 이 정도 오차는 받아들였다. 더 정밀하게 맞추려면 하한을 <b>1460</b>으로
+      올리는 안이 있다(700+760) — 실사용 데이터가 쌓인 뒤 조정 여지로 남긴다(§8).</p>
+  </div>
+
+  <!-- ══════════════════════ §6 시연 ══════════════════════ -->
+  <h2 id="s6"><span class="no">⑥</span>실제로 눌러보기 <span class="src">— 아래는 축소 그림이며 모든 내용은 (시연)입니다. 진짜 화면·데이터가 아닙니다.</span></h2>
+
+  <div class="scenario">
+    <div class="scentitle">ⓐ 세로 본창 — 사장님 듀얼 모니터 재현</div>
+    <div class="scensub">모니터1(본창, 세로 1080폭)에서 ☰로 화면을 고르면 → 항상 팝업 → 모니터2(보조, 가로)로 자동 배치됩니다. 도킹은 이 시나리오에서 절대 비활성입니다.</div>
+    <div class="demorow">
+      <div>
+        <div class="moncap"><b>모니터1</b> · 본창(세로, 축소)</div>
+        <div id="monA1">
+          <div class="srail">
+            <button id="b-menu" title="☰ 화면 고르기(Ctrl+K)">☰</button>
+            <button title="🕘">🕘</button><button title="⭐">⭐</button>
+            <button id="b-home" title="💬 대화 홈">💬</button>
+          </div>
+          <div class="swork" id="b-work">
+            <div class="schat" style="flex:1;">
+              <div class="chead">대화 · 전폭(폭 부족 — 도킹 절대 비활성)</div>
+              <div class="cbody">
+                <div class="bubble">발견된 새 취약점 있어?</div>
+                <div class="bubble me">신규 3건, 그중 KEV 1건 …</div>
+              </div>
+            </div>
+            <div class="spal" id="b-pal"></div>
+            <div class="stoast" id="b-toast"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="moncap"><b>모니터2</b> · 보조(가로, 축소) — 화면 전용</div>
+        <div id="monA2">아직 열린 화면이 없습니다</div>
+      </div>
+    </div>
+    <div class="democtl"><button class="demobtn" onclick="demoResetB()">시연 초기화</button></div>
+  </div>
+
+  <div class="scenario">
+    <div class="scentitle">ⓑ 가로 본창 — 고객 1대(단일 모니터, 가로 1920)</div>
+    <div class="scensub">내부 폭 1864 ≥ 1400 → 도킹이 기본입니다. ⧉ 창으로 누르면 팝업으로 반전되고, 그 선택이 기억됩니다(다음에 다시 열면 팝업이 먼저 뜹니다) — ⇤ 붙이기로 다시 되돌릴 수 있습니다.</div>
+    <div class="moncap"><b>단일 모니터</b>(가로, 축소)</div>
+    <div id="simB">
+      <div class="srail">
+        <button id="a-menu" title="☰ 화면 고르기(Ctrl+K)">☰</button>
+        <button title="🕘">🕘</button><button title="⭐">⭐</button>
+        <button id="a-home" title="💬 대화 홈으로">💬</button>
+      </div>
+      <div class="swork" id="a-work">
+        <div class="sdock" id="a-dock">
+          <div class="dhead"><span class="nm" id="a-dockname">—</span>
+            <button id="a-pop" title="⧉ 창으로 빼기(반전, 기억됨)">⧉ 창으로</button>
+            <button id="a-fold" title="✕ 접기(상태 유지)">✕ 접기</button>
+          </div>
+          <div class="dbody"><div class="ph">(시연) 자리표시자 — 실제 화면 아님 · 패널 1164px</div>
+            <div class="phrow w80"></div><div class="phrow w60"></div><div class="phrow w40"></div>
+            <div class="phrow w80"></div><div class="phrow w60"></div>
+          </div>
+        </div>
+        <div class="schat">
+          <div class="chead">대화 · <span id="a-chatw">전폭</span></div>
+          <div class="cbody">
+            <div class="bubble">이 자산의 조치 현황 알려줘</div>
+            <div class="bubble me">우선순위 상 3건 대기 중입니다 …</div>
+          </div>
+          <div class="prefbadge" id="a-prefbadge">기억됨: 팝업 우선</div>
+        </div>
+        <div class="spal" id="a-pal"></div>
+        <div class="spop" id="a-popwin" style="right:20px;top:20px;width:230px;height:150px;">
+          <div class="phead2"><span id="a-popname">—</span><span class="x2" id="a-popclose">✕</span></div>
+          <div class="pbody2">(시연) 별도 OS 창처럼 보이는 자리표시자입니다.</div>
+          <button class="predock" id="a-redock">⇤ 붙이기</button>
+        </div>
+        <div class="sfold" id="a-foldchip">📎 접힘: <span id="a-foldname">—</span> · 다시 열기</div>
+        <div class="stoast" id="a-toast"></div>
+      </div>
+    </div>
+    <div class="democtl">
+      <button class="demobtn" onclick="demoResetA()">시연 초기화</button>
+      <button class="demobtn" onclick="clearPrefA()">기억만 초기화</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ §7 공존 규칙 · 기술근거 ══════════════════════ -->
+  <h2 id="s7"><span class="no">⑦</span>공존 규칙 · 기술 근거</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0;">도킹 슬롯 = 1개 (탭 부활 금지)</h3>
+      <p>프로 셸은 2026-08-19 P2 수리로 "탭 개념 없음"을 명문화했다(app.html:56 주석). 도킹 패널을 여러 개
+        허용하면 그 결정을 조용히 뒤집는 것과 같다. 슬롯이 차 있으면 새 화면은 팝업으로 보낸다(§3 규칙3).</p>
+      <h3>접기 = 숨김, 버림 아님</h3>
+      <p>✕ 접기는 iframe을 지우지 않는다 — 기존 탭이 쓰는 <code>.screen{display:none}</code>과 정확히 같은
+        메커니즘. 사이드카 패턴(MS Security Copilot: "숨겨도 백그라운드 유지")과 일치한다.</p>
+    </div>
+    <div class="card good">
+      <h3 style="margin-top:0;">기술 장점 — 배관이 "그대로" 통한다(코드로 확인함)</h3>
+      <p>app.html:706-707의 <code>활성탭안인가()</code>는 <code>active.frame</code>만 보고 postMessage 출처를
+        판정한다. 도킹 화면을 표준 탭과 <b>같은 방식</b>으로 열면 📌 선택칩·🗂 범위·gijo:view가
+        <b>코드 수정 없이</b> 그대로 동작한다.</p>
+      <p>팝업(별도 OS 창)은 <code>onShellBridge</code>로 메인 프로세스를 거쳐야 한다(오늘 P4로 수리한 다리) —
+        보조 모니터 자동배치를 써도 이 배관 자체는 그대로다(창 위치만 바뀔 뿐, 메시지 경로는 안 바뀐다).</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0;">같은 화면을 도킹 + 팝업 동시에?</h3>
+    <p><b>금지한다.</b> 이미 도킹된 화면을 다시 고르면 패널을 강조만 한다. 서로 <b>다른</b> 화면을 하나는 도킹,
+      하나는(자동배치로 다른 모니터에) 팝업으로 동시에 여는 것은 허용한다 — 상태 충돌이 없다. NN/g 원칙
+      ("새 창은 비교·결합·추적이 명확할 때만")과 일치.</p>
+  </div>
+
+  <!-- ══════════════════════ §8 포기한 것 ══════════════════════ -->
+  <h2 id="s8"><span class="no">⑧</span>무엇을 포기했나</h2>
+  <ul>
+    <li><b>다중 도킹 슬롯</b> — 여러 화면을 동시에 나란히 도킹(탭 부활과 같아지므로).</li>
+    <li><b>손잡이로 폭 조절</b> — 표준 셸 콘솔의 기존 이유(app.html:604-608, iframe이 매번 다시 그려져 버벅임) 그대로.</li>
+    <li><b>1400px 근처의 정밀 조정(경계값 caveat, §5)</b> — 1460으로 올리는 안을 검토했지만, 사장님이 준 "~1400"에
+      가장 가깝게 우선 맞췄다. 실사용 데이터가 쌓이기 전에는 더 다듬지 않는다.</li>
+    <li><b>3개 이상 모니터의 정밀 매칭</b> — 보조 디스플레이가 여럿이면 "가로 쪽 중 가장 넓은 것"까지만 고른다.
+      "본창과 나란히·특정 위치" 같은 세밀한 배치는 하지 않는다(우선 자동배치가 되는 것 자체가 개선).</li>
+    <li><b>동시 도킹+팝업(같은 화면)</b> — §7에서 금지로 결정.</li>
+    <li><b>창 크기 변경 중 자동 재판정</b> — 이미 도킹된 화면은 창을 좁혀도 도중에 뺏지 않는다. 판정은
+      <b>여는 순간에만</b> 한다(작업 중 놀라게 하지 않는다).</li>
+  </ul>
+
+  <!-- ══════════════════════ §9 원칙 자가점검 ══════════════════════ -->
+  <h2 id="s9"><span class="no">⑨</span>제품 원칙 자가점검</h2>
+  <table>
+    <tr><th style="width:20%">원칙</th><th>점검</th></tr>
+    <tr><td>정직한 구현</td><td>§6의 모든 상호작용은 "(시연)"으로 표시했다. 동작하지 않는 것을 동작하는 척하지 않았다.</td></tr>
+    <tr><td>입력은 대화창에서만</td><td>도킹 패널·보조모니터 팝업 모두 새 입력칸을 추가하지 않는다 — 대화창이
+      유일한 지시 창구라는 원칙이 그대로 유지된다.</td></tr>
+    <tr><td>단일 출처</td><td>도킹 가능 여부·기억 판단은 함수 하나(§10)에서만 읽는다. 화면 이름은 지금과 같이
+      nav.js GROUPS에서만 읽는다(새 이름표를 만들지 않음). 디스플레이 판정은 이미 쓰이던
+      <code>screen.getDisplayMatching</code> 하나를 재사용한다(새 판정 로직을 따로 안 만듦).</td></tr>
+    <tr><td>무변경 원칙(요청 준수)</td><td>레일 56px·아이콘 4개, 결재판, 📌 선택/🗂 범위 배관 — 전부 그대로다.</td></tr>
+  </table>
+
+  <!-- ══════════════════════ §10 구현 참고 ══════════════════════ -->
+  <h2 id="s10"><span class="no">⑩</span>구현 참고(메인 에이전트용 — 승인 후)</h2>
+  <div class="card">
+    <h3 style="margin-top:0;">1) 도킹 CSS — 새 그리드를 만들지 않는다, 기존 <code>.work.console-side</code> 재사용</h3>
+    <pre>/* app.html:201-206의 .work.console-side는 이미 "화면=유동, 대화=고정 var(--console-w,380px)"다.
+   프로가 화면을 도킹할 때 이 클래스를 강제로 붙이고 --console-w만 700으로 올린다.
+   SIDE_KEY/자리적용()은 건드리지 않는다(표준 셸 전용으로 남긴다 — 무변경 원칙). */
+function dock(page, label) {
+  // 표준 탭 open()의 본문(522-539행)과 동일하게 tabs.push()·embedSrc·active=t
+  ... // (표준 open()과 같은 tabs[] 등록 — 이래야 §7의 배관 재사용이 성립)
+  var work = document.querySelector(".work");
+  work.classList.add("console-side");           // 기존 CSS 그대로 사용
+  work.style.setProperty("--console-w", "700px"); // 표준 380과 다른 값(프로 전용)
+  document.body.classList.add("pro-docked");      // chat-home 해제는 tabs.length>0이 자동 처리
+}</pre>
+    <p>화면 이름·⧉/⇤ 버튼을 보여줄 작은 헤더(24px)가 필요하다 — 탭줄(<code>.shellfoot</code>)이 프로에서
+      숨겨져 있으므로, <code>#screens</code> 앞에 <code>.dockhead</code>를 하나 두는 정도의 작은 DOM 추가가 필요하다.</p>
+
+    <h3>2) <code>open()</code> 프로 분기(app.html:493-503) — §3 규칙을 그대로 코드화</h3>
+    <pre>function 내부폭() { return window.innerWidth - 56; }
+function 폭충분한가() { return 내부폭() >= 1400; }
+function 기억된선택() { try { return localStorage.getItem("gijo:pro:dockpref:v1"); } catch(e){ return null; } }
+
+if (프로인가()) {
+  if (dockedTab && dockedTab.page === page) { 도킹패널강조(); return; }              // 규칙1
+  if (window.gijo.isPopoutOpen && window.gijo.isPopoutOpen(page)) {                  // 규칙2
+    window.gijo.openShellPopout(page, label); return;
+  }
+  if (dockedTab && dockedTab.page !== page) {                                        // 규칙3
+    window.gijo.openShellPopout(page, label);
+    toast("이미 도킹된 화면이 있어 새 창으로 엽니다"); return;
+  }
+  if (!폭충분한가()) { window.gijo.openShellPopout(page, label); return; }            // 규칙4(하한, 기억보다 우선)
+  if (기억된선택() === "popup") { window.gijo.openShellPopout(page, label); return; }  // 규칙5
+  dock(page, label);                                                                  // 규칙6
+}</pre>
+    <h3>3) 헤더 버튼 — 기존 어휘 재사용</h3>
+    <ul>
+      <li><b>⧉ 창으로</b> — 기존 <code>tbPopout</code>과 동일 호출 후 <code>undock()</code> +
+        <code>localStorage.setItem("gijo:pro:dockpref:v1","popup")</code>.</li>
+      <li><b>⇤ 붙이기</b> — 콘솔의 기존 <code>#csBackBtn</code>/<code>dockConsoleWindow()</code>(app.html:215-219,
+        879-886)과 <b>같은 어휘를 화면에 재사용</b>. 팝업창(별도 BrowserWindow) 안에 작은 버튼으로 두고,
+        새 IPC <code>shell:dockBack(page)</code>가 본창에 "이 화면을 도킹해 달라"고 요청 → 본창이 §3 규칙4를
+        먼저 검사(폭 부족하면 붙이기를 거절하고 이유를 설명 — 안전 하한은 사용자 조작으로도 못 뚫는다).
+        성공 시 <code>localStorage.setItem(...,"dock")</code>.</li>
+    </ul>
+    <h3>4) main.ts — 보조 모니터 자동 배치(popoutBounds 확장, main.ts:784-798)</h3>
+    <pre>function popoutBounds(portrait, ref) {
+  const base = ref ?? (mainWindow && !mainWindow.isDestroyed() ? mainWindow.getBounds() : undefined);
+  const refDisplay = base ? screen.getDisplayMatching(base) : screen.getPrimaryDisplay(); // 기존 함수 재사용(790,794행)
+  const refNarrow = refDisplay.workAreaSize.width - 56 < 1400;   // 본창이 좁은 디스플레이에 있는가
+  if (refNarrow) {
+    const others = screen.getAllDisplays().filter(d => d.id !== refDisplay.id);           // 기존 함수 재사용(786행)
+    if (others.length) {
+      const landscape = others
+        .filter(d => d.workAreaSize.width > d.workAreaSize.height)
+        .sort((a, b) => b.workAreaSize.width - a.workAreaSize.width)[0];
+      const target = landscape || others[0];
+      const wa = target.workArea;
+      return { x: wa.x + 20, y: wa.y + 20, width: wa.width - 40, height: wa.height - 40 };
+    }
+  }
+  // ── 여기부터 기존 코드(변경 없음): 단일 모니터 · 본창이 이미 넓은 디스플레이인 경우 ──
+  ...(기존 popoutBounds 본문 그대로)
+}</pre>
+    <p>단일 모니터(<code>others.length===0</code>)에서는 위 분기를 안 타므로 <b>기존 동작이 그대로 보존</b>된다 —
+      회귀 없음. 표준 셸의 「⧉ 창으로」도 같은 함수를 쓰므로 이 개선을 자동으로 물려받는다(부작용 아님).</p>
+
+    <h3>5) "다른 모니터에 열림 ↗" 표시</h3>
+    <p>새로 추적 코드를 만들지 않는다 — 기존 <code>window.gijo.listWindows()</code>(app.html:826-834)가 이미
+      각 팝업 창 정보를 준다. 그 창의 <code>getBounds()</code>가 속한 디스플레이가 본창의 디스플레이와 다르면
+      "↗ 다른 모니터"로 표시하고, 클릭 시 기존 <code>focusWindow(id)</code>를 그대로 호출한다.</p>
+
+    <h3>6) 저장 키</h3>
+    <ul>
+      <li><b>신규</b> <code>gijo:pro:dockpref:v1</code> = <code>"dock"</code> | <code>"popup"</code>
+        (없으면 자동/폭규칙). <b>불변식: 내부 폭&lt;1400이면 이 값이 무엇이든 무시하고 팝업</b>(§3 규칙4가
+        규칙5보다 먼저 검사됨 — 순서가 안전성의 전부다).</li>
+      <li><code>gijo:tabs:v1</code>·<code>gijo:console:side</code>(SIDE_KEY) — 프로 미사용, 무변경(기존 결정 계승).</li>
+      <li>도킹 자체의 열림/접힘 상태 — 세션 한정, 재시작 시 초기화(app.html:912 "프로는 저장 탭을 복원하지
+        않는다" 결정과 같은 방향). <b>기억되는 것은 오직 "도킹 vs 팝업" 선호 하나뿐</b>이다.</li>
+    </ul>
+    <h3>7) 시험(제안)</h3>
+    <ul>
+      <li>폭 경계(내부 폭 1399/1400/1460) × 기억값(dock/popup/없음) 조합 소스 감시 — 규칙4가 항상 규칙5보다
+        먼저 검사되는지(안전 하한 우회 불가) 회귀로 고정.</li>
+      <li><code>popoutBounds</code>는 Electron 앱 전체 기동 없이, 순수 함수로 분리해 가짜 디스플레이 배열
+        [{width:1080,portrait},{width:1920,landscape}] 두 벌을 넣어 유닛 시험(가능하면 vitest).</li>
+    </ul>
+  </div>
+
+  <footer>
+    시안 작성: gijo-mockup · 2026-08-19(최초안) → 같은 날 가로세로 모니터 대응 개정. 제품 코드는 읽기만 했고
+    수정하지 않았다(client/src/renderer/pages/app.html, client/src/main.ts, client/src/renderer/pages/nav.js 열람).
+    근거 문서: 프로셸_외부사례조사_2026-08-19.md. 이 파일은 외부 CDN·웹폰트·원격 이미지를 쓰지 않으며
+    더블클릭으로 오프라인에서 열린다.
+  </footer>
+</div>
+
+<script>
+  // ════════ (시연) 전용 스크립트 — 제품 코드와 무관, 이 문서 안에서만 동작 ════════
+  var SCREENS = ["자산 고르기","발견·수집","우선순위","조치","검증","보고","AI","보안제품","기록"];
+  var stA = { docked: null, folded: false, pref: null };   // 시나리오 ⓑ(가로, 단일 모니터)
+  var stB = { onMon2: null };                               // 시나리오 ⓐ(세로, 듀얼 모니터)
+
+  function el(id) { return document.getElementById(id); }
+  function toast(prefix, msg) {
+    var t = el(prefix + "-toast");
+    t.textContent = msg; t.classList.add("on");
+    clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("on"); }, 2400);
+  }
+
+  // ── ⓑ 가로 본창(단일 모니터) — 도킹 + 기억 ─────────────────────────────
+  function buildPaletteA() {
+    var pal = el("a-pal");
+    var html = '<div class="phead">화면 고르기 (시연) — 도킹 기본, 기억: ' + (stA.pref || "없음") + '</div>';
+    SCREENS.forEach(function (name) {
+      var dockedHere = stA.docked === name;
+      var tag = dockedHere ? '<span class="ptag">도킹됨</span>'
+        : (stA.pref === "popup" ? '<span class="ptag mem">기억됨: 팝업</span>' : '<span class="ptag">도킹 가능(기본)</span>');
+      html += '<div class="prow" onclick="pickA(\'' + name + '\')"><span>' + name + '</span>' + tag + '</div>';
+    });
+    pal.innerHTML = html;
+  }
+  el("a-menu").addEventListener("click", function (e) { e.stopPropagation(); buildPaletteA(); el("a-pal").classList.toggle("on"); });
+
+  function pickA(name) {
+    el("a-pal").classList.remove("on");
+    if (stA.docked === name) { flashDockA(); toast("a", '"' + name + '"은(는) 이미 도킹되어 있습니다'); if (stA.folded) unfoldA(); return; }
+    if (stA.docked && stA.docked !== name) { openPopupA(name); toast("a", "이미 도킹된 화면이 있어 새 창으로 엽니다"); return; }
+    if (stA.pref === "popup") { openPopupA(name); toast("a", "기억된 선택(팝업)을 따릅니다 — ⇤ 붙이기로 되돌릴 수 있습니다"); return; }
+    dockA(name);
+  }
+  function dockA(name) {
+    stA.docked = name; stA.folded = false;
+    el("a-dockname").textContent = name;
+    el("a-dock").classList.add("on");
+    el("a-chatw").textContent = "700px(고정, 도킹 중)";
+    el("a-foldchip").classList.remove("on");
+  }
+  function flashDockA() {
+    var d = el("a-dock"); d.style.outline = "2px solid var(--blue)";
+    setTimeout(function () { d.style.outline = "none"; }, 500);
+  }
+  function unfoldA() {
+    stA.folded = false; el("a-dock").classList.add("on"); el("a-foldchip").classList.remove("on");
+    el("a-chatw").textContent = "700px(고정, 도킹 중)";
+  }
+  el("a-fold").addEventListener("click", function () {
+    if (!stA.docked) return;
+    stA.folded = true; el("a-dock").classList.remove("on");
+    el("a-chatw").textContent = "전폭(접힘 — 상태는 유지)";
+    el("a-foldname").textContent = stA.docked; el("a-foldchip").classList.add("on");
+    toast("a", "접었습니다 — 화면 상태는 그대로 살아 있습니다(다시 그리지 않음)");
+  });
+  el("a-foldchip").addEventListener("click", function () { unfoldA(); toast("a", "다시 폈습니다 — 리로드 없음"); });
+
+  function openPopupA(name) {
+    el("a-popname").textContent = "⧉ " + name;
+    el("a-popwin").classList.add("on");
+    el("a-redock").disabled = false; // 이 시나리오는 항상 폭 충분(가로 단일 모니터) → 붙이기 가능
+  }
+  el("a-pop").addEventListener("click", function () {
+    if (!stA.docked) return;
+    var name = stA.docked;
+    el("a-dock").classList.remove("on"); stA.docked = null; stA.folded = false;
+    el("a-chatw").textContent = "전폭"; el("a-foldchip").classList.remove("on");
+    stA.pref = "popup"; el("a-prefbadge").classList.add("on");
+    openPopupA(name);
+    toast("a", '"' + name + '"을(를) 창으로 옮겼습니다 — 이 선택이 기억됩니다');
+  });
+  el("a-redock").addEventListener("click", function () {
+    var name = el("a-popname").textContent.replace("⧉ ", "");
+    el("a-popwin").classList.remove("on");
+    stA.pref = "dock"; el("a-prefbadge").classList.remove("on");
+    dockA(name);
+    toast("a", '"' + name + '"을(를) 다시 붙였습니다 — 기억이 "도킹"으로 바뀌었습니다');
+  });
+  el("a-popclose").addEventListener("click", function () { el("a-popwin").classList.remove("on"); });
+  el("a-home").addEventListener("click", function () {
+    stA.docked = null; stA.folded = false;
+    el("a-dock").classList.remove("on"); el("a-foldchip").classList.remove("on");
+    el("a-chatw").textContent = "전폭";
+    toast("a", "대화 홈으로 — 도킹된 화면을 닫았습니다(기억은 유지됩니다)");
+  });
+  function clearPrefA() { stA.pref = null; el("a-prefbadge").classList.remove("on"); toast("a", "기억을 초기화했습니다 — 다음부터 다시 도킹이 기본입니다"); }
+  function demoResetA() {
+    stA = { docked: null, folded: false, pref: null };
+    el("a-dock").classList.remove("on"); el("a-foldchip").classList.remove("on");
+    el("a-popwin").classList.remove("on"); el("a-prefbadge").classList.remove("on");
+    el("a-chatw").textContent = "전폭";
+  }
+
+  // ── ⓐ 세로 본창(듀얼 모니터) — 항상 팝업 + 보조모니터 자동배치 ──────────
+  function buildPaletteB() {
+    var pal = el("b-pal");
+    var html = '<div class="phead">화면 고르기 (시연) — 폭 1024 &lt; 1400, 도킹 절대 비활성</div>';
+    SCREENS.forEach(function (name) {
+      html += '<div class="prow dis" onclick="pickB(\'' + name + '\')"><span>' + name + '</span>' +
+        '<span class="ptag no">팝업 → 모니터2</span></div>';
+    });
+    pal.innerHTML = html;
+  }
+  el("b-menu").addEventListener("click", function (e) { e.stopPropagation(); buildPaletteB(); el("b-pal").classList.toggle("on"); });
+  el("b-home").addEventListener("click", function () { toast("b", "대화 홈(이미 전폭 — 도킹 불가 환경)"); });
+
+  function pickB(name) {
+    el("b-pal").classList.remove("on");
+    stB.onMon2 = name;
+    var mon2 = el("monA2");
+    mon2.classList.add("filled");
+    mon2.innerHTML =
+      '<div class="sdock on" style="border-right:0;">' +
+      '<div class="dhead"><span class="nm">⧉ ' + name + ' — 모니터2(가로)</span>' +
+      '<button onclick="closeMon2()">✕ 닫기</button></div>' +
+      '<div class="dbody"><div class="ph">(시연) 자리표시자 — 팝업 창이 이 모니터 작업영역 대부분을 씁니다(≈1880×1000)</div>' +
+      '<div class="phrow w80"></div><div class="phrow w60"></div><div class="phrow w40"></div>' +
+      '<div class="phrow w80"></div><div class="phrow w60"></div><div class="phrow w40"></div></div></div>';
+    toast("b", '"' + name + '" ↗ 화면이 모니터2(가로)에 열렸습니다');
+  }
+  function closeMon2() {
+    stB.onMon2 = null;
+    var mon2 = el("monA2");
+    mon2.classList.remove("filled");
+    mon2.textContent = "아직 열린 화면이 없습니다";
+  }
+  function demoResetB() { closeMon2(); }
+
+  document.addEventListener("click", function () { el("a-pal").classList.remove("on"); el("b-pal").classList.remove("on"); });
+  ["a-pal","b-pal"].forEach(function (id) { el(id).addEventListener("click", function (e) { e.stopPropagation(); }); });
+</script>
+</body>
+</html>

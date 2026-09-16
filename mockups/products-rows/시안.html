@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 보안제품 관리 엑셀형 개편 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 보안제품 관리 화면 「엑셀형」 개편 (추천 1개)
+  대상: client/src/renderer/pages/products.html (prodHtml·loadProducts·#groups)
+  파일: mockups/products-rows/시안.html — 이 파일은 결정을 위한 문서이며, 제품 코드는
+        읽기만 했고 한 글자도 고치지 않았다.
+
+  ■ 문제 (요청서 그대로, 직접 코드로 확인)
+    products.html:71 .prod{padding:13px 15px} — 카드 하나가 [이름줄]+[점검 한 줄]+
+    [매뉴얼 2열 상자(:89 .docs)]+[정형정보 토글(:107 .fields-toggle)]을 **항상 펼쳐서**
+    그린다(:288-309 prodHtml이 조건 없이 전부 이어붙임). 접는 장치가 없다. 카드 사이 간격도
+    있다(:68 .group-body{gap:10px}). 실측(요청서 제공) 카드 1개 ≈ 190px — 엑셀형 행(30px)의
+    6배. 이 문서 안에서 실제 products.html CSS를 그대로 복사해 다시 재현하고, 렌더링 직후
+    JS로 스스로 재서(offsetHeight) 아래 "숫자" 절에 싣는다 — 손 계산이 아니라 **이 파일을
+    실제로 열면 브라우저가 잰 값**이다(MEMORY "실측 없이 「줄었다」 금지" 원칙).
+
+  ■ 설계 전 조사 — 표준·모범사례(2026-08-21, 이번 작업에서 직접 검색해 확인한 근거만 적는다)
+    1) Progressive Disclosure(Jakob Nielsen, 1995 / NN·g) — 고급·부차 정보는 2차 화면·펼침으로
+       미루고, 필요한 순간에만 드러낸다. 2006년 NN/g 연구: 이 패턴을 적용한 화면이 초기 과업
+       완료 속도 30~50% 빠름(참고 사례: macOS 인쇄 대화상자의 "세부사항 보기"). → 문서 목록·
+       정형정보 입력폼처럼 "항상 볼 필요는 없는" 정보를 행 안에 다 펴 두지 않고 클릭 시에만
+       펼치는 이 시안의 핵심 근거.
+    2) WAI-ARIA 표(Table/Treegrid) 패턴(W3C APG, MDN aria-expanded 문서) — 부모 행이 자식 행을
+       펼치고 접을 때 aria-expanded를 그 행(또는 트리거 셀)에 둔다는 것이 표준 규약이다. 이
+       시안의 그룹 머리행(▸/▾)과 행 끝 화살표 컨트롤이 이 규약대로 aria-expanded를 갖는다.
+    3) Material Design 데이터 표 밀도(m2.material.io/design/components/data-tables) — 기본
+       행 40dp, "고밀도(high density)" 32dp. 우리 부품(.g-rows-r)의 30px는 이미 업계 "고밀도"
+       구간(32dp)과 같은 급 — 새로 만드는 값이 아니라 **이미 검증된 사내 표준 부품**(gijo-ui.css,
+       2026-08-20 승인 시안 knowledge-rows에서 확정, memory.html·redteam.html 등에서 재사용 중)을
+       그대로 쓴다.
+    4) 제품 내부 선례 — nav.js:989-1013 window.gijo자세히아래로("두 칸을 한 칸으로 펴고,
+       자세히를 누른 줄 바로 아래로") — 「목록 옆 큰 상세 패널」 화면 5곳(작업 내역·통합 관제·
+       자산 통합 뷰·조치 승인·기억 학습)에 이미 쓰이는 사내 표준 패턴. products.html은 애초
+       옆 패널이 없는 단일 목록이라 이 부품을 그대로 붙일 대상(칸/목록/자세히 3요소)이 없다 —
+       그래서 **같은 효과**(누른 줄 바로 아래에, 닫기 가능하게 펼침)만 이 문서 안에서 가볍게
+       재현했다. 실제 구현 때는 이 화면 구조에 맞는 소규모 토글이면 충분하고, nav.js를 억지로
+       끌어올 필요는 없다는 것도 이 시안의 결론 중 하나다(아래 "참고" 절).
+
+  ■ 핵심 결정 3줄
+    1. 열 규약(1=제품명·2=제조사/모델·3=상태 한글·4=다음 점검) 그대로 + **트레일링 컨트롤 열**
+       (화살표, memory.html의 관계 목록 삭제열과 같은 관례) 하나 추가 — 상세 펼치기 전용.
+    2. 선택(대화창)과 상세 펼치기를 **서로 다른 클릭 대상**으로 분리한다. 행 몸통 클릭 = 대화창
+       선택(gijoSelectNotify, 기존 그대로), 행 끝 화살표 클릭 = 상세 펼침. 같은 클릭에 두 가지
+       뜻을 얹지 않는다(products.html 자신도 헤더 줄=선택, 점검줄/정형정보 토글=별도 조작으로
+       이미 나누고 있다 — 그 관례를 그대로 잇는다).
+    3. 문서 "제목 추가" 입력창은 상세 패널에서 뺐다 — 상세는 **읽기 전용 요약**(목록·문서 개수·
+       채운 정형정보 비율)만 보여주고, 실제 조작(문서 추가·정형정보 입력·삭제)은 버튼으로
+       각 전용 화면/다이얼로그로 보낸다. 정확한 실측 숫자는 아래 "숫자" 절 표에 있다(이 문서가
+       스스로 잰 값) — 요약하면 카드 190px×10=1,900px 대비 큰 폭으로 줄어든다.
+
+  이 파일은 결정을 위한 정지 그림에 가깝지만, 그룹 접기·상세 펼치기·종류 칩 이동·행 선택
+  표시는 **실제로 동작한다**(순수 화면단 토글이라 서버 없이도 정직하게 재현 가능해서다).
+  반대로 "점검 보기/등록 →"·"정형정보 열기 →"·"✕ 제품 삭제"는 실제 서버·다른 화면 이동이
+  필요해 **이 문서 안에서는 동작하지 않는다** — 눌러도 안내 문구만 뜨고 조용히 성공한 척
+  하지 않는다(정직한 구현 원칙).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════════ 1) 실제 색 토큰 — products.html:8-12 :root 그대로 복사 ════════
+   표준(다크) 화면 기준. 프로 라이트 테마 호환: 아래 모든 색은 var(--token) 참조뿐이고
+   새 하드코딩 색을 추가하지 않았다(단, products.html 자신이 이미 쓰는 #f5928a 지연색 등
+   기존 인라인 관례는 그대로 재사용). 실제 구현 시 gijo-ui.css의 --g-* 이중 폴백
+   (예: var(--g-border, var(--border,...)))을 쓰면 라이트에서도 자동 대응된다. */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+/* Pretendard는 gijo-ui.css가 fonts/PretendardVariable.woff2로 번들 동봉하지만, 이 시안은
+   자체완결 파일이라 그 상대경로에 기대지 않는다 — 실제 앱과 같은 폴백 스택만 쓴다(시스템에
+   Pretendard 없으면 Malgun Gothic/Segoe UI로 자동 대체, 외부 요청 0). */
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+
+/* ════════ 2) 실제 products.html의 비교용 CSS — 한 글자도 안 고치고 그대로 복사 ════════
+   (아래 블록은 client/src/renderer/pages/products.html:24-26,39-50,60-130 원본. "기존" 재현의
+   신뢰성을 위해 시안 전용으로 다시 쓰지 않았다.) */
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.notice{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--muted);line-height:1.7;max-width:1040px;margin-bottom:20px;}
+.notice b{color:var(--blue-light);}
+.cat-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;max-width:1040px;}
+.cat-chip{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700;color:var(--text);cursor:pointer;}
+.cat-chip:hover{border-color:var(--border-strong);}
+.cat-chip .cnt{background:var(--blue);color:#fff;border-radius:10px;padding:0 8px;font-size:12.25px;font-weight:800;}
+.cat-chip.empty{opacity:.5;}
+.cat-chip.empty .cnt{background:var(--muted-2);}
+.group{margin-bottom:18px;max-width:1040px;}
+.group-body{padding:10px 0 0;display:flex;flex-direction:column;gap:10px;}
+.prod{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;}
+.prod-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;border-radius:8px;}
+.prod-name{font-size:13.5px;font-weight:800;color:#fff;}
+.prod-meta{font-size:12.5px;color:var(--muted);}
+.prod-asset{font-size:12px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
+.prod-pin{font-size:11.25px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35);border-radius:20px;padding:2px 8px;white-space:nowrap;}
+.prod-del{margin-left:auto;background:transparent;border:1px solid var(--red);color:#f5928a;border-radius:7px;padding:4px 10px;font-size:12.25px;font-weight:700;cursor:pointer;}
+.prod-maint{font-size:12.5px;color:var(--muted);margin-top:8px;padding:6px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;cursor:pointer;}
+.docs{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.doc-col-title{font-size:12.5px;font-weight:800;color:var(--blue-light);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.doc-list{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
+.doc-item{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;}
+.doc-title{font-size:12px;font-weight:700;color:var(--text);}
+.doc-searchable{font-size:11.5px;font-weight:800;color:var(--teal);background:rgba(30,185,128,0.14);padding:1px 6px;border-radius:5px;}
+.doc-by{font-size:12px;color:var(--muted-2);margin-left:auto;}
+.doc-del{background:transparent;border:none;color:var(--muted-2);font-size:13px;cursor:pointer;padding:0 2px;}
+.doc-add{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.doc-add input[type=text]{flex:1;min-width:120px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:6px 9px;color:var(--text);font-size:12.5px;outline:none;}
+.doc-add button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 12px;font-size:12.25px;font-weight:700;cursor:pointer;}
+.doc-hint{font-size:12px;color:var(--muted-2);min-height:12px;flex-basis:100%;}
+.fields-toggle{margin-top:10px;padding:8px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;font-size:12.5px;font-weight:700;color:var(--blue-light);cursor:pointer;display:flex;align-items:center;gap:6px;}
+.fields-toggle .car{margin-left:auto;color:var(--muted-2);font-size:11.75px;}
+
+/* ════════ 3) 공용 엑셀형 부품(.g-rows) — client/src/renderer/pages/gijo-ui.css:352-369
+   그대로 복사(신규 시각 언어 금지 요구사항 — 새로 만들지 않고 이미 있는 부품을 쓴다는
+   증거로, 복사본임을 밝힌다). 색은 --g-* 이중 폴백째로 그대로 두어 라이트 테마 호환도 승계. */
+.g-rows { border: 1px solid var(--g-border, var(--border, rgba(255,255,255,.08))); border-radius: 8px; overflow: hidden; background: var(--g-surface-1, var(--panel, #30302e)); }
+.g-rows-scroll { max-height: var(--gr-maxh, 540px); overflow-y: auto; }
+.g-rows-head { display: grid; align-items: center; height: 26px; padding: 0 12px; font-size: 11px; font-weight: 800; color: var(--g-muted-2, var(--muted-2, #a49d95)); letter-spacing: .4px; background: var(--g-surface-2, var(--panel-2, #1f1e1d)); border-bottom: 1px solid var(--g-border-strong, var(--border-strong, rgba(255,255,255,.16))); position: sticky; top: 0; z-index: 2; }
+.g-rows-gh { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; font-size: 12px; font-weight: 800; color: var(--g-text, var(--text, #e9e7e2)); background: var(--g-surface-2, var(--panel-2, #1f1e1d)); border-bottom: 1px solid var(--g-border, var(--border, rgba(255,255,255,.08))); cursor: pointer; user-select: none; }
+.g-rows-gh .tri { width: 10px; color: var(--g-muted-2, var(--muted-2, #a49d95)); font-size: 11px; }
+.g-rows-gh .cnt { margin-left: auto; color: var(--g-muted-2, var(--muted-2, #a49d95)); font-weight: 700; font-size: 11.5px; }
+.g-rows-body.folded { display: none; }
+.g-rows-r { display: grid; align-items: center; height: 30px; padding: 0 12px; font-size: 12.5px; color: var(--g-text, var(--text, #e9e7e2)); cursor: pointer; }
+.g-rows-body .g-rows-r:nth-child(even), .g-rows-flat .g-rows-r:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
+.g-rows-r:hover { background: rgba(59,130,246,.07); }
+.g-rows-r.sel { background: rgba(59,130,246,.12); box-shadow: inset 3px 0 0 var(--g-blue, var(--blue, #3b82f6)); }
+.g-rows .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-rows .ta-r { text-align: right; font-variant-numeric: tabular-nums; }
+.g-rows .gm { color: var(--g-muted, var(--muted, #b3ada4)); }
+.g-rows .gm2 { color: var(--g-muted-2, var(--muted-2, #a49d95)); }
+
+/* ════════ 4) 신규 — 이번 시안이 products.html용으로 새로 정하는 부분(열 폭·상태 색·
+   상세 패널). 새 시각 언어를 만들지 않고 기존 값을 재사용한 곳은 주석에 출처를 적었다. ════════ */
+.g-rows--prod .g-rows-head, .g-rows--prod .g-rows-r{grid-template-columns:1.3fr 1.15fr 1.5fr 108px 26px;gap:10px;}
+.g-rows--prod{max-width:1040px;}
+/* 얼룩(zebra)을 nth-child 대신 명시적 클래스로 계산한다 — 상세 펼침 판(.prow-detail)이
+   행 사이에 형제로 끼어들면 :nth-child 홀짝이 밀리는 함정이 있다(부품 자체는 안 건드리고
+   이 화면 로컬에서만 무력화 후 재정의). */
+.g-rows--prod .g-rows-body .g-rows-r:nth-child(even){background:none;}
+.g-rows--prod .g-rows-body .g-rows-r.zeb{background:var(--g-zebra, rgba(255,255,255,.025));}
+.pname{display:flex;align-items:center;gap:5px;min-width:0;}
+.pname>.trunc{flex:1;min-width:0;}
+.pname .passet{font-size:11px;color:var(--purple);flex:none;}
+.pstatus{display:flex;align-items:center;gap:4px;min-width:0;}
+.doc-mini{font-size:12px;flex:none;}
+.doc-mini.off{opacity:.28;filter:grayscale(1);}
+/* 상태 색 — 새로 정하지 않고 products.html:280-283 maintLineHtml의 기존 인라인 색을
+   클래스로만 옮겼다(지연 #f5928a·대기 var(--amber)·완료 var(--teal), 코드 그대로). */
+.st-late{color:#f5928a;font-weight:800;}
+.st-wait{color:var(--amber);font-weight:800;}
+.st-done{color:var(--teal);font-weight:700;}
+.row-chev{justify-self:end;width:22px;height:22px;border-radius:6px;background:transparent;border:1px solid transparent;color:var(--muted-2);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.row-chev:hover{border-color:var(--border-strong);color:var(--text);}
+.g-rows-r.open .row-chev{color:var(--blue-light);}
+.prow-detail{background:var(--panel-2);border-top:1px dashed var(--border);border-bottom:1px solid var(--border);padding:12px 16px 14px;}
+.prow-detail .pd-head{font-size:12.75px;font-weight:800;color:#fff;margin-bottom:9px;}
+.prow-detail .pd-head .cat{color:var(--muted-2);font-weight:700;font-size:12px;margin-left:6px;}
+.pd-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:10px;}
+@media(max-width:760px){.pd-grid{grid-template-columns:1fr;}}
+.pd-col-title{font-size:11.5px;font-weight:800;color:var(--blue-light);margin-bottom:5px;}
+.pd-doc{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:5px 9px;margin-bottom:4px;font-size:11.75px;}
+.pd-doc .t{color:var(--text);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pd-doc .sr{font-size:11px;font-weight:800;color:var(--teal);background:rgba(30,185,128,.14);padding:1px 5px;border-radius:4px;flex:none;}
+.pd-doc .by{font-size:11px;color:var(--muted-2);flex:none;}
+.pd-empty{font-size:11.5px;color:var(--muted-2);padding:2px 0 4px;}
+.pd-row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:2px;}
+.pd-chip{font-size:11.75px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:6px 10px;}
+.pd-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:11px;flex-wrap:wrap;}
+.pd-btn{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);border-radius:7px;padding:6px 11px;font-size:11.75px;font-weight:700;cursor:pointer;}
+.pd-btn:hover{border-color:var(--blue);}
+.pd-btn.danger{color:#f5928a;border-color:var(--red);}
+.selbar{display:none;align-items:center;gap:8px;max-width:1040px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.35);border-radius:9px;padding:9px 14px;font-size:12.5px;margin-bottom:12px;}
+.selbar b{color:#fff;}
+.selNote{color:var(--muted-2);font-size:11.5px;margin-left:auto;}
+.mockToast{display:none;position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#111;border:1px solid var(--border-strong);color:var(--text);font-size:12.5px;padding:10px 16px;border-radius:9px;box-shadow:0 12px 30px rgba(0,0,0,.5);max-width:560px;z-index:50;}
+
+/* ════════ 5) 이 문서(시안) 전용 설명 CSS — 실제 제품에는 없다 ════════ */
+.docwrap{max-width:1120px;margin:0 auto;padding:26px 30px 90px;}
+h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:6px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:980px;line-height:1.75;margin-bottom:16px;}
+.summary-box{border:1px solid var(--blue);background:rgba(59,130,246,.08);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:12.75px;line-height:1.8;}
+.summary-box b{color:#fff;}
+.summary-box ol{margin-left:18px;margin-top:4px;}
+.banner{border:1px solid rgba(240,160,32,.5);background:rgba(240,160,32,.08);color:#f0c060;border-radius:8px;padding:11px 15px;font-size:12.25px;margin-bottom:24px;line-height:1.6;}
+h2{font-size:14.5px;font-weight:800;color:#fff;margin:32px 0 9px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+h2 .n{color:var(--blue-light);font-size:11px;font-weight:700;letter-spacing:.4px;border:1px solid var(--blue-light);border-radius:4px;padding:2px 7px;}
+.note{font-size:12.25px;color:var(--muted);line-height:1.75;margin-bottom:10px;max-width:980px;}
+.note b.hi{color:var(--text);}
+.note b.bad{color:#f5928a;}
+.note b.ok{color:var(--teal);}
+table.t{width:100%;border-collapse:collapse;font-size:12.15px;margin:8px 0 6px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+code{background:var(--panel-2);border-radius:4px;padding:1px 6px;font-size:11.5px;color:#dfe6ff;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+.meas b{color:var(--teal);}
+.mock-shell{border:1px dashed var(--border-strong);border-radius:12px;padding:16px 18px 6px;margin:12px 0 8px;background:rgba(0,0,0,.08);}
+.mock-shell-label{font-size:11px;color:var(--muted-2);margin-bottom:10px;letter-spacing:.3px;}
+.measrow{display:flex;align-items:center;gap:10px;margin:10px 0;}
+.measbox{border:1px dashed var(--border-strong);border-radius:8px;padding:8px 12px;}
+.mbadge{display:inline-block;font-size:12px;font-weight:800;color:var(--teal);background:rgba(30,185,128,.1);border:1px solid rgba(30,185,128,.35);border-radius:6px;padding:3px 10px;margin-left:6px;}
+.mbadge.bad{color:#f0c060;background:rgba(240,160,32,.1);border-color:rgba(240,160,32,.35);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.75px;color:var(--muted);margin:8px 0 14px;}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.chk-table td:first-child{width:230px;color:var(--text);font-weight:600;}
+.chk-ok{color:var(--teal);font-weight:800;}
+footer.docfoot{margin-top:50px;padding-top:14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1>보안제품 관리 — 카드 190px → 엑셀행 30px 개편 시안</h1>
+<p class="lead">
+  대상 화면: <code>client/src/renderer/pages/products.html</code> — 종류별 그룹(<code>#groups</code>) 안의 제품 카드(<code>.prod</code>, <code>prodHtml</code>).
+  카드는 이름·점검줄·문서 2열·정형정보 토글을 <b>항상 펼쳐서</b> 그리고, 접는 장치가 없다. 이 시안은 이미 사내에 있는
+  엑셀형 부품(<code>.g-rows</code>, gijo-ui.css)으로 갈아엎는 <b>추천 1개</b>다.
+</p>
+
+<div class="summary-box">
+  <b>한눈에 — 핵심 결정 3줄</b>
+  <ol>
+    <li>열 규약(1=제품명·2=제조사/모델·3=상태 한글·4=다음 점검) + <b>트레일링 컨트롤 열</b>(화살표, memory.html 관계 목록의 삭제열과 같은 관례) — 상세 펼치기 전용.</li>
+    <li>선택(대화창)과 상세 펼치기를 <b>서로 다른 클릭 대상</b>으로 분리한다 — 행 몸통=선택, 행 끝 화살표=상세.</li>
+    <li>문서 "제목 추가" 입력창은 상세에서 뺐다 — 상세는 <b>읽기 전용 요약</b>만, 실제 조작은 전용 화면/다이얼로그로. 정확한 실측은 아래 "숫자" 절(이 문서가 스스로 잰 값).</li>
+  </ol>
+</div>
+
+<div class="banner">
+  ⚠ <b>정직한 구현 고지</b> — 그룹 접기·상세 펼치기·종류 칩 이동·행 선택 표시는 <b>실제로 동작</b>합니다(순수 화면단 토글).
+  반대로 "🔧 점검 보기/등록 →"·"🧬 정형정보 열기 →"·"✕ 제품 삭제"는 서버·다른 화면 이동이 필요해 <b>이 문서 안에서는 동작하지 않습니다</b> —
+  눌러도 하단에 안내 문구만 뜨고, 성공한 척하지 않습니다.
+</div>
+
+<h2><span class="n">근거</span>설계 전 조사 — 표준·모범사례</h2>
+<p class="note">아래 네 출처는 이번 작업에서 직접 확인했다(추측·기억 아님).</p>
+<table class="t">
+  <tr><th style="width:230px">출처</th><th style="width:330px">확인한 내용</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>Progressive Disclosure<br><span style="color:var(--muted-2)">Jakob Nielsen 1995 / NN/g</span></td>
+    <td>부차 정보는 2차 화면·펼침으로 미룬다. 2006년 NN/g 연구: 적용 화면이 초기 과업 완료 <b class="hi" style="color:#8fb8ff">30~50% 빠름</b>. 예: macOS 인쇄 대화상자의 "세부사항 보기".</td>
+    <td>문서 목록·정형정보 입력폼처럼 "항상 볼 필요는 없는" 정보를 행 안에 늘 펴 두지 않고, 클릭해야 나오는 상세로 옮기는 핵심 근거.</td>
+  </tr>
+  <tr>
+    <td>WAI-ARIA 표 패턴<br><span style="color:var(--muted-2)">W3C APG Table / MDN aria-expanded</span></td>
+    <td>부모 행이 자식(상세) 행을 펼칠 때 <code>aria-expanded</code>를 그 행 또는 트리거 셀에 둔다는 것이 표준 규약.</td>
+    <td>그룹 머리(▸/▾)와 행 끝 화살표 모두 <code>aria-expanded</code>를 갖는다(아래 마크업 참고).</td>
+  </tr>
+  <tr>
+    <td>Material Design 표 밀도<br><span style="color:var(--muted-2)">m2.material.io/design/components/data-tables</span></td>
+    <td>기본 행 40dp, "고밀도" 32dp. 우리 부품(.g-rows-r)은 <b style="color:var(--teal)">이미 30px</b> — 업계 고밀도 구간과 같은 급.</td>
+    <td>새 값을 만들지 않는다 — 2026-08-20 승인 시안(knowledge-rows)에서 확정돼 memory.html 등이 이미 쓰는 <b>사내 표준 부품 그대로</b>.</td>
+  </tr>
+  <tr>
+    <td>제품 내부 선례<br><span style="color:var(--muted-2)">nav.js:989-1013 gijo자세히아래로</span></td>
+    <td>"목록 옆 큰 상세 패널"을 한 칸으로 펴고 자세히를 <b>누른 줄 바로 아래</b>로 옮기는 사내 표준(5화면 사용 중).</td>
+    <td>products.html은 옆 패널 자체가 없는 단일 목록이라 그 부품을 그대로 붙일 대상이 없다 — <b>같은 효과</b>만 이 문서에서 가볍게 재현(아래 "참고" 절에 이유).</td>
+  </tr>
+</table>
+
+<h2><span class="n">결정</span>왜 이 안인가 — 다른 두 길과 비교</h2>
+<p class="note">검토한 다른 길 둘. 실제 CSS로 재현해 세로 높이를 재 보면 왜 버렸는지 바로 보인다.</p>
+
+<table class="t">
+  <tr><th style="width:260px">버린 안</th><th>왜</th></tr>
+  <tr>
+    <td><b class="hi">안 A — 카드는 그대로 두고 문서·정형정보만 접기</b><br><span style="color:var(--muted-2)">(이름줄+점검줄은 항상 보이고 나머지만 토글)</span></td>
+    <td>가장 손이 적게 가는 안이지만, 카드 자체의 구조 비용(padding 13px×2·border-radius·카드 사이 gap 10px)은 그대로 남는다.
+      아래 "확대" 절에서 이 안을 실제 <code>.prod/.prod-top/.prod-maint</code> CSS로 재현해 <b>실측</b>한다 — 문서·정형정보를 다 접어도
+      엑셀 행 30px의 3배 안팎이 나온다(표만 접어도 근본적으로 카드 관용구를 벗어나지 못한다).</td>
+  </tr>
+  <tr>
+    <td><b class="hi">안 B — 2열 카드 그리드</b><br><span style="color:var(--muted-2)">(카드를 그대로 두고 가로로 2개씩 배치)</span></td>
+    <td>가로폭은 아끼지만 <b>열 정렬 비교가 안 된다</b> — 제조사·상태·다음 점검을 세로로 훑어 비교하는 것이 이번 요청의 핵심(엑셀형)인데,
+      타일이 2열로 늘어서면 같은 열끼리 시선이 안 맞는다. 요청서의 열 규약(1~4열)도 지킬 수 없다. 또 각 타일 안에 문서·정형정보를
+      다 펴 두면 밀도 개선이 거의 없고, 접으면 결국 안 A와 같은 문제가 남는다.</td>
+  </tr>
+</table>
+
+<h2><span class="n">확대</span>단일 제품 — 기존 카드 vs 안 A(카드 접기) vs 신규(엑셀행+상세) 실측</h2>
+<p class="note">
+  같은 제품(시큐아이 MF2-5200) 하나로 세 가지를 실제 CSS로 재현했다. 아래 배지는 <b class="ok">이 문서를 연 브라우저가 렌더링 직후 잰 값</b>이다
+  (손 계산 아님 — <code>offsetHeight</code>). 전부 실제 제품과 같은 폭(1040px 컨테이너)에서 쟀다 — 좁은 칸에 욱여넣으면 줄바꿈이 늘어 값이 부풀려진다.
+</p>
+
+<div class="mock-shell">
+  <div class="mock-shell-label">① 기존 — products.html의 .prod CSS 그대로(문서·정형정보 전부 펼쳐진 상태, 실제 기본 모습)</div>
+  <div class="group" style="margin-bottom:0">
+    <div class="group-body" id="oldCardWrap">
+      <div class="prod" id="oldCardDemo">
+        <div class="prod-top">
+          <span class="prod-name">시큐아이 MF2-5200</span>
+          <span class="prod-meta">SECUI · MF2-5200</span>
+          <span class="prod-asset">🔗 fw-core-01</span>
+          <span class="prod-pin">📌 선택</span>
+          <button class="prod-del">✕ 제품 삭제</button>
+        </div>
+        <div class="prod-maint">🔧 점검 2건 · 지연 1 · 다음 점검 2026-09-02</div>
+        <div class="docs">
+          <div class="doc-col">
+            <div class="doc-col-title">📘 제품 매뉴얼</div>
+            <div class="doc-list">
+              <div class="doc-item"><span class="doc-title">MF2-5200 관리자 매뉴얼 v3.2</span><span class="doc-searchable">🔍 검색가능</span><span class="doc-by">김보안</span><button class="doc-del">✕</button></div>
+            </div>
+            <div class="doc-add"><input type="text" placeholder="문서 제목 — 파일은 대시보드 ＋로"><button>＋ 추가</button><div class="doc-hint"></div></div>
+          </div>
+          <div class="doc-col">
+            <div class="doc-col-title">🗒 로그 매뉴얼</div>
+            <div class="doc-list">
+              <div class="doc-item"><span class="doc-title">MF2-5200 Syslog 연동 가이드</span><span class="doc-searchable">🔍 검색가능</span><span class="doc-by">김보안</span><button class="doc-del">✕</button></div>
+            </div>
+            <div class="doc-add"><input type="text" placeholder="문서 제목 — 파일은 대시보드 ＋로"><button>＋ 추가</button><div class="doc-hint"></div></div>
+          </div>
+        </div>
+        <div class="fields-toggle"><span>🧬 정형 정보 (온톨로지)</span><span class="car">▸</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="measrow">이 카드 실측 높이: <span class="mbadge bad" id="mOldCard">재는 중…</span> <span style="color:var(--muted-2);font-size:11.5px">(요청서 제공 실측 190px과 비교 — 같은 자리대인지 이 문서 안에서 교차 확인)</span></div>
+</div>
+
+<div class="mock-shell">
+  <div class="mock-shell-label">② 버린 안 A — 문서·정형정보만 접은 카드(이름줄·점검줄은 항상 노출, 실제 .prod/.prod-top/.prod-maint CSS 그대로)</div>
+  <div class="group" style="margin-bottom:0">
+    <div class="group-body">
+      <div class="prod" id="altCardDemo">
+        <div class="prod-top">
+          <span class="prod-name">시큐아이 MF2-5200</span>
+          <span class="prod-meta">SECUI · MF2-5200</span>
+          <span class="prod-asset">🔗 fw-core-01</span>
+          <span class="prod-pin">📌 선택</span>
+          <button class="prod-del">✕ 제품 삭제</button>
+        </div>
+        <div class="prod-maint">🔧 점검 2건 · 지연 1 · 다음 점검 2026-09-02</div>
+        <div class="fields-toggle" style="margin-top:8px"><span>▸ 매뉴얼 2건 · 정형정보 8/14 (접힘)</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="measrow">이 카드 실측 높이: <span class="mbadge bad" id="mAltCard">재는 중…</span> <span style="color:var(--muted-2);font-size:11.5px">— 다 접어도 카드 구조(패딩·라운드·gap) 비용은 남는다</span></div>
+</div>
+
+<div class="mock-shell">
+  <div class="mock-shell-label">③ 신규 — 엑셀 행 + 화살표로 편 상세(같은 제품, 실제 새 부품 — 둘러보기용으로 자동으로 펼쳐 보여준다. 화살표를 누르면 접힌다)</div>
+  <div class="g-rows g-rows--prod" id="closeupRowWrap" style="max-width:none">
+    <div class="g-rows-head"><span>제품명</span><span>제조사·모델</span><span>상태</span><span class="ta-r">다음 점검</span><span></span></div>
+    <div class="g-rows-body" id="closeupBody"></div>
+  </div>
+  <div class="measrow">
+    행만(접힘): <span class="mbadge" id="mCloseupRow">재는 중…</span>
+    &nbsp; 행+상세(폄): <span class="mbadge" id="mCloseupOpen">재는 중…</span>
+  </div>
+</div>
+
+<h2><span class="n">전체</span>제품 10개·7종류 — 바뀐 뒤 모습 (실제 부품, 그룹 접기·상세 펼치기 동작함)</h2>
+<p class="note">
+  아래는 요청서가 준 예시(방화벽·EDR·WAF 등 그럴듯한 한국 보안제품)로 채운 실제 재현이다.
+  <b class="hi">종류·아이콘은 서버(<code>getProductCategories</code>)가 정하는 값이라 이 시안은 그럴듯한 예시로만 채웠다</b> — 실제 목록·순서는 다를 수 있다.
+  1번(시큐아이 MF2-5200)은 상세를 펼친 채로 시작한다(둘러보기 편의) — 화살표를 누르면 접힌다.
+</p>
+<div class="legend">
+  <span>📘 제품 매뉴얼 있음</span><span style="opacity:.4">📘 없음(회색)</span>
+  <span>🗒 로그 매뉴얼</span><span>🔗 연결 자산</span>
+  <span class="st-late">■ 지연</span><span class="st-wait">■ 승인대기</span><span class="st-done">■ 완료</span>
+  <span>예정 / 이력없음은 기본 글자색</span>
+</div>
+
+<div class="cat-summary" id="catChips"></div>
+<div class="selbar" id="selBar"></div>
+
+<div class="mock-shell">
+  <div class="mock-shell-label">products.html #groups 재현 — .g-rows.g-rows--prod</div>
+  <div class="g-rows g-rows--prod" id="prodRowsWrap">
+    <div id="prodRows"></div>
+  </div>
+  <div class="measrow" style="flex-wrap:wrap">
+    이 표 전체 실측 높이(10개 제품·기본 상태): <span class="mbadge" id="mNewTotal">재는 중…</span>
+    <span style="color:var(--muted-2);font-size:11.5px">— 상세 1개(①) 펼친 채 잰 값. 전부 접으면 더 낮다.</span>
+  </div>
+</div>
+
+<h2><span class="n">숫자</span>밀도 — 기존 대비 얼마나 줄었나 (전부 이 문서가 스스로 잰 값)</h2>
+<p class="note">
+  아래 표의 왼쪽 열(px)은 전부 <code>offsetHeight</code>로 렌더링 직후 실측한 값이다 — 손으로 계산해 적지 않았다(MEMORY "실측 없이 「줄었다」 금지" 원칙).
+  기준 창은 1920×1080(본문 폭 ≈1040px), 기존 카드 190px×10=1,900px은 요청서가 제공한 실측 기준선이다.
+</p>
+<table class="t">
+  <tr><th style="width:300px">항목</th><th style="width:170px">값(실측)</th><th>비고</th></tr>
+  <tr><td>엑셀 행 1개 높이(<code>.g-rows-r</code>)</td><td id="mRowH">재는 중…</td><td>gijo-ui.css 부품 고정값(공용 — knowledge-rows 등과 동일)</td></tr>
+  <tr><td>그룹 머리 1개 높이(<code>.g-rows-gh</code>)</td><td id="mGhH">재는 중…</td><td>종류 접기 단위</td></tr>
+  <tr><td>표 머리(<code>.g-rows-head</code>) 높이</td><td id="mHeadH">재는 중…</td><td>표 전체에 1번만</td></tr>
+  <tr><td>기존 카드 1개(문서·정형정보 펼침, 실제 기본 모습)</td><td id="mOldCard2">재는 중…</td><td>요청서 제공 실측 190px과 대조</td></tr>
+  <tr><td>버린 안 A — 카드 접힘(이름·점검줄만)</td><td id="mAltCard2">재는 중…</td><td>다 접어도 행보다 훨씬 크다</td></tr>
+  <tr><td><b class="hi">기존 카드 10개 세로 총합</b>(요청서 기준선)</td><td><b>1,900px</b></td><td>190px × 10 (카드 사이 gap·그룹 머리 별도)</td></tr>
+  <tr><td><b class="hi">신규 표 10개·7종류 총합</b>(전부 접힘, 그룹 머리 포함)</td><td id="mNewTotalCollapsed">재는 중…</td><td>표 머리 1 + 그룹 머리 7 + 행 10</td></tr>
+  <tr><td><b class="ok">증감</b></td><td id="mReduction">재는 중…</td><td>1,900px 대비</td></tr>
+  <tr><td>참고 — 버린 안 A로 10개를 다 접어도</td><td id="mAltTotal10">재는 중…</td><td>카드 관용구 자체의 하한선(문서·정형정보 유무와 무관)</td></tr>
+</table>
+<div class="meas">
+  참고(가정치, 실측 아님) — 화면 위쪽(상단바·채팅위젯·안내문·종류 칩)이 대략 260~320px를 먹는다고 가정하면(정확한 값은 화면 실제 배치에 달려 있어 이 문서만으로는 못 잰다),
+  1080px 창에서 목록에 남는 세로 공간은 대략 <b>560px 안팎</b>이다. 기존 카드(190px)는 그 안에 <b>약 2~3개</b>만 들어가고, 신규 표는 그룹 머리를 감안해도
+  <b class="ok">10개가 스크롤 없이 대부분 또는 전부 들어간다</b> — "화면을 두 번 스크롤한다"던 문제가 사실상 없어진다.
+</div>
+
+<h2><span class="n">공백</span>카드가 갖고 있던 정보 — 어디로 갔나</h2>
+<p class="note">정보를 조용히 빼지 않았다. 카드에 있던 7가지가 각각 어디로 갔는지 표로 남긴다.</p>
+<table class="t">
+  <tr><th style="width:260px">카드에 있던 것</th><th>새 위치</th></tr>
+  <tr><td>제품명·제조사·모델</td><td>1~2열(행)에 그대로 — 항상 보임, 줄어들지 않음.</td></tr>
+  <tr><td>연결 자산(🔗 배지)</td><td>1열에 작은 🔗 아이콘(툴팁으로 자산명) — 접힌 채도 존재는 보임. 전체 이름은 상세 패널 머리줄에서 재확인.</td></tr>
+  <tr><td>점검 현황 문구(지연/승인대기/다음점검/완료/이력없음)</td><td>3열(색 문구로 압축: 지연 N/대기 N/예정/완료/이력없음) + 4열(가장 급한 날짜 하나). <b class="hi">전체 문장은 상세 패널에 그대로</b>(예: "🔧 점검 2건 · 지연 1 · 다음 점검 2026-09-02").</td></tr>
+  <tr><td>매뉴얼 보유(제품/로그, 검색가능 배지, 업로더, 제목)</td><td>3열엔 📘🗒 아이콘(있음/없음만, 없으면 회색). <b class="hi">제목·업로더·검색가능 배지는 상세 패널의 2열 목록 그대로.</b></td></tr>
+  <tr><td>문서 "제목 추가" 입력창</td><td><b class="bad">상세 패널엔 없음</b> — 읽기 전용 목록만(아래 "포기" 절에 이유). "파일은 대시보드 ＋로" 안내 문구는 실제 구현 시 그대로 남기도록 권고.</td></tr>
+  <tr><td>정형정보(온톨로지) 토글 + 입력폼 + AI 초안 채우기 + CSV</td><td>상세 패널엔 "N/14 항목 채움(비율)" 요약 한 줄 + "정형정보 열기 →" 버튼(전용 화면/패널로 이동). 입력·AI 초안은 이 화면 안에서 펴지 않는다.</td></tr>
+  <tr><td>제품 삭제 버튼</td><td>상세 패널 맨 아래(빨강, 확인창은 기존 그대로 유지 권고) — 한 번 더 열어야 나온다(오조작 방지, 대신 "무엇을 포기했나"에 대가 적음).</td></tr>
+</table>
+
+<h2><span class="n">포기</span>무엇을 포기했는가</h2>
+<table class="t">
+  <tr><th style="width:260px">포기한 것</th><th>왜</th></tr>
+  <tr><td>상세 패널 안에서 바로 정형정보 입력·AI 초안까지 하기</td><td>펼쳤을 때 입력폼까지 나오면 상세 패널마다 높이가 들쭉날쭉해져 "표"라는 느낌이 깨진다. 예측 가능한 밀도(행 30px 고정)를 지키려고 무거운 조작은 전용 화면으로 보낸다.</td></tr>
+  <tr><td>상세 패널의 문서 추가/삭제 버튼을 살아있게 두기</td><td>진짜로 살리려면 서버 IPC 호출까지 시안 범위에 들어온다. 가짜로 동작하는 척 꾸미면 안 된다는 원칙상, 이번 시안은 읽기 전용으로 보수적으로 제안하고 실 구현 여부는 메인 에이전트 판단으로 남긴다.</td></tr>
+  <tr><td>행마다 종류 아이콘 반복</td><td>이미 그룹 머리에 종류 아이콘·이름이 한 번 나온다. 행마다 다시 넣으면 열 하나를 더 쓰게 되고 중복이다.</td></tr>
+  <tr><td>안 A(카드 접기만)</td><td>위 "확대" 절 실측 참고 — 다 접어도 카드 구조 비용(패딩·라운드·gap)이 남아 행의 3배 안팎.</td></tr>
+  <tr><td>안 B(2열 카드 그리드)</td><td>열 정렬 비교 불가, 요청서의 열 규약(1~4열)을 지킬 수 없다.</td></tr>
+  <tr><td>nav.js의 gijo자세히아래로 그대로 끌어오기</td><td>그 부품은 "옆 상세 패널"이 있는 화면 전제다. products.html은 단일 목록이라 붙일 대상(칸/목록/자세히)이 없다 — 같은 효과만 가볍게 재현했다(아래 "참고").</td></tr>
+</table>
+
+<h2><span class="n">점검</span>제품 원칙 자가점검</h2>
+<table class="t chk-table">
+  <tr><th style="width:230px">원칙</th><th>이 시안에서</th></tr>
+  <tr><td>입력칸 0</td><td><span class="chk-ok">✓</span> 상세 패널에서 문서 제목 입력창을 뺐다 — 읽기 전용 목록 + 화면 이동 버튼뿐. "메뉴는 보기용, 지시는 대화창" 원칙과도 맞다.</td></tr>
+  <tr><td>지시는 대화창</td><td><span class="chk-ok">✓</span> 행 클릭 = 대화창 선택(gijoSelectNotify) 그대로 유지. 상세 버튼은 화면 이동만, 여기서 값을 바꾸지 않는다.</td></tr>
+  <tr><td>정직 — 없는 데이터 지어내지 않기</td><td><span class="chk-ok">✓</span> 점검 이력 없는 제품은 "이력없음"·"—"로 그대로 표기(완료로 둔갑 안 시킴). 밀도 숫자는 전부 이 문서가 렌더링 직후 스스로 잰 값(손 계산 아님) — "가정치" 구간은 명시적으로 그렇다고 적었다.</td></tr>
+  <tr><td>11px 미만 금지</td><td><span class="chk-ok">✓</span> 새로 추가한 클래스 중 가장 작은 값은 11px(<code>.passet</code>·<code>.pd-doc .sr/.by</code>) — 그 아래로 내려간 곳 없음. 기존 부품(<code>.g-rows-head</code> 11px)도 그대로.</td></tr>
+  <tr><td>새 시각 언어 금지(요구사항 1)</td><td><span class="chk-ok">✓</span> <code>.g-rows</code> CSS는 gijo-ui.css:352-369를 그대로 복사했다 — 새로 만든 건 열 폭(그리드 템플릿)과 상태 색 클래스(기존 인라인 색 재사용)뿐.</td></tr>
+  <tr><td>종류 칩 유지(요구사항 2)</td><td><span class="chk-ok">✓</span> <code>.cat-chip</code> CSS·동작(클릭 시 해당 그룹으로 스크롤+펼침) products.html:44-50,717-722 그대로 — 2026-08-21 결정(막대는 걷고 칩은 조작 겸용으로 남김)과 일관.</td></tr>
+</table>
+
+<h2><span class="n">참고</span>구현 참고 (메인 에이전트용 — 시안 승인 후)</h2>
+<table class="t">
+  <tr><th style="width:190px">항목</th><th>내용</th></tr>
+  <tr><td>zebra 함정</td><td>상세 패널을 행의 다음 형제(sibling)로 DOM에 넣으면 <code>:nth-child(even)</code> 얼룩이 밀린다. 이 시안처럼 명시적 <code>.zeb</code> 클래스로 대체하거나, 얼룩 계산을 "실제 행 개수" 기준으로 따로 매길 것.</td></tr>
+  <tr><td>선택(gijoSelectNotify)과 상세 펼치기 분리</td><td>행 몸통 클릭 = 선택(<code>data-select-zone</code>과 동등), 트레일링 화살표 클릭 = 상세 — <b>클릭 위임에서 화살표를 먼저 처리하고 return</b>해야 한다(products.html:641-666 "선택은 맨 마지막"과 같은 순서 계약).</td></tr>
+  <tr><td>상세 패널 데이터</td><td>제품당 매뉴얼 2목록(제품/로그)·점검 요약 문구(기존 <code>maintLineHtml</code> 로직 그대로 재사용 가능)·정형정보 N/전체 항목 수만 있으면 된다 — 새 API 불필요, 기존 <code>listSecurityProductsGrouped</code>·<code>listMaintenance</code>·<code>getProductFields</code> 응답에 이미 있다.</td></tr>
+  <tr><td>"정형정보 열기"·"점검 보기" 버튼</td><td>실제로는 기존 <code>toggleFields()</code>가 열던 패널이나 <code>maintenance.html</code> 이동을 그대로 부르면 된다(이 시안은 자리만 만들었다).</td></tr>
+  <tr><td>문서 "제목 추가"</td><td>이번 시안은 상세를 읽기 전용으로 뒀지만, 실제 구현 시 "필요하면 살린다" 판단은 메인 에이전트·사용자 몫으로 남긴다(위 "포기" 절 참고).</td></tr>
+</table>
+
+<footer class="docfoot">
+  mockups/products-rows/시안.html · GIJO AS 시안 · 제품 코드는 읽기만 했고 수정하지 않았다.
+</footer>
+
+</div>
+
+<div class="mockToast" id="mockToast"></div>
+
+<script>
+  const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const TODAY = "2026-08-21"; // 이 문서를 연 날짜(대화 컨텍스트) — 지연/예정 판정 기준
+
+  // 요청서 예시대로 채운 그럴듯한 한국 보안제품 10개 · 종류 8개(1개는 0건 — cat-chip.empty 시연용).
+  // 실제 종류·아이콘 목록은 서버(getProductCategories)가 정한다 — 이 표는 그럴듯한 예시일 뿐이다.
+  const CATS = [
+    { id: "fw", label: "방화벽", icon: "🧱" },
+    { id: "edr", label: "EDR", icon: "🖥️" },
+    { id: "waf", label: "WAF", icon: "🌐" },
+    { id: "nac", label: "NAC", icon: "🔑" },
+    { id: "soc", label: "통합관제(SIEM)", icon: "📡" },
+    { id: "ips", label: "IPS/IDS", icon: "🚨" },
+    { id: "dlp", label: "DLP", icon: "🔒" },
+    { id: "enc", label: "암호화", icon: "🔐" }, // 0개 — 종류 칩의 empty 상태 재현용
+  ];
+
+  const PRODUCTS = [
+    { id: "p1", cat: "fw", name: "시큐아이 MF2-5200", vendor: "SECUI", model: "MF2-5200", asset: "fw-core-01",
+      docs: { manual: [{ title: "MF2-5200 관리자 매뉴얼 v3.2", searchable: true, by: "김보안" }], logManual: [{ title: "MF2-5200 Syslog 연동 가이드", searchable: true, by: "김보안" }] },
+      fields: { filled: 8, total: 14 } },
+    { id: "p2", cat: "fw", name: "포티넷 FortiGate 100F", vendor: "Fortinet", model: "FortiGate 100F", asset: "fw-dmz-02",
+      docs: { manual: [{ title: "FortiGate 100F Administration Guide", searchable: false, by: "이운영" }], logManual: [] },
+      fields: { filled: 3, total: 14 } },
+    { id: "p3", cat: "fw", name: "안랩 트러스가드 2000", vendor: "안랩", model: "TrusGuard 2000", asset: "",
+      docs: { manual: [], logManual: [] },
+      fields: { filled: 0, total: 14 } },
+    { id: "p4", cat: "edr", name: "안랩 AhnLab EDR", vendor: "안랩", model: "EDR Agent 4.0", asset: "srv-app-05",
+      docs: { manual: [{ title: "AhnLab EDR 설치·운영 매뉴얼", searchable: true, by: "박탐지" }], logManual: [{ title: "EDR 이벤트 로그 필드 정의서", searchable: true, by: "박탐지" }] },
+      fields: { filled: 11, total: 14 } },
+    { id: "p5", cat: "edr", name: "지니언스 Genian EDR", vendor: "지니언스", model: "Genian EDR", asset: "srv-app-06",
+      docs: { manual: [{ title: "Genian EDR 관리자 가이드", searchable: true, by: "최자산" }], logManual: [] },
+      fields: { filled: 6, total: 14 } },
+    { id: "p6", cat: "waf", name: "펜타시큐리티 WAPPLES", vendor: "펜타시큐리티", model: "WAPPLES v6", asset: "web-edge-01",
+      docs: { manual: [{ title: "WAPPLES v6 운영 매뉴얼", searchable: true, by: "정웹보안" }], logManual: [{ title: "WAPPLES 이벤트 로그 가이드", searchable: false, by: "정웹보안" }] },
+      fields: { filled: 9, total: 14 } },
+    { id: "p7", cat: "nac", name: "지니언스 Genian NAC", vendor: "지니언스", model: "Genian NAC", asset: "",
+      docs: { manual: [{ title: "Genian NAC 관리자 매뉴얼", searchable: true, by: "최자산" }], logManual: [] },
+      fields: { filled: 4, total: 14 } },
+    { id: "p8", cat: "soc", name: "이글루코퍼레이션 SPiDER TM", vendor: "이글루코퍼레이션", model: "SPiDER TM", asset: "soc-collector-01",
+      docs: { manual: [{ title: "SPiDER TM 운영 매뉴얼", searchable: true, by: "한관제" }], logManual: [{ title: "SPiDER TM 연동 로그 가이드", searchable: true, by: "한관제" }] },
+      fields: { filled: 14, total: 14 } },
+    { id: "p9", cat: "ips", name: "윈스 스나이퍼 IPS", vendor: "윈스", model: "Sniper IPS", asset: "fw-core-01",
+      docs: { manual: [], logManual: [{ title: "Sniper IPS 로그 필드 정의서", searchable: true, by: "윤침해" }] },
+      fields: { filled: 2, total: 14 } },
+    { id: "p10", cat: "dlp", name: "마크애니 SafePC DRM", vendor: "마크애니", model: "SafePC DRM", asset: "",
+      docs: { manual: [], logManual: [] },
+      fields: { filled: 0, total: 14 } },
+  ];
+
+  // products.html의 allMaints와 같은 모양 — {productId, status:'scheduled'|'reported'|'done', scheduleDate}.
+  // maintLineHtml과 같은 규칙(overdue=scheduled&&date<=오늘, pending=reported, next=scheduled&&date>오늘)으로
+  // statusFor()가 계산한다 — 그림이 다른 규칙을 쓰면 화면 안에서 숫자가 어긋난다(제품 코드의 교훈 재사용).
+  const MAINTS = [
+    { pid: "p1", status: "scheduled", date: "2026-08-05" }, { pid: "p1", status: "scheduled", date: "2026-09-02" },
+    { pid: "p2", status: "scheduled", date: "2026-09-10" },
+    { pid: "p4", status: "reported", date: "2026-08-18" }, { pid: "p4", status: "scheduled", date: "2026-09-20" },
+    { pid: "p5", status: "done", date: "2026-07-15" },
+    { pid: "p6", status: "scheduled", date: "2026-07-28" }, { pid: "p6", status: "scheduled", date: "2026-08-10" }, { pid: "p6", status: "scheduled", date: "2026-09-05" },
+    { pid: "p7", status: "scheduled", date: "2026-08-30" },
+    { pid: "p8", status: "done", date: "2026-06-01" }, { pid: "p8", status: "done", date: "2026-07-01" }, { pid: "p8", status: "done", date: "2026-08-01" }, { pid: "p8", status: "done", date: "2026-05-01" }, { pid: "p8", status: "done", date: "2026-04-01" },
+  ];
+
+  function statusFor(p) {
+    const mine = MAINTS.filter((m) => m.pid === p.id);
+    const overdue = mine.filter((m) => m.status === "scheduled" && m.date <= TODAY).sort((a, b) => a.date.localeCompare(b.date));
+    const pending = mine.filter((m) => m.status === "reported");
+    const next = mine.filter((m) => m.status === "scheduled" && m.date > TODAY).sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (overdue.length) return { cls: "st-late", text: `지연 ${overdue.length}`, dateText: overdue[0].date, dateCls: "st-late",
+      line: `🔧 점검 ${mine.length}건 · 지연 ${overdue.length}` + (next ? ` · 다음 점검 ${next.date}` : "") };
+    if (pending.length) return { cls: "st-wait", text: `대기 ${pending.length}`, dateText: pending[0].date, dateCls: "gm2",
+      line: `🔧 점검 ${mine.length}건 · 승인대기 ${pending.length}` + (next ? ` · 다음 점검 ${next.date}` : "") };
+    if (next) return { cls: "gm", text: "예정", dateText: next.date, dateCls: "gm2", line: `🔧 점검 ${mine.length}건 · 다음 점검 ${next.date}` };
+    if (mine.length) return { cls: "st-done", text: "완료", dateText: "—", dateCls: "gm2", line: `🔧 점검 ${mine.length}건 · 점검 완료` };
+    return { cls: "gm2", text: "이력없음", dateText: "—", dateCls: "gm2", line: "🔧 점검 이력 없음 — 점검 등록 →" };
+  }
+
+  function docCol(list, label) {
+    return `<div class="pd-col-title">${label}</div>` + (list.length
+      ? list.map((d) => `<div class="pd-doc"><span class="t" title="${esc(d.title)}">${esc(d.title)}</span>` +
+          (d.searchable ? `<span class="sr">🔍 검색가능</span>` : "") + `<span class="by">${esc(d.by)}</span></div>`).join("")
+      : `<div class="pd-empty">아직 없음 — 대시보드 ＋로 올리면 자동으로 붙습니다.</div>`);
+  }
+
+  function detailHtml(p, cat, st) {
+    const pct = Math.round((p.fields.filled / p.fields.total) * 100);
+    return `<div class="pd-head">${esc(p.name)}<span class="cat">${cat.icon} ${esc(cat.label)}${p.asset ? ` · 🔗 ${esc(p.asset)}` : ""}</span></div>` +
+      `<div class="pd-grid">${docCol(p.docs.manual, "📘 제품 매뉴얼")}${docCol(p.docs.logManual, "🗒 로그 매뉴얼")}</div>` +
+      `<div class="pd-row2"><span class="pd-chip">${st.line}</span><span class="pd-chip">🧬 정형 정보 ${p.fields.filled}/${p.fields.total}항목 (${pct}%)</span></div>` +
+      `<div class="pd-actions">` +
+      `<button class="pd-btn" data-stub="점검 이력 화면(maintenance.html)">🔧 점검 보기/등록 →</button>` +
+      `<button class="pd-btn" data-stub="정형 정보 패널(온톨로지 양식)">🧬 정형정보 열기 →</button>` +
+      `<button class="pd-btn danger" data-stub="제품 삭제 확인창">✕ 제품 삭제</button>` +
+      `</div>`;
+  }
+
+  // scope: 같은 제품(p1)을 "확대" 절과 "전체" 절 두 군데서 따로 그리므로, DOM id·data-chev를
+  // scope로 구분한다(안 그러면 id="pd-p1"이 문서에 두 번 생겨 getElementById가 첫 번째만
+  // 찾는 결함이 생긴다 — 실측 중 발견해 고쳤다).
+  function rowHtml(p, zeb, scope) {
+    const uid = (scope || "") + p.id;
+    const cat = CATS.find((c) => c.id === p.cat);
+    const st = statusFor(p);
+    const hasManual = p.docs.manual.length > 0, hasLog = p.docs.logManual.length > 0;
+    return `<div class="g-rows-r${zeb ? " zeb" : ""}" data-pid="${p.id}" tabindex="0">` +
+      `<span class="pname"><span class="trunc" title="${esc(p.name)}">${esc(p.name)}</span>` +
+      (p.asset ? `<span class="passet" title="연결 자산: ${esc(p.asset)}">🔗</span>` : "") + `</span>` +
+      `<span class="trunc gm" title="${esc(p.vendor)} · ${esc(p.model)}">${esc(p.vendor)} · ${esc(p.model)}</span>` +
+      `<span class="pstatus">` +
+      `<span class="doc-mini${hasManual ? "" : " off"}" title="제품 매뉴얼 ${hasManual ? "있음" : "없음"}">📘</span>` +
+      `<span class="doc-mini${hasLog ? "" : " off"}" title="로그 매뉴얼 ${hasLog ? "있음" : "없음"}">🗒</span>` +
+      `<span class="${st.cls}">${st.text}</span></span>` +
+      `<span class="ta-r ${st.dateCls}">${st.dateText}</span>` +
+      `<button class="row-chev" data-chev="${uid}" title="상세 펼치기" aria-expanded="false">▸</button>` +
+      `</div>` +
+      `<div class="prow-detail" id="pd-${uid}" style="display:none">${detailHtml(p, cat, st)}</div>`;
+  }
+
+  function renderChips() {
+    const byCat = {};
+    PRODUCTS.forEach((p) => (byCat[p.cat] = (byCat[p.cat] || 0) + 1));
+    document.getElementById("catChips").innerHTML = CATS.map((c) => {
+      const n = byCat[c.id] || 0;
+      return `<div class="cat-chip ${n ? "" : "empty"}" data-jump="${c.id}"><span>${c.icon} ${esc(c.label)}</span><span class="cnt">${n}</span></div>`;
+    }).join("");
+  }
+
+  function renderGroups() {
+    const grouped = {};
+    PRODUCTS.forEach((p) => { (grouped[p.cat] = grouped[p.cat] || []).push(p); });
+    const head = `<div class="g-rows-head"><span>제품명</span><span>제조사·모델</span><span>상태</span><span class="ta-r">다음 점검</span><span></span></div>`;
+    const body = CATS.filter((c) => grouped[c.id] && grouped[c.id].length).map((c) => {
+      const list = grouped[c.id];
+      const rows = list.map((p, i) => rowHtml(p, i % 2 === 1, "")).join("");
+      return `<div class="g-rows-gh" data-g="${c.id}" aria-expanded="true"><span class="tri">▾</span>${c.icon} ${esc(c.label)}<span class="cnt">${list.length}개</span></div>` +
+        `<div class="g-rows-body" data-body="${c.id}">${rows}</div>`;
+    }).join("");
+    document.getElementById("prodRows").innerHTML = head + body;
+
+    // 확대 절(단일 행) — 같은 렌더 함수로 p1 하나만 다시 그린다(값이 두 곳에서 어긋나지 않게).
+    // scope="closeup-"로 id를 구분한다(위 uid 주석 참고).
+    document.getElementById("closeupBody").innerHTML = rowHtml(PRODUCTS[0], false, "closeup-");
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const t = document.getElementById("mockToast");
+    t.textContent = msg; t.style.display = "block";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (t.style.display = "none"), 3200);
+  }
+
+  function toggleDetail(id, forceOpen) {
+    const panel = document.getElementById("pd-" + id);
+    if (!panel) return;
+    const opening = forceOpen != null ? forceOpen : panel.style.display === "none";
+    panel.style.display = opening ? "block" : "none";
+    document.querySelectorAll(`[data-chev="${id}"]`).forEach((b) => {
+      b.textContent = opening ? "▾" : "▸";
+      b.setAttribute("aria-expanded", opening ? "true" : "false");
+      const row = b.closest(".g-rows-r");
+      if (row) row.classList.toggle("open", opening);
+    });
+  }
+
+  function selectRow(id) {
+    document.querySelectorAll(".g-rows-r.sel").forEach((r) => r.classList.remove("sel"));
+    // data-pid는 scope 없이 실제 제품 id 그대로라 같은 제품이 "확대"·"전체" 두 곳에 있으면
+    // 둘 다 선택 표시한다(어디를 눌러도 같은 제품이라는 걸 눈으로 알 수 있게).
+    const rows = document.querySelectorAll(`.g-rows-r[data-pid="${id}"]`);
+    const p = PRODUCTS.find((x) => x.id === id);
+    if (!rows.length || !p) return;
+    rows.forEach((r) => r.classList.add("sel"));
+    const st = statusFor(p);
+    const bar = document.getElementById("selBar");
+    bar.style.display = "flex";
+    bar.innerHTML = `🎯 <b>${esc(p.name)}</b> · ${esc(p.vendor)} · ${esc(p.model)} — 대화창에 「이거」로 담깁니다` +
+      `<span class="selNote">(시안 시뮬레이션 — 실제로는 selectnotify.js·gijoSelectNotify가 전달)</span>`;
+  }
+
+  function wireClicks(rootId) {
+    document.getElementById(rootId).addEventListener("click", (e) => {
+      const gh = e.target.closest(".g-rows-gh");
+      if (gh) {
+        const body = document.querySelector(`[data-body="${gh.dataset.g}"]`);
+        const folded = body.classList.toggle("folded");
+        gh.querySelector(".tri").textContent = folded ? "▸" : "▾";
+        gh.setAttribute("aria-expanded", folded ? "false" : "true");
+        return;
+      }
+      const chev = e.target.closest(".row-chev");
+      if (chev) { e.stopPropagation(); toggleDetail(chev.dataset.chev); return; }
+      const stub = e.target.closest("[data-stub]");
+      if (stub) { toast(`🔧 시안 — 실제 화면에서는 「${stub.dataset.stub}」로 이동합니다. (이 시안에서는 동작하지 않습니다)`); return; }
+      const row = e.target.closest(".g-rows-r");
+      if (row) selectRow(row.dataset.pid);
+    });
+  }
+
+  document.getElementById("catChips").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-jump]");
+    if (!chip) return;
+    const body = document.querySelector(`[data-body="${chip.dataset.jump}"]`);
+    if (!body) { toast(`「${chip.textContent.trim()}」 종류엔 제품이 없습니다.`); return; }
+    body.classList.remove("folded");
+    const gh = document.querySelector(`.g-rows-gh[data-g="${chip.dataset.jump}"]`);
+    if (gh) { gh.querySelector(".tri").textContent = "▾"; gh.setAttribute("aria-expanded", "true"); }
+    body.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  function measure() {
+    const px = (el) => (el ? el.offsetHeight + "px" : "—");
+    document.getElementById("mOldCard").textContent = px(document.getElementById("oldCardDemo"));
+    document.getElementById("mOldCard2").textContent = px(document.getElementById("oldCardDemo"));
+    document.getElementById("mAltCard").textContent = px(document.getElementById("altCardDemo"));
+    document.getElementById("mAltCard2").textContent = px(document.getElementById("altCardDemo"));
+    const row1 = document.querySelector("#closeupBody .g-rows-r");
+    const gh1 = document.querySelector("#prodRows .g-rows-gh");
+    const head1 = document.querySelector("#prodRows .g-rows-head");
+    document.getElementById("mRowH").textContent = px(row1);
+    document.getElementById("mGhH").textContent = px(gh1);
+    document.getElementById("mHeadH").textContent = px(head1);
+    document.getElementById("mNewTotal").textContent = px(document.getElementById("prodRowsWrap"));
+
+    // ③ 신규 확대 절의 두 배지 — 행만(접힘) vs 행+상세(폄). closeup-p1 detail을 여기서 열고 잰다.
+    const closeupRowH = row1 ? row1.offsetHeight : 0;
+    document.getElementById("mCloseupRow").textContent = closeupRowH + "px";
+    toggleDetail("closeup-p1", true);
+    const closeupPanel = document.getElementById("pd-closeup-p1");
+    const closeupPanelH = closeupPanel ? closeupPanel.offsetHeight : 0;
+    document.getElementById("mCloseupOpen").textContent = (closeupRowH + closeupPanelH) + "px (행 " + closeupRowH + "px + 상세 " + closeupPanelH + "px)";
+
+    const altH = document.getElementById("altCardDemo").offsetHeight;
+    document.getElementById("mAltTotal10").textContent = (altH * 10) + "px (" + altH + "px × 10)";
+
+    // 전부 접은 표 총합 = 표머리 1 + 그룹머리(종류 수) + 행(제품 수). 실측값을 그대로 조합한다
+    // (전부 접었을 때를 다시 렌더링하지 않고, 이미 잰 단위값을 더한다 — 부품이 고정 높이라 성립).
+    const nGroups = new Set(PRODUCTS.map((p) => p.cat)).size;
+    const nRows = PRODUCTS.length;
+    const headH = document.querySelector("#prodRows .g-rows-head").offsetHeight;
+    const ghH = document.querySelector("#prodRows .g-rows-gh").offsetHeight;
+    const rowH = document.querySelector("#prodRows .g-rows-r").offsetHeight;
+    // 위 세 단위값(headH·ghH·rowH)은 지금 상태(①만 펼침)의 라이브 표에서 그대로 잰 것이고,
+    // "전부 접힘" 총합은 그 단위값들의 합으로 따로 계산한다(부품이 고정 높이라 성립 — 실제로
+    // 전부 접어 다시 렌더링해도 같은 값이 나오는지는 그룹 머리를 눌러 직접 접어 보면 확인된다).
+    const collapsedTotal = headH + nGroups * ghH + nRows * rowH + 2; // +2 = .g-rows 바깥 테두리(1px×2)
+    document.getElementById("mNewTotalCollapsed").textContent =
+      collapsedTotal + "px (" + headH + "+" + (nGroups + "×" + ghH) + "+" + (nRows + "×" + rowH) + "+2 테두리)";
+    const reduction = 1900 - collapsedTotal;
+    const pct = Math.round((reduction / 1900) * 100);
+    document.getElementById("mReduction").textContent = `−${reduction}px (−${pct}%)`;
+  }
+
+  wireClicks("prodRows");
+  wireClicks("closeupBody");
+  renderChips();
+  renderGroups();
+  toggleDetail("p1", true); // 둘러보기 편의 — 1번은 펼친 채 시작
+  requestAnimationFrame(measure);
+</script>
+
+</body>
+</html>

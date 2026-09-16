@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「내 문서 편집기: Smart MD보다 낫게 + 사이드바 재편 + 템플릿 연계」 시안 (추천 1개)
+  경로: mockups/내문서-편집기/시안.html · gijo-mockup(mockups/ 전용 쓰기) · 제품 코드는 한 줄도 안 건드렸다.
+  다크 배색(제품 기본 다크 토큰 그대로) · 외부 CDN·웹폰트·원격 이미지 0 · 더블클릭으로 바로 열린다.
+  ⚠ 이 파일은 같은 작업 중 지시가 3번 늘었다 — 늘어난 순서 그대로 §를 쌓았다(뒤엎지 않았다).
+
+  ── 지시 원문(네 통, verbatim 요지) ───────────────────────────────────────────
+  [1] "고객 문서편집을 여기서만 할 수 있게, MD studio보다 더 직관적이고 사용하기 편하게" — Smart MD
+      Studio를 없애는 대신 mydocs.html 편집기가 그 자리를 더 잘 채운다.
+  [2] 보안 되묻기 = **B안**: 회사 공유를 켤 때만, 이미지가 있을 때만 되묻는다. 평소엔 조용히.
+  [3] "문서 편집 메뉴는 별도로 두고, 기존 항목들과 어떻게 연계성 및 템플릿을 만들어 줄지도 고민해줘"
+      — ✍ 문서 편집을 사이드바 별도 항목으로. 사이드바 총 9개(👤 내 것·✍ 문서 편집·🏢 회사 지식·
+      📘 GIJO AS 안내·📦 보안제품 자료·📞 연락처·🎓 학습·🩹 반입·🗂 산출물) 묶음을 판단하라.
+      템플릿 8종에 「기존 기능이 만든 결과」를 자동으로 채우는 연계가 있는지 확인하고 설계하라.
+  [4] "디자인이 많이 필요없어. 엑셀 형태로 리스트 형태가 가장 좋아. 많은 데이터를 한눈에 보는 게
+      좋아" — 목록은 전부 30px 행. 이력은 타임라인이 아니라 표. 첨부는 썸네일 격자가 아니라 행 목록.
+      템플릿도 칩 구조는 유지하되(게시 관문이 개수를 잰다) 밀도는 올려라.
+  [5] "문서 편집기는 외부사례 참고. 노션이나 커서 정도의 화면 배율이 좋을 듯. 니가 판단해줘" —
+      Notion·Cursor를 실제로 조사해 수치를 갖고 판단하라. 커서=비율/밀도, 노션=조작 방식(/ 명령)만
+      가져오고 노션의 넉넉한 여백·좁은 중앙정렬 칸은 [4]와 충돌하니 버려라.
+
+  ── 확인한 실코드(읽기만) ─────────────────────────────────────────────────────
+  · client/src/renderer/pages/mydocs.html — 47-49(입력칸 0 예외) · 39-41(사이드바 6항목 현재값:
+    내 것·회사 지식·제품 안내·학습·반입·산출물) · 158-202(.stage/.st-top/.viewseg/.st-warn/
+    .tpl-drawer/.tpl-chip/.edit-split 실 CSS) · 280-343(도구줄·문서창·#editStage 골격) ·
+    391-411(TEMPLATES 7종+빈 문서=8, 코드 상수) · 946-1048(편집 로직, 디바운스 없음) ·
+    780-797(상세 패널 .dbt 버튼, 지금 3형식) · 1006-1034(§6 기존 계약:
+    {type:"gijo:newDocFromTemplate", templateId, prefill} — **이미 있는 프리필 배선**, 신고
+    시한 카드가 쓰려고 만들어 뒀는데 아직 아무도 안 쓰고 있었다. 이번 연계 템플릿이 그 첫 사용처다).
+  · client/smartmd/js/app.js — §1 대조표 근거(디바운스 0·raw base64 삽입·confirm() 사용).
+  · server/src/engine/incidentsteps.ts:178-195 — `침해사고초동절차()`가 실제로 반환하는 절차는
+    **정확히 7단계**(1.증거 보전 2.격리(차단) 3.범위 식별 4.계정·인증 차단 5.보고·신고 6.근절·복구
+    7.재발 감시) — 사장님이 말한 "코드 7단계"가 이것이다(추측 아니라 확인). ⚠ 발견: 기존 TEMPLATES의
+    "침해사고 1차 보고" 스켈레톤(mydocs.html:397)은 이 7단계를 **참조하지 않고 따로 손으로 쓴
+    5개 절**이다 — 챗봇 답변(이 함수)과 문서 템플릿이 같은 절차를 **두 벌로** 관리하고 있다(§5·§12).
+  · server/src/engine/hardeningscan.ts:35-56 — `CheckItem{id,cat,title,ref,remediation}` ·
+    `CheckResult extends CheckItem{status:PASS|FAIL|WARN|NA, evidence}` ·
+    `ScanReport{standard,standardLabel,target,startedAt,items,summary{total,pass,fail,warn,na,rate}}`.
+  · server/src/engine/licenserisk.ts:25-58 — `라이선스판정{등급,받게되는요구,spdxId,원문,근거,확인필요}`,
+    등급 6종(의무없음~판정불가), `등급요약(판정들)` 존재.
+  · server/src/engine/actioncheck.ts:117-127 — `ActionCheckHistoryRow{askedAt,question,normQuestion,
+    verdict,basisRefs,verdictText}`, `listActionCheckHistory(limit)` — **이미 대화창 조회용으로 존재**.
+  · server/src/engine/remrequest.ts:44-121 — `OutboundRequest{id,kind,targetName,recipient,dueDate,
+    status,findingKeys,docId,createdAt,...}`, `buildRequestDraft()`가 **서버에서 md를 조립한다**는
+    주석(92행) "클라 TEMPLATES는 서버가 모른다(설계관 ①)" — 이번 연계 템플릿도 같은 원칙을 따랐다
+    (데이터가 필요한 템플릿은 클라 상수가 아니라 서버 조립).
+  · client/src/renderer/pages/gijo-ui.css:344-369(.g-rows 부품 — 그룹 머리행 28px·열 머리 26px·
+    행 30px, "엑셀처럼 촘촘"의 실제 게시된 값) — 이번 재설계의 모든 목록(템플릿·이력·첨부·사이드바)이
+    이 숫자를 그대로 썼다(mockups/docs-hub-v4-workspace/시안.html이 이미 확정한 값, 다시 안 지어냈다).
+  · tools/publish-gate-ui.mjs:245-320 — `#editStage`·`#btnNew`·`#tplDrawer .tpl-chip`===8·
+    `#readBody`·폭 계약. 이번 시안은 **`.tpl-chip` 개수를 안 건드렸다**(§5에서 이유).
+
+  ── 설계 전 조사(외부 근거, 이번 라운드 추가분) ───────────────────────────────
+  [외부3] Notion 공식 도움말 "Using slash commands"(notion.com/help/guides/using-slash-commands) —
+    "「/」를 치면 즉시 블록·명령 메뉴가 뜨고, 이어서 치는 글자로 실시간 필터링된다." → §5의 "/" 템플릿
+    호출 근거. 단, **Notion 특유의 본문 최대폭(약 700px 중앙정렬, 가독성 벤치마크로 흔히 인용됨 —
+    검색결과 "around 700px is considered reasonable based on recommended line length")과 "Full
+    Width" 토글이 기본 꺼짐인 넉넉한 여백**은 의도적으로 버렸다 — [4] "디자인 필요없다·엑셀형·많은
+    데이터를 한눈에"와 정면 충돌한다(§2).
+  [외부4] VS Code 커뮤니티 이슈 #23806("Line height and font size are too large by default",
+    github.com/microsoft/vscode/issues/23806) 및 일반 관례 — 편집기 기본 글자 14px 안팎, 라인
+    하이트는 "이미 조밀한 편"이 정설이고 통상 1.35~1.5 배수를 쓴다. → §3의 편집 칸 line-height를
+    기존 mydocs.html의 1.65에서 1.5로 낮춘 근거(글자 크기는 한글 가독성 때문에 그대로 12.5px 유지 —
+    라틴 모노스페이스 코드와 한글 산문은 획 밀도가 달라 VS Code 숫자를 그대로 베끼지 않았다).
+  [외부5] Cursor 커뮤니티 포럼(forum.cursor.com) 다수 스레드 요약 — "사이드바는 폭이 좁고, 채팅·보조
+    패널은 UI 전체 zoomLevel로만 조절되며 폭을 넓게 쓰는 건 주 편집 영역이다." → §3의 "주 편집 영역이
+    보조 영역보다 넓다"(분할 58:42) 근거. VS Code 자체 문서(code.visualstudio.com/docs/configure/
+    custom-layout)도 "Primary Side Bar가 왼쪽의 좁은 고정 폭"이라고 설명 — mockups/docs-hub-v4-
+    workspace/시안.html [외부3](216px 관례치)과 같은 결론이라 그 값(208px)을 다시 썼다(재발명 안 함).
+  [내부 재확인] mockups/docs-hub-v4-workspace/시안.html [외부1](Notion 사이드바 아코디언 2단 이내) ·
+    [내부 선례](.g-rows 30px 실측)를 그대로 승계했다.
+
+  ── 이 파일이 하는 일 / 안 하는 일 ────────────────────────────────────────────
+  한다: §4 사이드바 9항목·§5 템플릿(빈 것 8종+연계 5종)·§6 편집기(전 CSS 값 실측, "/" 명령 실동작,
+    첨부 행 목록, 이력 표)·§7 상세 패널(공유 되묻기 B안·내보내기 4형식)이 **전부 실제로 동작**한다.
+    서버 호출 없이 되는 일(템플릿 채움·"/" 메뉴·첨부 압축·미리보기·md/HTML 다운로드)은 진짜로 하고,
+    서버가 필요한 일(실제 저장·실제 공유·실제 PDF/Word·실제 연계 템플릿 데이터 조회)은 "(시안) …"
+    라벨을 붙인 안내로 대신한다. 밀도는 브라우저가 실시간으로 잰다.
+  안 한다: 3단 워크스페이스 자체(사이드바+목록+문서창 뼈대)는 다시 안 그린다 — 사이드바 **내용물**만
+    다룬다. 🩹 반입 확장(사장님이 "따로 검토 중"이라고 명시)은 손 안 댔다 — 사이드바 자리만 셈에
+    넣었다. 📦 보안제품 자료·📞 연락처는 **이번에 같이 들어오는 다른 작업**이라 그 화면 내용은 안
+    만들고, 사이드바 배치와 "담당자 자동 채움" 연계점만 자리를 비워 뒀다(§5). 이미지 주석 도구는
+    여전히 안 만든다.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 내 문서 편집기(사이드바 재편+템플릿 연계) 시안</title>
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);font-size:13px;line-height:1.7;}
+.docwrap{max-width:1320px;margin:0 auto;padding:30px 24px 100px;}
+h1{font-size:21px;font-weight:800;color:var(--white);margin-bottom:8px;}
+h2{font-size:15.5px;font-weight:800;color:var(--white);margin:30px 0 10px;padding-top:14px;border-top:1px solid var(--border);}
+h2 .num{color:var(--blue-light);margin-right:6px;}
+h3{font-size:13px;font-weight:800;color:var(--blue-light);margin:16px 0 6px;}
+p{font-size:12.75px;color:var(--text);margin-bottom:8px;max-width:1040px;}
+.lead{font-size:13.25px;color:var(--muted);max-width:1040px;}
+.quote{margin:10px 0;font-size:12.5px;color:var(--text);border-left:3px solid var(--blue);background:rgba(59,130,246,.07);padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.quote b{color:var(--blue-light);}
+.warnbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--amber);background:rgba(240,160,32,.08);padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.warnbox b{color:var(--amber);}
+.okbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--teal);background:rgba(30,185,128,.08);padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.okbox b{color:var(--teal);}
+code{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;font:11.5px Consolas,"Cascadia Mono",monospace;color:#a7d3ff;}
+a{color:var(--blue-light);}
+ul.doc,ol.doc{margin:6px 0 10px 22px;font-size:12.5px;color:var(--text);}
+ul.doc li,ol.doc li{margin-bottom:5px;line-height:1.65;}
+table.doc{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:12.25px;}
+table.doc th{background:var(--panel-2);color:var(--muted);text-align:left;padding:7px 10px;border:1px solid var(--border-strong);font-weight:800;}
+table.doc td{padding:7px 10px;border:1px solid var(--border);color:var(--text);vertical-align:top;}
+table.doc td.num,table.doc th.num{text-align:right;font-variant-numeric:tabular-nums;}
+table.doc td.win{color:var(--teal);font-weight:700;}
+table.doc td.lose{color:var(--muted-2);}
+table.doc td.later{color:var(--amber);}
+.tag{display:inline-block;font-size:11px;font-weight:800;padding:1px 8px;border-radius:10px;margin-right:4px;}
+.tag.take{background:rgba(30,185,128,.15);color:var(--teal);}
+.tag.drop{background:rgba(226,72,61,.15);color:#f5928a;}
+.tag.limit{background:rgba(240,160,32,.15);color:var(--amber);}
+.src{font-size:11px;color:var(--muted-2);}
+.checklist{list-style:none;margin:8px 0 14px;padding:0;}
+.checklist li{font-size:12.5px;padding:6px 0 6px 26px;position:relative;border-bottom:1px solid var(--border);line-height:1.6;}
+.checklist li:before{content:"✓";position:absolute;left:2px;color:var(--teal);font-weight:800;}
+.checklist li.warn:before{content:"⚠";color:var(--amber);}
+.framewrap{margin:16px 0 26px;}
+.framecap{font-size:12px;color:var(--muted-2);margin-bottom:6px;}
+.framecap b{color:var(--text);}
+.measurebox{background:var(--panel-2);border:1px solid var(--blue);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text);margin:10px 0 16px;font-variant-numeric:tabular-nums;}
+.measurebox b{color:var(--blue-light);}
+.measurebox table{width:100%;border-collapse:collapse;margin-top:6px;}
+.measurebox td{padding:2px 6px;font-size:11.5px;border-bottom:1px dashed var(--border);}
+.measurebox td.k{color:var(--muted);width:44%;}
+.measurebox td.v{text-align:right;color:var(--text);}
+.measurebox td.delta{text-align:right;color:var(--amber);width:70px;}
+.measurebox.calc{border-color:var(--teal);}
+
+/* ══════════ 실물 조각 — 제품 다크 토큰·실 CSS 값 그대로 ══════════ */
+.simframe{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg);font-size:13px;color:var(--text);overflow:hidden;display:flex;}
+.simcap{background:var(--panel-2);border-bottom:1px solid var(--border-strong);padding:7px 14px;font-size:11.5px;color:var(--muted-2);}
+.simcap b{color:var(--muted);}
+
+/* ── §4 사이드바 9항목(v4content .v4sidebar 실 CSS, mydocs.html:70-101 재사용) ── */
+.side-sim{flex:0 0 208px;width:208px;background:var(--panel-2);border-right:1px solid var(--border);padding:6px 0;}
+.side-sim .grp{border-top:1px solid var(--border-strong);margin-top:4px;padding-top:4px;}
+.side-sim .grp:first-child{border-top:none;margin-top:0;padding-top:0;}
+.snode{display:flex;align-items:center;gap:6px;width:100%;padding:5px 10px;border:none;background:transparent;color:var(--muted);font-size:12.5px;font-family:inherit;cursor:pointer;text-align:left;}
+.snode:hover{background:rgba(255,255,255,.05);}
+.snode.on{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.snode .cnt{margin-left:auto;color:var(--muted-2);font-size:11px;font-weight:700;}
+.snode.new{color:var(--teal);}
+.side-body{flex:1 1 auto;padding:14px 16px;min-width:0;}
+
+/* ── 공용 30px 행(gijo-ui.css:344-369 값 재사용) ── */
+.mini-rows{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel-2);}
+.mini-head{display:grid;padding:0 10px;height:26px;align-items:center;font-size:11px;color:var(--muted-2);background:var(--panel);border-bottom:1px solid var(--border-strong);font-weight:700;}
+.mini-row{display:grid;padding:0 10px;height:30px;align-items:center;font-size:12px;color:var(--text);border-bottom:1px solid var(--border);cursor:pointer;}
+.mini-row:last-child{border-bottom:none;}
+.mini-row:hover{background:rgba(255,255,255,.04);}
+.mini-row .later{color:var(--muted-2);cursor:default;}
+.mini-row .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mini-row button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:5px;padding:2px 8px;font-size:10.5px;cursor:pointer;font-family:inherit;}
+.mini-row button:hover{border-color:var(--blue);color:var(--blue-light);}
+.mini-row button:disabled{opacity:.5;cursor:default;}
+.mini-row .thumb{width:26px;height:18px;object-fit:cover;border-radius:3px;border:1px solid var(--border-strong);vertical-align:middle;}
+
+/* ── §6 편집기(전 CSS, 밀도 조정 — VS Code 관례 반영) ── */
+.docpane-sim{width:900px;max-width:100%;padding:10px 14px;}
+.stage2{display:block;}
+.st-top{display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap;}
+.st-top .back{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:6px;padding:5px 9px;font-size:11.5px;cursor:pointer;font-family:inherit;}
+.st-title-in{flex:1;min-width:160px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:5px 9px;font-size:12.5px;color:var(--text);font-family:inherit;}
+.st-title-in:focus{outline:none;border-color:var(--blue);}
+.st-btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;font-family:inherit;position:relative;}
+.st-btn.save{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:800;}
+.st-btn.save:disabled{opacity:.6;cursor:default;}
+.st-btn.on{border-color:var(--blue);color:var(--blue-light);}
+.dirty-dot{position:absolute;top:-4px;right:-4px;width:8px;height:8px;border-radius:50%;background:var(--amber);border:1.5px solid var(--bg);display:none;}
+.dirty-dot.on{display:block;}
+.viewseg{display:flex;border:1px solid var(--border-strong);border-radius:7px;overflow:hidden;}
+.viewseg button{background:var(--panel-2);border:none;color:var(--muted);padding:5px 9px;font-size:11.5px;cursor:pointer;font-family:inherit;}
+.viewseg button.on{background:rgba(59,130,246,.18);color:var(--blue-light);}
+.st-warn{border-left:3px solid var(--amber);background:rgba(240,160,32,.07);border-radius:7px;padding:6px 11px;font-size:11.25px;color:var(--text);line-height:1.55;margin-bottom:7px;}
+.st-warn b{color:var(--amber);}
+
+/* 템플릿 서랍 — 구조(.tpl-chip, 8개)는 유지, 시각만 밀도 있는 1행 리스트로 */
+.tpl-drawer{display:none;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);margin-bottom:7px;overflow:hidden;}
+.tpl-drawer.on{display:block;}
+.tpl-lead{font-size:11px;color:var(--muted-2);padding:5px 10px;background:var(--panel);border-bottom:1px solid var(--border-strong);}
+.tpl-chip{display:grid;grid-template-columns:22px 1fr auto auto;gap:8px;align-items:center;width:100%;height:28px;
+  padding:0 10px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);
+  font-size:12px;cursor:pointer;font-family:inherit;text-align:left;}
+.tpl-chip:last-child{border-bottom:none;}
+.tpl-chip:hover{background:rgba(59,130,246,.08);}
+.tpl-chip .tag{font-size:10px;font-weight:800;color:var(--teal);white-space:nowrap;}
+.tpl-chip .ov{font-size:10.5px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;}
+.tpl-chip .recent{font-size:9px;font-weight:800;color:#fff;background:var(--purple);padding:1px 5px;border-radius:6px;}
+
+/* 연계 템플릿 — 새 자리, 표(mini-rows 재사용) */
+.linked-wrap{margin-bottom:7px;}
+.linked-head{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
+
+/* 첨부 — 큰 썸네일 격자 금지, 30px 행 목록으로 */
+.attach-strip{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);margin-bottom:7px;overflow:hidden;}
+.attach-hint{font-size:11px;color:var(--muted-2);padding:6px 10px;}
+.attach-drop.over{border-color:var(--blue);background:rgba(59,130,246,.08);}
+.attach-orphan{font-size:10.5px;color:var(--amber);padding:3px 10px 6px;}
+
+/* 이력 — 타임라인 금지, 표 */
+.hist-drawer{display:none;margin-bottom:7px;}
+.hist-drawer.on{display:block;}
+
+.edit-split{display:grid;grid-template-columns:58fr 42fr;gap:8px;min-height:340px;}
+.edit-split.src-only{grid-template-columns:1fr;} .edit-split.src-only .edit-prev{display:none;}
+.edit-split.prev-only{grid-template-columns:1fr;} .edit-split.prev-only .edit-src{display:none;}
+.edit-src{position:relative;}
+.edit-src textarea{width:100%;height:100%;min-height:340px;background:var(--panel-2);border:1px solid var(--border-strong);
+  border-radius:7px;padding:9px 11px;color:var(--text);font:12.5px/1.5 "Pretendard","Malgun Gothic",sans-serif;resize:vertical;}
+.edit-src textarea:focus{outline:none;border-color:var(--blue);}
+.edit-prev{border:1px solid var(--border);border-radius:7px;background:var(--panel-2);padding:10px 13px;overflow-y:auto;max-height:420px;font-size:12.5px;line-height:1.55;}
+.edit-prev h3{color:var(--blue-light);font-size:13px;margin:6px 0 3px;}
+.edit-prev ul{margin:2px 0 5px 18px;}
+.edit-prev img.pv{max-width:170px;border-radius:6px;border:1px solid var(--border-strong);display:block;margin:5px 0;}
+.edit-prev .missing{color:var(--amber);font-size:11px;}
+.edit-prev .attach-append{margin-top:8px;padding-top:6px;border-top:1px dashed var(--border-strong);font-size:10.5px;color:var(--muted-2);}
+.stat-bar{display:flex;gap:12px;font-size:10.5px;color:var(--muted-2);margin-top:5px;flex-wrap:wrap;}
+.stat-bar b{color:var(--text);}
+.stat-bar .draft{color:var(--teal);}
+
+/* / 슬래시 명령 메뉴 */
+.slash-menu{position:absolute;z-index:20;background:var(--panel);border:1px solid var(--blue);border-radius:8px;
+  box-shadow:0 6px 18px rgba(0,0,0,.4);min-width:230px;max-height:220px;overflow-y:auto;display:none;}
+.slash-menu.on{display:block;}
+.slash-menu .sm-lead{font-size:10.5px;color:var(--muted-2);padding:5px 9px;border-bottom:1px solid var(--border);}
+.slash-menu .sm-item{padding:5px 9px;font-size:12px;color:var(--text);cursor:pointer;display:flex;gap:6px;align-items:center;}
+.slash-menu .sm-item.sel,.slash-menu .sm-item:hover{background:rgba(59,130,246,.18);color:var(--blue-light);}
+.slash-menu .sm-empty{padding:8px 9px;font-size:11.5px;color:var(--muted-2);}
+
+.toast-line{margin-top:6px;font-size:11px;color:var(--teal);min-height:14px;}
+.toast-line.err{color:#f5928a;}
+
+/* ── §7 상세 패널 ── */
+.detail-sim{width:440px;max-width:100%;padding:12px 14px;}
+.dn{font-weight:800;font-size:13.5px;margin-bottom:4px;}
+.dm{color:var(--muted);line-height:1.6;font-size:12.5px;}
+.gtxt-rag{color:var(--teal);font-weight:700;}
+.gtxt-share{color:var(--amber);font-weight:700;}
+.dbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+.dbt button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:6px;padding:5px 10px;font-size:11.5px;cursor:pointer;font-family:inherit;}
+.dbt button:hover{color:#fff;border-color:var(--blue);}
+.dbt button.warn:hover{color:#f5928a;border-color:var(--red);}
+.export-cap{font-size:10.5px;color:var(--muted-2);margin-top:4px;}
+.export-cap.on{color:var(--amber);}
+.share-confirm{margin-top:9px;border-left:3px solid var(--amber);background:rgba(240,160,32,.08);border-radius:0 8px 8px 0;padding:10px 13px;font-size:12px;line-height:1.6;}
+.share-confirm b{color:var(--amber);}
+.share-confirm .n{color:var(--blue-light);font-weight:800;}
+.share-confirm .row{display:flex;gap:7px;margin-top:8px;}
+.share-confirm button{border-radius:6px;padding:5px 11px;font-size:11.5px;cursor:pointer;font-family:inherit;border:1px solid var(--border-strong);}
+.share-confirm button.ok{background:var(--amber);border-color:var(--amber);color:#231b06;font-weight:800;}
+.share-confirm button.cancel{background:transparent;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1>내 문서 편집기 — Smart MD보다 낫게 · 사이드바 재편 · 템플릿 연계</h1>
+<p class="lead">사장님 지시 4통(2026-08-22) 전부 반영 순서대로 쌓았다: ① Smart MD 대체 ② 공유 되묻기 B안
+③ 사이드바 별도 항목+템플릿 연계 ④ "엑셀형, 노션·커서 참고 배율". §를 따라가면 지시가 어떻게
+답이 됐는지 그대로 보인다.</p>
+
+<h2><span class="num">§0</span> 결론</h2>
+<ul class="checklist">
+<li>✍ 문서 편집이 사이드바 <b>별도 9번째(정확히는 2번째) 항목</b>이 된다 — 👤 내 것 바로 옆.</li>
+<li>템플릿은 <b>두 층</b>이다: 기존 8종(빈 골격, 클라 상수, 구조 안 건드림) + <b>신설 연계 5종</b>
+  (하드닝 점검·라이선스 검토·규정 판정·침해사고 7단계·취약점 조치 — 실제 서버 데이터로 채워진다).</li>
+<li>모든 목록(템플릿·이력·첨부·사이드바)이 <b>30px 행</b>이다 — 카드·격자·타임라인을 없앴다.</li>
+<li>편집 칸은 <b>커서처럼 넓게, 노션처럼 "/"로</b> 템플릿을 부른다 — 노션의 중앙정렬 700px 여백은 버렸다.</li>
+<li>보안 되묻기는 <b>B안</b> 그대로: 회사 공유 + 이미지 있을 때만.</li>
+</ul>
+
+<h2><span class="num">§1</span> Smart MD ↔ 이 안 대조표</h2>
+<table class="doc">
+<tr><th style="width:15%">항목</th><th style="width:30%">Smart MD Studio</th><th style="width:33%">이 안</th><th style="width:22%">판정·근거</th></tr>
+<tr><td>미리보기</td><td>매 keystroke 전체 재파싱, 디바운스 0(app.js:83)</td>
+  <td>100ms 디바운스([외부1] 닐슨 0.1초 문턱) + 스크롤 동기화(Smart MD엔 있고 옛 mydocs엔 없던 것)</td>
+  <td class="win">이 안</td></tr>
+<tr><td>캡처 삽입</td><td>본문에 raw base64(app.js:505), 1장≈16만자</td>
+  <td>본문엔 <code>[사진1]</code> 토큰만, 실 그림은 별도 배열 — 20만자 한도 무관</td><td class="win">이 안</td></tr>
+<tr><td>첨부 관리</td><td>없음(텍스트를 직접 잘라야 함)</td><td>30px 행 목록에서 지우기·순서(§6)</td><td class="win">이 안</td></tr>
+<tr><td>이미지 주석</td><td>있음(app.js:551-592)</td><td>없음 — 의도적 제외</td><td class="lose">Smart MD(포기)</td></tr>
+<tr><td>서식 도구모음</td><td>11버튼+단축키</td><td>없음 — "/" 명령 + 템플릿으로 대체(§2·§6)</td><td class="lose">Smart MD(포기)</td></tr>
+<tr><td>템플릿</td><td>4종, 데이터 연계 없음</td><td><b>8종(빈)+5종(연계, 실 데이터)</b> — Smart MD엔 이 개념 자체가 없다</td><td class="win">이 안 — 격차 큼</td></tr>
+<tr><td>문서 이력</td><td>자동 스냅샷, <code>confirm()</code>으로 즉시 덮어씀(app.js:408-419)</td>
+  <td>저장할 때만 스냅샷(수동저장이라 자연히 뜸함) · 복원은 버퍼만 채움, 저장은 사람이(§8)</td>
+  <td class="win">이 안 — 설계상 더 안전, 서버 신설 필요</td></tr>
+<tr><td>저장</td><td>완전 자동(로컬 저장뿐, 다중기기 동기화 없음)</td>
+  <td>명시적 저장(서버 DB) + 저장 안 함 배지 + 로컬 초안 안전망</td><td class="win">이 안</td></tr>
+<tr><td>내보내기</td><td>4형식(md/HTML/PDF/docx)</td><td>지금 3형식→HTML 추가로 4형식 동률</td><td>동률</td></tr>
+<tr><td>그림 속 정보 노출</td><td>개념 없음(격리 창이라 안 가림)</td><td>공유 켤 때만 사실을 말하는 확인(B안, §9)</td><td class="win">이 안만 있음</td></tr>
+<tr><td>소속·격리</td><td>서버 권한 0 — 회사 지식·공유 개념이 없다</td><td>personal_docs 통합 — "여기서만"의 핵심</td><td class="win">이 안만 가능</td></tr>
+</table>
+
+<h2><span class="num">§2</span> 왜 이 안인가 · 무엇을 포기했는지</h2>
+<table class="doc">
+<tr><th>포기한 것</th><th>이유</th></tr>
+<tr><td>이미지 주석(화살표·모자이크)</td><td>고객 약속 목록 5개 어디에도 없다 — 별개 제품 크기.</td></tr>
+<tr><td>서식 도구모음 11버튼</td><td>[4]("엑셀형·디자인 최소")와 정면충돌 — 대신 "/" 명령(§외부3) + 템플릿 골격.</td></tr>
+<tr><td><b>노션의 넉넉한 여백·중앙정렬 700px 칸</b></td>
+  <td>[5]에서 사장님이 직접 지목해 버리라고 했다 — [4]와 충돌하기 때문. 편집 칸은 문서창 폭을 그대로 쓴다(§3).</td></tr>
+<tr><td>이미지 즉시 인라인(WYSIWYG)</td><td>원문 탭엔 <code>[사진1]</code> 글자만 — 20만자 한도를 이미지가 안 먹게 하는 대가.</td></tr>
+<tr><td>완전 자동저장(서버, 초 단위)</td><td>잦은 서버 쓰기는 §12의 공유 플래그 경합 같은 문제를 늘리는 방향 — 명시적 저장+로컬 초안으로 대신.</td></tr>
+<tr><td>"/"에 데이터 연계 템플릿까지 포함</td><td>연계 템플릿은 서버 조회가 필요해 몇백ms 걸릴 수 있다 — 가벼운 "/"(빈 골격, 로컬)와 무거운
+  것(연계, 서버)을 같은 입력 손짓에 안 섞는다(§5·§6). 연계는 전용 30px 표에 둔다.</td></tr>
+</table>
+
+<h2><span class="num">§3</span> 외부 사례 조사 — 무엇을 가져오고 무엇을 버렸나</h2>
+<table class="doc">
+<tr><th>항목</th><th>Notion</th><th>Cursor/VS Code</th><th>우리가 고른 값</th><th>근거</th></tr>
+<tr><td>사이드바 폭</td><td>도움말상 아코디언 트리, 폭 수치 비공개</td><td>고정 폭 좁은 Primary Side Bar(공식 문서),
+  커뮤니티 다수 스레드에서 "전체 zoom으로만 조절"</td><td class="win"><b>208px 유지</b></td>
+  <td>docs-hub-v4-workspace가 이미 216px 관례치 근거로 확정 — 재확인만, 재발명 안 함</td></tr>
+<tr><td>편집 칸 폭</td><td>본문 최대 약 700px 중앙정렬(가독성 벤치마크 통설), Full Width는 옵션</td>
+  <td>주 편집 영역이 창 대부분을 차지, 보조 패널만 좁음</td><td class="win"><b>문서창 전체 폭(제한 없음)</b></td>
+  <td>[외부5] + [4] "많은 데이터를 한눈에" — Notion 700px은 의도적으로 버림(§2)</td></tr>
+<tr><td>줄 높이/글자</td><td>큰 글씨(가독성 우선, 산문형)</td><td>[외부4] 기본 14px 안팎, "이미 조밀한 편"이 정설,
+  1.35~1.5배 라인하이트가 흔한 실무값</td><td class="win"><b>12.5px / line-height 1.5</b>(기존 1.65에서 하향)</td>
+  <td>한글이라 라틴 코드체보다 살짝 낮춤 — VS Code 숫자를 그대로 베끼지 않았다(정직 근거)</td></tr>
+<tr><td>분할 비율(원문:미리보기)</td><td>분할 개념 자체가 없음(WYSIWYG 단일 뷰)</td>
+  <td>주 편집 영역 &gt; 보조 패널</td><td class="win"><b>58 : 42</b>(기존 50:50에서 조정)</td>
+  <td>[외부5] "주 편집이 넓다" 원칙을 그대로 수치화 — 원문이 저작의 주 무대다</td></tr>
+<tr><td>조작 방식</td><td class="win"><b>"/" 명령</b>(치는 즉시 필터 메뉴, [외부3])</td>
+  <td>커맨드 팔레트(Ctrl+Shift+P) — 유사 계열</td><td class="win"><b>"/" 채택</b>(§6)</td>
+  <td>이미 mockups/docs-hub-v4-workspace/시안.html에 "/ 서식 삽입 메뉴"가 승인 없이도 실렸던 전례 —
+    이번에 정식으로 판정한다(아래)</td></tr>
+</table>
+
+<h3>"/" 명령이 「지시」로 읽히는가 — 판정(반증 시도 포함)</h3>
+<p><b>결론: 지시가 아니다, 저작 행위다.</b> 반증을 세 갈래로 시도했다:</p>
+<ul class="doc">
+<li><b>경로 반증</b> — "/"가 여는 목록은 서버·에이전트루프·LLM을 <b>전혀 호출하지 않는다.</b> 순수
+  클라이언트 텍스트 치환(TEMPLATES 코드 상수를 찾아 끼워 넣기)이다. "지시"가 성립하려면 AI가 뭔가를
+  "하게" 만들어야 하는데, 이 경로엔 애초에 AI가 없다 — 반증 실패(지시가 아니라는 결론이 버틴다).</li>
+<li><b>문맥 반증</b> — mydocs.html:47-49가 이미 "본문 작성 자리는 저작 행위"라고 편집기 전체를
+  예외로 뒀다. "/"는 그 예외 <b>안에서</b> 일어나는 조작이지 새 입력칸을 여는 게 아니다 — 반증 실패.</li>
+<li><b>전례 반증</b> — mockups/docs-hub-v4-workspace/시안.html(2026-08-21 승인)이 이미 "/ 서식
+  삽입 메뉴"를 실동작 데모에 넣었고 반려되지 않았다 — 반증 실패(이미 한 번 같은 판정을 통과했다).</li>
+</ul>
+<p>세 갈래 다 반증이 안 됐으므로 채택한다. 단 §2에서 정한 대로 <b>연계(데이터) 템플릿은 "/"에서 뺀다</b>
+— 그건 서버 조회가 걸려 "가벼운 저작 손짓"의 성격을 벗어난다.</p>
+
+<h2><span class="num">§4</span> 사이드바 9항목 재편</h2>
+<p>지금 6항목(mydocs.html:39-41: 내 것·회사 지식·제품 안내·학습·반입·산출물)에 <b>✍ 문서 편집</b>이
+새로 서고, 같은 시기 다른 작업이 <b>📦 보안제품 자료·📞 연락처</b>를 더한다(그 화면 내용은 이 시안
+범위 밖 — 자리만 잡는다). [4] 지시대로 <b>접지 않는다, 감추지 않는다</b> — 대신 <b>0px짜리 가는 선</b>
+(테두리 1px)만으로 3덩이를 나눴다: 접이식 헤더(28px 손실)를 안 쓴 이유가 그것이다.</p>
+<div class="framewrap">
+<div class="simframe">
+<div class="side-sim">
+  <div class="grp">
+    <button class="snode on">👤 내 것<span class="cnt">18</span></button>
+    <button class="snode new">✍ 문서 편집<span class="cnt">NEW</span></button>
+  </div>
+  <div class="grp">
+    <button class="snode">🏢 회사 지식<span class="cnt">64</span></button>
+    <button class="snode">📘 GIJO AS 안내<span class="cnt">12</span></button>
+    <button class="snode">📦 보안제품 자료<span class="cnt">—</span></button>
+    <button class="snode">📞 연락처<span class="cnt">—</span></button>
+  </div>
+  <div class="grp">
+    <button class="snode">🎓 학습<span class="cnt">44</span></button>
+    <button class="snode">🩹 반입<span class="cnt">7</span></button>
+    <button class="snode">🗂 산출물<span class="cnt">—</span></button>
+  </div>
+</div>
+<div class="side-body">
+  <p style="margin-top:0"><b>묶음 판단(내 판단, 반증 가능):</b></p>
+  <ul class="doc" style="margin-left:16px">
+    <li><b>①저작</b>(내 것·문서 편집) — 사장님이 "짝"이라 짚은 그대로 붙였다. 문서 편집이 <b>쓰기 시작점</b>,
+      내 것이 <b>파일 관리자</b>(§5 마지막 문단에서 역할 차이를 확정).</li>
+    <li><b>②참고자료</b>(회사 지식·GIJO AS 안내·보안제품 자료·연락처) — 전부 "찾아서 읽는" 성격,
+      쓰기 조작이 없다.</li>
+    <li><b>③자동/이력</b>(학습·반입·산출물) — 사람이 손으로 안 만들고 시스템이 쌓는 것들.
+      ⚠ <b>🩹 반입은 곧 커진다</b>(사장님 예고 — 취약점 스캔·보안로그·운영리포트 원본까지) — 이번
+      시안은 그 확장을 설계하지 않지만, ③ 자리에 남을 것은 셈에 넣었다(전용 화면으로 분리될 수도
+      있다는 뜻 — 그건 그 작업이 판단할 몫).</li>
+  </ul>
+  <div class="measurebox" id="sideMeasure" style="margin-top:10px">측정 준비 중…</div>
+</div>
+</div>
+</div>
+
+<h2><span class="num">§5</span> 템플릿 연계 — "협업"의 실체</h2>
+<p><b>확인 결과: 지금 8종 중 자동으로 채워지는 것은 0개다.</b> 전부 손으로 빈칸을 채우는 골격 텍스트고
+(mydocs.html:395-411), 기존 기능(하드닝 점검·라이선스 판정·규정 판정·조치 요청)의 결과를 끌어오는
+길이 하나도 없다. 아래는 사장님이 준 접점표를 실제 코드로 대조·반증한 결과다.</p>
+<table class="doc">
+<tr><th>기존 기능(실제 존재 확인)</th><th>템플릿 후보</th><th>실 데이터 소스(파일:필드)</th><th>이번/나중</th></tr>
+<tr><td>하드닝 점검(hardeningscan.ts)</td><td>🧪 점검 결과서</td>
+  <td><code>ScanReport{standard,target,items[].{id,cat,title,status,evidence},summary}</code></td>
+  <td class="win">이번 — 데이터 완비</td></tr>
+<tr><td>공급망 점검·SBOM(licenserisk.ts)</td><td>⚖ 라이선스 검토서</td>
+  <td><code>라이선스판정{등급,받게되는요구,spdxId,근거,확인필요}</code> + <code>등급요약()</code></td>
+  <td class="win">이번 — 데이터 완비</td></tr>
+<tr><td>행동 대조 판정(actioncheck.ts)</td><td>📋 규정 판정 기록</td>
+  <td><code>ActionCheckHistoryRow{askedAt,question,verdict,basisRefs,verdictText}</code>,
+  이미 <code>listActionCheckHistory()</code>로 대화창이 쓰고 있음</td><td class="win">이번 — 데이터 완비</td></tr>
+<tr><td>침해사고 초동 절차(incidentsteps.ts, <b>실제로 7단계</b> 확인)</td><td>🚨 침해사고 보고서</td>
+  <td><code>침해사고초동절차()</code> 반환문 — 7개 표제(증거보전~재발감시), <b>시각·조치내용은
+  사건별이라 코드가 모른다 → 표제만 자동, 나머지는 빈칸</b></td><td class="win">이번 — 표제만 자동(정직 한계 명시)</td></tr>
+<tr><td>조치 요청(remrequest.ts)</td><td>🛠 취약점 조치 보고서</td>
+  <td><code>OutboundRequest{kind,targetName,dueDate,status,findingKeys}</code> + <code>playbook.
+  remediationFor()</code> — 단 <code>resolveFindings()</code>가 지금 <b>비공개 함수</b>라 findingKeys→
+  실제 자산/취약점 이름 변환에 신규 export 필요</td><td class="later">이번 설계, 구현은 작은 서버작업 필요(§12)</td></tr>
+<tr><td>보안제품 자료(진행 중 — 아직 코드 없음)</td><td>📑 제품 검토 품의서</td>
+  <td>없음 — 있는 척하지 않는다</td><td class="later">나중(그 작업 완료 후)</td></tr>
+<tr><td>연락처(진행 중 — 아직 코드 없음)</td><td>📇 "담당자" 자동 채움</td>
+  <td>없음 — 이건 <b>독립 템플릿이 아니라</b> 위 다른 템플릿들의 "담당자" 칸을 대체할 <b>부품</b>이다
+  (타이핑 대신 고르기)</td><td class="later">나중 — 그때까지 담당자 칸은 지금처럼 자유 텍스트</td></tr>
+</table>
+
+<h3>메커니즘 — 왜 <code>.tpl-chip</code> 개수를 안 건드렸나</h3>
+<p>기존 8종은 <b>클라 상수</b>(TEMPLATES 배열, 서버 모름)다. 연계 5종은 <b>서버가 조립</b>해야 한다
+(remrequest.ts:92 "클라 TEMPLATES는 서버가 모른다"는 같은 원칙이 이미 이 저장소에 있다). 성격이 다른
+것을 같은 칩 목록에 욱여넣으면 "빈 것"과 "데이터 로딩 중"이 구분 안 돼 헷갈린다. 그래서 <b>연계
+템플릿은 별도의 30px 표</b>(<code>#linkedTpl</code>, <code>.tpl-chip</code> 아님)로 뒀다 — 이러면
+<b>게시 관문의 <code>=== 8</code>을 안 건드려도 된다.</b> (표 형태로 합치는 대안도 가능하지만, 그러면
+관문 상수를 8→13으로 고쳐야 하고 "빈 것"·"데이터 있는 것"을 한 선택자로 세게 된다 — 덜 정직하다고
+판단했다. §12에 두 방식 다 적어 최종 판단은 메인 에이전트·설계관 몫으로 남긴다.)</p>
+
+<h2><span class="num">§6</span> 라이브 데모 — ✍ 문서 편집(전용 화면)</h2>
+<p class="lead">사이드바에서 ✍ 문서 편집을 누르면 이 화면이 뜬다(👤 내 것과 다른 자리 — 내 것은 "이미
+쓴 문서를 찾아 관리", 문서 편집은 "지금 바로 쓰기 시작"). 문서창 900px 기준, 분할 58:42.</p>
+<div class="framewrap">
+<div class="simframe">
+<div class="simcap" style="flex:0 0 100%"><b>문서창(900px)</b> — #editStage·#btnNew·#tplDrawer .tpl-chip(8개)·
+  #readBody id 그대로(게시 관문). "/"를 원문 칸에 쳐 보라 — 실제로 메뉴가 뜬다.</div>
+</div>
+</div>
+<div class="framewrap">
+<div class="simframe">
+<div class="docpane-sim">
+  <div class="stage2" id="editStage">
+    <div class="st-top">
+      <button class="back">← 닫기</button>
+      <input class="st-title-in" id="dTitle" maxlength="120" placeholder="제목을 적어 주세요">
+      <button class="st-btn" id="btnNew">📋 업무 템플릿</button>
+      <button class="st-btn" id="dHistBtn">🕘 이력</button>
+      <div class="viewseg" id="dViewSeg">
+        <button data-v="src" class="on">원문</button>
+        <button data-v="split">분할</button>
+        <button data-v="prev">미리보기</button>
+      </div>
+      <button class="st-btn save" id="dSave">💾 저장<span class="dirty-dot" id="dDirty"></span></button>
+    </div>
+    <div class="st-warn">⚠ 비밀번호는 저장할 때 자동으로 살펴봅니다. <b>그림 속 글자는 못 가립니다</b> —
+      공유를 켤 때 따로 확인합니다(§9). 원문 칸에 <code>/</code>를 쳐 보세요 — 템플릿 메뉴가 뜹니다.</div>
+
+    <div class="tpl-drawer" id="tplDrawer"></div>
+
+    <div class="linked-wrap">
+      <div class="linked-head">🔗 연계 템플릿 — 기존 기능의 결과로 채워집니다(예시 데이터로 시연)</div>
+      <div class="mini-rows" id="linkedTpl"></div>
+    </div>
+
+    <div class="hist-drawer" id="histDrawer">
+      <div class="mini-rows" id="histRows"></div>
+    </div>
+
+    <div class="attach-strip" id="attachStrip">
+      <div class="attach-hint" id="attachHint">원문 칸에 화면 캡처를 <b style="color:var(--text)">Ctrl+V</b>로
+        붙여넣거나 끌어다 놓으세요 — 최대 10장.</div>
+      <div class="mini-rows" id="attachRows" style="display:none"></div>
+      <div class="attach-orphan" id="attachOrphan" style="display:none"></div>
+    </div>
+
+    <div class="edit-split src-only" id="dSplit">
+      <div class="edit-src">
+        <textarea id="dBody" placeholder="본문을 적어 주세요 — /를 치면 템플릿 메뉴가 뜹니다. 화면 캡처는 Ctrl+V."></textarea>
+        <div class="slash-menu" id="slashMenu"></div>
+      </div>
+      <div class="edit-prev" id="dPrev"></div>
+    </div>
+    <div class="stat-bar" id="statBar"></div>
+    <div class="toast-line" id="toastA"></div>
+  </div>
+</div>
+</div>
+</div>
+<p class="src">§5 표에서 "이번" 4종(점검 결과서·라이선스 검토서·규정 판정 기록·침해사고 보고서)을
+🔗 연계 템플릿 행에서 눌러 보면 실 필드 이름 그대로 채워진 <b>예시 데이터</b>가 즉시 들어간다(정직
+라벨: "시안 예시 데이터"). 8종 빈 템플릿은 위 📋 서랍이나 "/"에서 그대로 빈칸으로 열린다 — 이 둘의
+차이가 "빈 템플릿 vs 채워진 템플릿"이다.</p>
+
+<h2><span class="num">§7</span> 라이브 데모 — 상세 패널(공유 되묻기 B안·내보내기)</h2>
+<div class="framewrap">
+<div class="simframe">
+<div class="simcap" style="flex:0 0 100%"><b>상세 패널(440px)</b> — 👤 내 것에서 저장된 문서를 골랐을 때.
+  예시: "네트워크 취약점 점검 결과"(첨부 2장 가정).</div>
+</div>
+</div>
+<div class="framewrap">
+<div class="simframe">
+<div class="detail-sim">
+  <div class="dn">네트워크 취약점 점검 결과</div>
+  <div class="dm" id="detMeta"></div>
+  <div class="dbt">
+    <button data-act="edit">✏ 고치기</button>
+    <button data-act="rag" id="bRag">AI 포함</button>
+    <button data-act="share" id="bShare">🏢 공유</button>
+    <button data-act="down">⬇ .md</button>
+    <button data-act="html">⬇ HTML</button>
+    <button data-act="pdf">⬇ PDF</button>
+    <button data-act="word">⬇ Word</button>
+    <button data-act="del" class="warn">✕ 삭제</button>
+  </div>
+  <div class="export-cap on" id="exportCap">📎 첨부 2장 — 내보낸 파일에도 그대로 담깁니다(가려지지 않습니다).</div>
+  <div id="shareConfirmSlot"></div>
+  <div class="toast-line" id="toastB"></div>
+</div>
+</div>
+</div>
+
+<h2><span class="num">§8</span> 밀도 숫자(실측 + 1920×1080 계산)</h2>
+<p>아래는 로드 즉시 1회 실측한 값이고, 조작할 때마다 다시 잰다. "1920×1080 몇 줄" 행은 위에서 실측한
+편집 칸 세로 픽셀과 텍스트 line-height(computed)로 <b>계산</b>한 값이다(추측 아님, 계산식을 옆에 적었다).</p>
+<div class="measurebox calc" id="measureBox">측정 준비 중…</div>
+<table class="doc">
+<tr><th>구성요소</th><th>이번 라운드 전(추정, mydocs.html 실 CSS 기준)</th><th>이번 안(실측)</th><th>비고</th></tr>
+<tr><td>템플릿 서랍(8개, 열림)</td><td class="num">~96px(4열×2행 카드)</td><td class="num" id="cmpTpl">재는 중…</td>
+  <td>카드→30px 이하 1행 리스트로 — 개수는 그대로, 높이는 표에서 실측</td></tr>
+<tr><td>첨부(3장 가정)</td><td class="num">~78px(썸네일 격자)</td><td class="num" id="cmpAtt">재는 중…</td>
+  <td>격자→행 목록, 얇은 썸네일 26×18 인라인</td></tr>
+<tr><td>이력(예시 2건)</td><td class="num">~110px(세로 타임라인 카드)</td><td class="num" id="cmpHist">재는 중…</td>
+  <td>타임라인→표(날짜·고친 이·바뀐 줄 수·되돌리기)</td></tr>
+<tr><td>분할 비율</td><td>50 : 50</td><td>58 : 42</td><td>[외부5] 주 편집 영역 우선</td></tr>
+<tr><td>편집칸 line-height</td><td>1.65</td><td>1.5</td><td>[외부4] — 한글 특성 고려해 VS Code 값 그대로는 안 씀</td></tr>
+</table>
+
+<h2><span class="num">§9</span> 원칙 자가점검 + 약속 목록 5개</h2>
+<ul class="checklist">
+<li>입력칸 0 예외 — mydocs.html:47-49 그대로, "/"·연계 템플릿도 결국 "고르기"이지 "지시"가 아니다(§3).</li>
+<li>화면엔 정체성 한 줄+⚠경고만 — 사용법은 ⓘ 챗봇으로.</li>
+<li>엑셀형·다크·기존 색·글꼴 — 전 목록 30px 행, 카드·타임라인·큰 썸네일 격자를 없앴다([4] 정면 반영).</li>
+<li>가짜 상호작용 금지 — md·HTML 다운로드는 진짜 파일. PDF·Word·실제 저장·실제 연계 데이터 조회는
+  "(시안) …" 라벨. 연계 템플릿 예시 데이터는 "시안 예시 데이터"라고 항상 표시.</li>
+<li><code>confirm()</code> 금지 원칙 준수 — 이력 복원·공유 확인 전부 화면 안 카드.</li>
+<li class="warn">라이트도 같은 화면 — 사이드바 9항목·연계 템플릿 표는 폭이 좁아지면 줄바꿈/가로
+  스크롤로 대응해야 한다(이 시안은 그 좁은 폭 실기 확인까진 못 했다 — 구현 뒤 라이트에서 확인 필요).</li>
+</ul>
+<h3>약속 목록 5개</h3>
+<ul class="checklist">
+<li>화면 캡처 Ctrl+V — §6 첨부 행 목록(paste는 #dBody에 직접)</li>
+<li>.md/HTML/PDF/워드 4형식 — §7(md·HTML 실동작, PDF·Word 라벨)</li>
+<li>템플릿 — §6 8종(빈)+5종(연계, §5)</li>
+<li>문서 이력 — §6 이력 표(신설, 서버 필요 — §12)</li>
+<li>인터넷 불필요 — 전부 로컬 처리, 서버 호출은 온프렘(4000)뿐</li>
+</ul>
+
+<h2><span class="num">§10</span> 사장님 결정 B — 왜 B인가</h2>
+<table class="doc">
+<tr><th>안</th><th>결과</th><th>판정</th></tr>
+<tr><td>A — 늘 경고</td><td>매번 뜨는 경고는 안 읽는다</td><td class="lose">기각</td></tr>
+<tr><td>C — 이미지 있으면 공유 금지</td><td>증적 공유 목적 자체를 막는다</td><td class="lose">기각</td></tr>
+<tr><td><b>B — 공유 켤 때만, 이미지 있을 때만</b></td><td>위험이 실제로 커지는 순간에만 마찰</td>
+  <td class="win">채택 — personaldocs.ts:249-250 "막지 않는다, 대신 알린다"</td></tr>
+</table>
+<table class="doc">
+<tr><th>출구</th><th>결정</th><th>근거</th></tr>
+<tr><td>AI 지식 포함(ragOptIn)</td><td class="win">되묻지 않음</td>
+  <td>personaldocs.ts:207-208 — "내 질문에만 근거로 나옵니다", 새 사람이 안 본다</td></tr>
+<tr><td>PDF·Word 내보내기</td><td class="win">되묻지 않음 — 문구 한 줄</td>
+  <td>내보내기는 이미 명시적 조작 — 확인창을 얹어도 새 정보가 없다</td></tr>
+</table>
+
+<h2><span class="num">§11</span> 되묻기 문구 원문(mydocs.html:1124-1126 잣대)</h2>
+<div class="quote">"글에 섞인 비밀번호·API 키는 <b>자동으로 가립니다</b>. 그림 속 내용은 <b>자동으로 가릴 수
+없습니다.</b>" — §7의 공유 카드는 같은 사실을 "회사 공유" 문맥에 맞춰 다시 썼다. 겁주는 형용사 없이.</div>
+
+<h2><span class="num">§12</span> 구현 참고</h2>
+<ul class="checklist">
+<li>게시 관문(publish-gate-ui.mjs:245-320) — <code>#editStage</code>·<code>#btnNew</code>·
+  <code>#tplDrawer .tpl-chip===8</code>·<code>#readBody</code>·폭 계약 그대로. 연계 템플릿은 <b>다른
+  선택자</b>(<code>#linkedTpl</code>)라 관문 수정이 필요 없다 — 단 <b>합쳐서 하나의 칩 목록으로
+  가겠다면</b> <code>=== 8</code>을 <code>=== 13</code>으로 고쳐야 한다(8빈+5연계). 어느 쪽이든
+  값은 실화면에서 다시 재야 한다.</li>
+<li>붙여넣기 리스너는 <code>#editBody</code> 요소 자체에(document 아님) — §5-A 그대로 유지.</li>
+<li><b>연계 템플릿 서버 작업(신규, 이번 시안 범위 밖)</b> — remrequest.ts의 <code>buildRequestDraft</code>
+  패턴을 그대로 승계해 <code>build점검결과서Draft()</code>·<code>build라이선스검토서Draft()</code>·
+  <code>build규정판정기록Draft()</code>·<code>build침해사고보고서Draft()</code> 4개를 서버에 만들고,
+  기존 §6 신고시한 계약(<code>gijo:newDocFromTemplate</code>, mydocs.html:1006-1034)의 <code>prefill</code>
+  경로로 편집기에 꽂는다 — <b>새 배선이 아니라 이미 있는 배선의 두 번째 사용처</b>다.</li>
+<li>🛠 취약점 조치 보고서 — <code>remrequest.ts</code>의 <code>resolveFindings()</code>가 지금
+  비공개(파일 안 함수)다. export하거나 동등 로직을 복제해야 한다.</li>
+<li><b>★발견(정본 불일치)</b> — 기존 TEMPLATES의 "침해사고 1차 보고"(mydocs.html:397)가
+  <code>incidentsteps.ts</code>의 7단계와 <b>다른 손글씨 절차</b>를 쓰고 있다. 챗봇이 "침해사고 어떻게
+  대응해?"라고 답하는 절차와, 문서 템플릿이 주는 절차가 달라질 수 있다는 뜻이다 — 이번 연계 템플릿
+  (🚨 침해사고 보고서, incidentsteps.ts 직접 참조)이 자리잡으면, 기존 빈 템플릿 쪽도 <b>같은 소스로
+  합치는 정리</b>를 다음 라운드에 권한다(이번 시안 범위 밖, 판단은 메인 에이전트).</li>
+<li>사이드바 9항목 — 📦 보안제품 자료·📞 연락처는 <b>다른 작업이 화면 내용을 만든다</b>. 이 시안은
+  자리(순서·묶음)만 확정했다 — 그 작업이 실제 화면을 붙일 때 <code>.v4node</code> 목록에 항목 2개를
+  추가하면 된다(구조 변경 없음, mydocs.html:39-101 그대로 확장 가능).</li>
+<li>공유 플래그 경합(재확인) — personaldocs.ts:221-223, <code>shareStmt.run</code>이 먼저 커밋되고
+  <code>syncRag</code>가 나중에 돈다 — 실패해도 <code>shared=1</code>이 남는다. §7의 공유 되묻기를
+  붙이는 배치에서 같이 고쳐야 "확인은 받았는데 실제로는 반쯤 실패"가 안 생긴다.</li>
+<li>HTML 내보내기 — <code>client/src/preload.ts:42</code>의 <code>personalDocsExport(id,"docx"|"pdf")</code>에
+  <code>"html"</code> 추가 필요.</li>
+</ul>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+// ── 업무 템플릿 8종 — mydocs.html:395-411 그대로(코드 상수) ──
+var LEGAL_NOTE = "⚠ 참고용 골격입니다 — 법률 자문이 아닙니다.";
+var TEMPLATES = [
+  { id:"incident_report", icon:"🚨", label:"침해사고 1차 보고", tag:"⏱24h", overlap:"기존 골격(손글씨 5절 — §12 불일치 발견)",
+    body:"### 침해사고 1차 보고\n\n"+LEGAL_NOTE+"\n\n- 인지일시: \n- 대상 시스템: \n\n### 1. 피해내용\n- " },
+  { id:"breach_notice", icon:"📋", label:"개인정보 유출 신고서", tag:"⏱72h", overlap:"",
+    body:"### 개인정보 유출 신고서\n\n"+LEGAL_NOTE+"\n\n- 인지일시: \n- 유출 규모: " },
+  { id:"weekly_report", icon:"📅", label:"주간 보안 보고", tag:"", overlap:"",
+    body:"### 주간 보안 보고\n\n### 1. 이번 주 처리 현황\n- 신규 발견: \n- 조치 완료: " },
+  { id:"handover_note", icon:"🔁", label:"인수인계 메모", tag:"", overlap:"개인 초안",
+    body:"### 인수인계 메모(개인 초안)\n\n### 1. 진행 중인 업무\n- " },
+  { id:"remediation_plan", icon:"🛠", label:"취약점 조치 계획", tag:"", overlap:"",
+    body:"### 취약점 조치 계획\n\n### 대상\n- 자산: \n- 취약점: " },
+  { id:"risk_accept", icon:"⚖", label:"보안 예외 신청", tag:"", overlap:"개인 초안",
+    body:"### 보안 예외(위험수용) 신청\n\n### 유효기간\n- 만료(필수): " },
+  { id:"equipment_check", icon:"🔧", label:"장비 점검 기록", tag:"", overlap:"",
+    body:"### 장비 점검 기록\n\n- 점검일시: \n- 장비명: " }
+];
+var TEMPLATE_BLANK = { id:"blank", icon:"📄", label:"빈 문서", tag:"", overlap:"", body:"" };
+var ALL_TPL = TEMPLATES.concat([TEMPLATE_BLANK]);
+
+// ── 연계 템플릿 5종 — §5 표와 1:1(예시 데이터, "시안 예시 데이터" 라벨 필수) ──
+var LINKED = [
+  { id:"hardening", icon:"🧪", label:"점검 결과서", src:"hardeningscan.ts", ready:true,
+    build:function(){
+      var items=[{id:"ACCT-01",cat:"계정정책",title:"기본 관리자 계정 비활성화",status:"FAIL",evidence:"admin 계정 활성 상태 확인됨"},
+        {id:"NET-04",cat:"네트워크",title:"불필요 포트 차단",status:"PASS",evidence:"3389 포트 닫힘 확인"},
+        {id:"LOG-02",cat:"로그",title:"감사 로그 보관 90일",status:"WARN",evidence:"보관 45일로 설정됨"}];
+      var L=["### 점검 결과서 — CIS 기준(web-app-01)","","- 표준: CIS · 대상: web-app-01 · 점검일: 2026-08-22","- 요약: 총 3건 · PASS 1 · FAIL 1 · WARN 1",""];
+      items.forEach(function(it){ L.push("#### ["+it.id+"] "+it.title+" — "+it.status); L.push("- 분류: "+it.cat); L.push("- 증거: "+it.evidence); L.push(""); });
+      L.push("### 캡처 증적","(위 §6 첨부 스트립에서 화면 캡처를 붙여 이 절 아래 참고로 남기세요)");
+      return { title:"점검 결과서 — web-app-01(CIS)", body:L.join("\n") };
+    }},
+  { id:"license", icon:"⚖", label:"라이선스 검토서", src:"licenserisk.ts", ready:true,
+    build:function(){
+      var parts=[{name:"pdfium2",등급:"고지만",요구:"저작권 고지만 필요",근거:"BSD-3-Clause"},
+        {name:"fast-xml-parser",등급:"고친파일공개",요구:"고친 파일의 소스만 공개",근거:"MPL-2.0"}];
+      var L=["### 라이선스 검토서","","- 검토일: 2026-08-22 · 대상 부품: "+parts.length+"개",""];
+      parts.forEach(function(p){ L.push("#### "+p.name+" — "+p.등급); L.push("- 받게 되는 요구: "+p.요구); L.push("- 근거: "+p.근거); L.push(""); });
+      return { title:"라이선스 검토서", body:L.join("\n") };
+    }},
+  { id:"actioncheck", icon:"📋", label:"규정 판정 기록", src:"actioncheck.ts", ready:true,
+    build:function(){
+      var rows=[{askedAt:"2026-08-20 09:12",question:"USB로 로그 파일을 외부로 반출해도 되나요?",verdict:"deny",basisRefs:"정보보안지침 12조"},
+        {askedAt:"2026-08-21 14:03",question:"외주업체에 점검 결과 요약을 공유해도 되나요?",verdict:"conditional",basisRefs:"정보보안지침 18조"}];
+      var VL={allow:"○ 허용",conditional:"△ 조건부",deny:"× 금지",insufficient:"보류"};
+      var L=["### 규정 판정 기록","",""];
+      rows.forEach(function(r){ L.push("#### "+r.askedAt+" — "+VL[r.verdict]); L.push("- 물음: "+r.question); L.push("- 근거: "+r.basisRefs); L.push(""); });
+      return { title:"규정 판정 기록", body:L.join("\n") };
+    }},
+  { id:"incident7", icon:"🚨", label:"침해사고 보고서(7단계)", src:"incidentsteps.ts", ready:true,
+    build:function(){
+      var steps=["증거 보전","격리(차단)","범위 식별","계정·인증 차단","보고·신고","근절·복구","재발 감시"];
+      var L=["### 침해사고 보고서(코드 7단계 골격)","",LEGAL_NOTE,"","- 인지일시: ","- 대상 시스템: ",""];
+      steps.forEach(function(s,i){ L.push("### "+(i+1)+". "+s); L.push("- 시각: "); L.push("- 조치 내용: "); L.push(""); });
+      return { title:"침해사고 보고서", body:L.join("\n") };
+    }},
+  { id:"vulnfix", icon:"🛠", label:"취약점 조치 보고서", src:"remrequest.ts(자산조회 신규 필요)", ready:false,
+    build:null }
+];
+
+// ── 상태 ──
+var attachments = [], attachCounter = 0, dirty = false;
+var lastTplKey = "gijoMock_lastTpl_내문서편집기2";
+var draftTimer = null, previewTimer = null, syncingScroll = false, baseline = null;
+var MAX_IMAGE_DIMENSION = 1600, JPEG_QUALITY = 0.85;
+
+var $body=document.getElementById("dBody"), $title=document.getElementById("dTitle"), $prev=document.getElementById("dPrev"),
+    $save=document.getElementById("dSave"), $dirty=document.getElementById("dDirty"), $toastA=document.getElementById("toastA"),
+    $statBar=document.getElementById("statBar"), $tplDrawer=document.getElementById("tplDrawer"),
+    $histDrawer=document.getElementById("histDrawer"), $histRows=document.getElementById("histRows"),
+    $attachRows=document.getElementById("attachRows"), $attachOrphan=document.getElementById("attachOrphan"),
+    $linkedTpl=document.getElementById("linkedTpl"), $slash=document.getElementById("slashMenu");
+
+// ── 템플릿 서랍(빈 8종, 1행 리스트) ──
+function drawTemplates(){
+  var recent=null; try{ recent=localStorage.getItem(lastTplKey); }catch(e){}
+  $tplDrawer.innerHTML = '<div class="tpl-lead">고르면 본문이 골격으로 채워집니다 — 코드 상수, AI가 짓지 않습니다.</div>' +
+    ALL_TPL.map(function(t){
+      return '<button class="tpl-chip" data-tpl="'+esc(t.id)+'"><span>'+t.icon+'</span><span class="trunc">'+esc(t.label)+'</span>'+
+        (t.id===recent?'<span class="recent">최근</span>':'<span></span>')+
+        '<span class="tag">'+(t.tag?esc(t.tag):(t.overlap?'<span class="ov">'+esc(t.overlap)+'</span>':''))+'</span></button>';
+    }).join("");
+}
+document.getElementById("btnNew").addEventListener("click", function(){
+  $tplDrawer.classList.toggle("on"); this.classList.toggle("on", $tplDrawer.classList.contains("on"));
+});
+$tplDrawer.addEventListener("click", function(ev){
+  var btn=ev.target.closest(".tpl-chip"); if(!btn) return;
+  applyTemplate(ALL_TPL.find(function(x){return x.id===btn.getAttribute("data-tpl");}));
+});
+function applyTemplate(t){
+  if(!t) return;
+  $body.value = t.body;
+  if(!$title.value.trim() && t.id!=="blank") $title.value = t.label;
+  try{ localStorage.setItem(lastTplKey, t.id); }catch(e){}
+  drawTemplates(); markDirty(); schedulePreview(); measureAll();
+}
+
+// ── 연계 템플릿(5종, 예시 데이터로 채움) ──
+function drawLinked(){
+  $linkedTpl.innerHTML = '<div class="mini-head" style="grid-template-columns:24px 1fr 130px 70px">'+
+    '<span></span><span>이름</span><span>소스</span><span></span></div>' +
+    LINKED.map(function(t){
+      return '<div class="mini-row" style="grid-template-columns:24px 1fr 130px 70px" data-linked="'+esc(t.id)+'">'+
+        '<span>'+t.icon+'</span><span class="trunc">'+esc(t.label)+'</span>'+
+        '<span class="trunc" style="color:var(--muted-2);font-size:10.5px">'+esc(t.src)+'</span>'+
+        (t.ready ? '<button data-fill="'+esc(t.id)+'">채워서 열기</button>' : '<span class="later">나중</span>')+
+        '</div>';
+    }).join("");
+}
+$linkedTpl.addEventListener("click", function(ev){
+  var b=ev.target.closest("[data-fill]"); if(!b) return;
+  var t=LINKED.find(function(x){return x.id===b.getAttribute("data-fill");});
+  if(!t||!t.build) return;
+  if ($body.value.trim()){
+    // 이미 쓴 내용이 있으면 화면 안 확인(네이티브 confirm 금지) — 시안은 항상 진행으로 흉내
+  }
+  var r = t.build();
+  $body.value = r.body; $title.value = r.title;
+  markDirty(); schedulePreview(); measureAll();
+  toast($toastA, "🔗 "+t.label+" — 실 데이터로 채워졌습니다(시안 예시 데이터, 실제로는 "+t.src+"에서 조회합니다).");
+});
+// ── 이력(표, 예시 2건) ──
+document.getElementById("dHistBtn").addEventListener("click", function(){
+  $histDrawer.classList.toggle("on"); this.classList.toggle("on", $histDrawer.classList.contains("on"));
+});
+function drawHistory(){
+  var rows=[
+    {t:"방금 — 지금 편집 중",who:"—",diff:"—",act:null},
+    {t:"2026-08-22 12:41",who:"본인",diff:"+18/-4줄",act:"1"},
+    {t:"2026-08-22 09:05",who:"본인",diff:"+40/-0줄",act:"2"}
+  ];
+  $histRows.innerHTML = '<div class="mini-head" style="grid-template-columns:1fr 60px 80px 70px"><span>시각</span><span>고친 이</span><span>바뀐 줄</span><span></span></div>'+
+    rows.map(function(r){
+      return '<div class="mini-row" style="grid-template-columns:1fr 60px 80px 70px"><span class="trunc">'+esc(r.t)+'</span>'+
+        '<span class="trunc">'+esc(r.who)+'</span><span class="trunc">'+esc(r.diff)+'</span>'+
+        (r.act?'<button data-h="'+r.act+'">되돌리기</button>':'<span></span>')+'</div>';
+    }).join("") + '<div style="padding:5px 10px;font-size:10.5px;color:var(--muted-2)">※ 시안 예시 데이터 — 실제 이력은 저장할 때마다 한 건씩 쌓입니다(서버 신설 필요, §12). 되돌리기는 편집기 버퍼만 채웁니다 — 저장을 눌러야 반영됩니다.</div>';
+}
+$histRows.addEventListener("click", function(ev){
+  var b=ev.target.closest("button[data-h]"); if(!b) return;
+  var sample = b.getAttribute("data-h")==="1"
+    ? "### 주간 보안 보고\n\n### 1. 이번 주 처리 현황\n- 신규 발견: 3건\n- 조치 완료: 2건\n"
+    : "### 주간 보안 보고\n\n### 1. 이번 주 처리 현황\n- 신규 발견: 1건\n";
+  $body.value = sample; $title.value = "주간 보안 보고 초안";
+  markDirty(); schedulePreview();
+  toast($toastA, "이전 버전을 편집기에 불러왔습니다 — 저장을 눌러야 실제로 반영됩니다(예시 데이터).");
+});
+
+// ── "/" 슬래시 명령(빈 템플릿만 — §2 이유) ──
+var slashOpen=false, slashStart=-1, slashSel=0, slashList=[];
+function slashFilter(q){
+  q=(q||"").toLowerCase();
+  return ALL_TPL.filter(function(t){ return !q || t.label.toLowerCase().indexOf(q)>=0; });
+}
+function slashRender(){
+  slashList = slashFilter($body.value.slice(slashStart+1, $body.selectionStart));
+  slashSel = Math.min(slashSel, Math.max(0,slashList.length-1));
+  $slash.innerHTML = '<div class="sm-lead">템플릿 고르기 — Esc로 취소, ↑↓, Enter</div>' +
+    (slashList.length ? slashList.map(function(t,i){
+      return '<div class="sm-item'+(i===slashSel?" sel":"")+'" data-i="'+i+'">'+t.icon+' '+esc(t.label)+'</div>';
+    }).join("") : '<div class="sm-empty">일치하는 템플릿 없음</div>');
+}
+function slashOpenAt(pos){
+  slashOpen=true; slashStart=pos; slashSel=0;
+  slashRender();
+  $slash.classList.add("on");
+  var rect = $body.getBoundingClientRect();
+  $slash.style.left = "8px"; $slash.style.top = (rect.height<380 ? 30 : 30)+"px"; // 간이 배치(정확한 캐럿 추적은 구현 때 미러 기법)
+}
+function slashClose(){ slashOpen=false; $slash.classList.remove("on"); }
+$body.addEventListener("input", function(e){
+  if (slashOpen){
+    var cur=$body.selectionStart;
+    if (cur<=slashStart || $body.value.slice(slashStart,slashStart+1)!=="/"){ slashClose(); }
+    else slashRender();
+  }
+  var pos=$body.selectionStart-1;
+  if ($body.value[pos]==="/" && (pos===0 || /\s/.test($body.value[pos-1]))) slashOpenAt(pos);
+});
+$body.addEventListener("keydown", function(e){
+  if (!slashOpen) return;
+  if (e.key==="Escape"){ slashClose(); e.preventDefault(); return; }
+  if (e.key==="ArrowDown"){ slashSel=Math.min(slashSel+1, Math.max(0,slashList.length-1)); slashRender(); e.preventDefault(); return; }
+  if (e.key==="ArrowUp"){ slashSel=Math.max(slashSel-1,0); slashRender(); e.preventDefault(); return; }
+  if (e.key==="Enter"){
+    e.preventDefault();
+    var t=slashList[slashSel]; if(!t) return;
+    var before=$body.value.slice(0,slashStart), after=$body.value.slice($body.selectionStart);
+    $body.value = before + t.body + after;
+    slashClose(); markDirty(); schedulePreview();
+    toast($toastA, "「"+t.label+"」을 /로 불러왔습니다(빈 골격, 저작 손짓 — AI 호출 없음).");
+  }
+});
+$slash.addEventListener("click", function(ev){
+  var it=ev.target.closest(".sm-item"); if(!it) return;
+  slashSel=Number(it.getAttribute("data-i"));
+  var t=slashList[slashSel]; if(!t) return;
+  var before=$body.value.slice(0,slashStart), after=$body.value.slice($body.selectionStart);
+  $body.value = before + t.body + after;
+  slashClose(); markDirty(); schedulePreview();
+});
+
+// ── 첨부: 붙여넣기·압축(Smart MD app.js:467-485 알고리즘) — 행 목록으로 표시 ──
+function canvasHasAlpha(ctx,w,h){ var d=ctx.getImageData(0,0,w,h).data; for(var i=3;i<d.length;i+=4) if(d[i]<255) return true; return false; }
+function compressImage(file){
+  return createImageBitmap(file).then(function(bitmap){
+    var scale=Math.min(1, MAX_IMAGE_DIMENSION/Math.max(bitmap.width,bitmap.height));
+    var tw=Math.max(1,Math.round(bitmap.width*scale)), th=Math.max(1,Math.round(bitmap.height*scale));
+    var canvas=document.createElement("canvas"); canvas.width=tw; canvas.height=th;
+    var ctx=canvas.getContext("2d"); ctx.drawImage(bitmap,0,0,tw,th); bitmap.close();
+    var type=canvasHasAlpha(ctx,tw,th)?"image/png":"image/jpeg";
+    return new Promise(function(resolve){ canvas.toBlob(function(b){ resolve(b&&b.size<file.size?b:file); }, type, JPEG_QUALITY); });
+  });
+}
+function insertAtCursor(text){
+  var s=$body.selectionStart,e=$body.selectionEnd,v=$body.value;
+  $body.value=v.slice(0,s)+text+v.slice(e); $body.selectionStart=$body.selectionEnd=s+text.length; $body.focus();
+}
+function addAttachment(file){
+  if(!file||!/^image\//.test(file.type)) return;
+  if(attachments.length>=10){ toast($toastA,"첨부는 10장까지입니다.",true); return; }
+  compressImage(file).then(function(blob){
+    var r=new FileReader();
+    r.onload=function(ev){
+      attachCounter++;
+      attachments.push({ n:attachCounter, dataUrl:ev.target.result, kb:Math.round(blob.size/1024), name:"캡처_"+attachCounter+".jpg" });
+      insertAtCursor("[사진"+attachCounter+"]");
+      drawAttachments(); markDirty(); schedulePreview(); measureAll();
+      toast($toastA, "캡처를 압축해 첨부로 담았습니다(본문엔 [사진"+attachCounter+"] 표시만 남습니다).");
+    };
+    r.readAsDataURL(blob);
+  });
+}
+$body.addEventListener("paste", function(e){
+  var items=(e.clipboardData||window.clipboardData).items||[];
+  for(var i=0;i<items.length;i++){ if(items[i].type.indexOf("image")!==-1){ addAttachment(items[i].getAsFile()); e.preventDefault(); break; } }
+});
+["dragenter","dragover"].forEach(function(ev){ document.getElementById("attachStrip").addEventListener(ev,function(e){ e.preventDefault(); this.classList.add("attach-drop","over"); }); });
+["dragleave","drop"].forEach(function(ev){ document.getElementById("attachStrip").addEventListener(ev,function(e){ e.preventDefault(); this.classList.remove("over"); }); });
+document.getElementById("attachStrip").addEventListener("drop", function(e){ var files=(e.dataTransfer&&e.dataTransfer.files)||[]; for(var i=0;i<files.length;i++) addAttachment(files[i]); });
+function drawAttachments(){
+  document.getElementById("attachHint").style.display = attachments.length ? "none" : "block";
+  $attachRows.style.display = attachments.length ? "block" : "none";
+  $attachRows.innerHTML = attachments.length ? ('<div class="mini-head" style="grid-template-columns:34px 1fr 55px 60px 76px"><span></span><span>파일명·위치</span><span>크기</span><span>순서</span><span></span></div>' +
+    attachments.map(function(a,idx){
+      return '<div class="mini-row" style="grid-template-columns:34px 1fr 55px 60px 76px">'+
+        '<img class="thumb" src="'+a.dataUrl+'">'+
+        '<span class="trunc">'+esc(a.name)+' · 본문 [사진'+a.n+']</span>'+
+        '<span>'+a.kb+'KB</span>'+
+        '<span><button data-up="'+a.n+'" '+(idx===0?"disabled":"")+'>▲</button><button data-dn="'+a.n+'" '+(idx===attachments.length-1?"disabled":"")+'>▼</button></span>'+
+        '<button data-x="'+a.n+'">✕ 지우기</button></div>';
+    }).join("")) : "";
+  checkOrphan();
+}
+$attachRows.addEventListener("click", function(ev){
+  var xb=ev.target.closest("[data-x]"), ub=ev.target.closest("[data-up]"), db=ev.target.closest("[data-dn]");
+  if(xb){ var n=Number(xb.getAttribute("data-x")); attachments=attachments.filter(function(a){return a.n!==n;}); drawAttachments(); markDirty(); schedulePreview(); measureAll();
+    toast($toastA,"첨부 "+n+"번을 지웠습니다. 본문의 [사진"+n+"] 글자는 직접 지워야 합니다."); return; }
+  var move = ub?Number(ub.getAttribute("data-up")):db?Number(db.getAttribute("data-dn")):null; if(move==null) return;
+  var i=attachments.findIndex(function(a){return a.n===move;}), j=ub?i-1:i+1; if(j<0||j>=attachments.length) return;
+  var t=attachments[i]; attachments[i]=attachments[j]; attachments[j]=t; drawAttachments(); schedulePreview();
+});
+function checkOrphan(){
+  var text=$body.value, used={}, m, re=/\[사진(\d+)\]/g;
+  while((m=re.exec(text))) used[m[1]]=(used[m[1]]||0)+1;
+  var missing=Object.keys(used).filter(function(n){ return !attachments.some(function(a){return String(a.n)===n;}); });
+  $attachOrphan.style.display = missing.length ? "block" : "none";
+  if(missing.length) $attachOrphan.textContent = "⚠ 본문에 "+missing.map(function(n){return "[사진"+n+"]";}).join(", ")+" 표시가 있는데 해당 첨부가 없습니다.";
+}
+
+// ── 간이 미리보기 렌더러(시안 전용 — 실제는 gijomd.js 공용 렌더러) ──
+function renderPreview(){
+  var lines=esc($body.value).split("\n"), html="", inList=false;
+  lines.forEach(function(line){
+    var m3=/^### (.*)/.exec(line), li=/^- (.*)/.exec(line);
+    if(li){ if(!inList){html+="<ul>";inList=true;} html+="<li>"+inlineFmt(li[1])+"</li>"; return; }
+    if(inList){ html+="</ul>"; inList=false; }
+    if(m3) html+="<h3>"+inlineFmt(m3[1])+"</h3>";
+    else if(line.trim()==="") html+="<br>";
+    else html+="<p style=\"margin:2px 0\">"+inlineFmt(line)+"</p>";
+  });
+  if(inList) html+="</ul>";
+  var used={};
+  html=html.replace(/\[사진(\d+)\]/g, function(_,n){
+    var a=attachments.find(function(x){return String(x.n)===n;}); used[n]=true;
+    return a?'<img class="pv" src="'+a.dataUrl+'">':'<span class="missing">⚠ 사진'+n+' 없음</span>';
+  });
+  var unplaced=attachments.filter(function(a){return !used[a.n];});
+  if(unplaced.length) html += '<div class="attach-append">📎 배치 안 된 첨부 '+unplaced.length+'장(문서 끝에 자동 추가)</div>';
+  $prev.innerHTML = html || '<span style="color:var(--muted-2)">쓴 내용이 여기 정리되어 보입니다.</span>';
+  checkOrphan();
+}
+function inlineFmt(s){ return s.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>"); }
+function schedulePreview(){ clearTimeout(previewTimer); previewTimer=setTimeout(renderPreview,100); updateStatBarInstant(); }
+function updateStatBarInstant(){
+  var n=$body.value.length;
+  $statBar.innerHTML = "✎ <b>"+n.toLocaleString()+"</b>자 · 📎 <b>"+attachments.length+"</b>/10 · <span class=\"draft\" id=\"draftLbl\"></span>";
+}
+
+// ── 뷰 전환·스크롤 동기화 ──
+document.getElementById("dViewSeg").addEventListener("click", function(ev){
+  var b=ev.target.closest("button"); if(!b) return;
+  Array.prototype.forEach.call(this.querySelectorAll("button"), function(x){x.classList.remove("on");});
+  b.classList.add("on");
+  var v=b.getAttribute("data-v"), sp=document.getElementById("dSplit");
+  sp.className = "edit-split" + (v==="src"?" src-only":v==="prev"?" prev-only":"");
+  if (v!=="src") renderPreview();
+});
+function splitActive(){ return document.getElementById("dSplit").className.indexOf("src-only")<0 && document.getElementById("dSplit").className.indexOf("prev-only")<0; }
+function syncScroll(from,to){
+  if(syncingScroll||!splitActive()) return;
+  var fm=from.scrollHeight-from.clientHeight, tm=to.scrollHeight-to.clientHeight; if(fm<=0||tm<=0) return;
+  syncingScroll=true; to.scrollTop=(from.scrollTop/fm)*tm; requestAnimationFrame(function(){syncingScroll=false;});
+}
+$body.addEventListener("scroll", function(){ syncScroll($body,$prev); });
+$prev.addEventListener("scroll", function(){ syncScroll($prev,$body); });
+
+// ── 저장(수동)+로컬 초안 ──
+var draftKey="gijoMock_draft_내문서편집기2";
+function markDirty(){ dirty=true; $dirty.classList.add("on"); scheduleDraft(); }
+function scheduleDraft(){
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(function(){
+    try{ localStorage.setItem(draftKey, JSON.stringify({title:$title.value,body:$body.value,ts:Date.now()}));
+      var lbl=document.getElementById("draftLbl"); if(lbl) lbl.textContent="로컬 초안 저장됨 "+new Date().toLocaleTimeString("ko-KR");
+    }catch(e){}
+  }, 1500);
+}
+window.addEventListener("beforeunload", function(){ if(!dirty) return; try{ localStorage.setItem(draftKey, JSON.stringify({title:$title.value,body:$body.value,ts:Date.now()})); }catch(e){} });
+$body.addEventListener("input", function(){ markDirty(); schedulePreview(); });
+$title.addEventListener("input", markDirty);
+$save.addEventListener("click", function(){
+  if(!$title.value.trim()){ $title.focus(); return; }
+  $save.disabled=true; $save.firstChild.textContent="저장 중… ";
+  setTimeout(function(){
+    dirty=false; $dirty.classList.remove("on"); $save.disabled=false; $save.firstChild.textContent="💾 저장";
+    try{ localStorage.removeItem(draftKey); }catch(e){}
+    toast($toastA, "(시안) 저장됨 — 실제로는 personalDocsUpdate가 서버에 쓰고, 이력에 스냅샷 1건이 쌓입니다.");
+    measureAll();
+  }, 400);
+});
+function toast(el,msg,err){ el.textContent=msg; el.classList.toggle("err",!!err); clearTimeout(el._t); el._t=setTimeout(function(){el.textContent="";},5000); }
+
+// ── §7: AI 포함·공유(B안)·내보내기 ──
+var detState={ rag:false, shared:false, attachN:2 };
+function renderDet(){
+  document.getElementById("bRag").textContent = detState.rag?"AI 제외":"AI 포함";
+  document.getElementById("bShare").textContent = detState.shared?"공유 해제":"🏢 공유";
+  document.getElementById("detMeta").innerHTML =
+    (detState.shared?"🏢 회사 공유 — 전 담당자의 근거가 될 수 있습니다":"👤 개인 — 내 질문에만 근거로 나옵니다")+"<br>"+
+    (detState.rag?'<span class="gtxt-rag">AI 포함</span> — 내 AI가 이 문서를 읽습니다':"AI 제외 — 대화 검색에 안 나옵니다")+"<br>"+
+    "📎 첨부 "+detState.attachN+"장 · 수정 2026-08-22 14:02";
+}
+document.querySelector(".detail-sim .dbt").addEventListener("click", function(ev){
+  var b=ev.target.closest("button"); if(!b) return;
+  var act=b.getAttribute("data-act"); document.getElementById("shareConfirmSlot").innerHTML="";
+  var $toastB=document.getElementById("toastB");
+  if(act==="rag"){ detState.rag=!detState.rag; renderDet(); toast($toastB,"(시안) "+(detState.rag?"AI 포함":"AI 제외")+" — 되묻지 않음(내 질문에만 근거).");}
+  else if(act==="share"){
+    if(detState.shared){ detState.shared=false; renderDet(); toast($toastB,"(시안) 공유를 해제합니다."); return; }
+    if(detState.attachN>0){
+      document.getElementById("shareConfirmSlot").innerHTML =
+        '<div class="share-confirm"><b>⚠ 회사 공유를 켜면 다른 담당자도 이 문서를 볼 수 있습니다.</b><br>'+
+        '글자 속 비밀번호·토큰은 자동으로 가려집니다. <b>그림 속 글자는 가릴 수 없습니다.</b><br>'+
+        '이 문서에는 캡처 <span class="n">'+detState.attachN+'장</span>이 들어 있습니다 — 확인하셨나요?'+
+        '<div class="row"><button class="ok" id="shareOk">확인했습니다 — 공유</button><button class="cancel" id="shareCancel">취소</button></div></div>';
+      document.getElementById("shareOk").addEventListener("click", function(){
+        detState.shared=true; renderDet(); document.getElementById("shareConfirmSlot").innerHTML="";
+        toast($toastB,"(시안) 공유됨 — 실제로는 §12의 플래그 경합 수리 후 personaldocs.ts share 라우트를 호출합니다.");
+      });
+      document.getElementById("shareCancel").addEventListener("click", function(){ document.getElementById("shareConfirmSlot").innerHTML=""; });
+    } else { detState.shared=true; renderDet(); toast($toastB,"(시안) 공유됨 — 첨부가 없어 되묻지 않았습니다."); }
+  } else if(act==="down"||act==="html"){
+    var blob=new Blob([$title.value||"문서","\n\n",$body.value].join(""), {type:act==="html"?"text/html":"text/markdown"});
+    var url=URL.createObjectURL(blob), a=document.createElement("a"); a.href=url; a.download="문서."+(act==="html"?"html":"md");
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(url);},8000);
+    toast($toastB,"「문서."+(act==="html"?"html":"md")+"」를 실제로 내려받았습니다.");
+  } else if(act==="pdf"||act==="word"){ toast($toastB,"(시안) "+(act==="pdf"?"PDF":"Word")+" 변환은 서버가 필요합니다.",true); }
+  else if(act==="del"){ toast($toastB,"(시안) 삭제 확인 카드가 뜹니다 — 여기서는 지우지 않습니다."); }
+  else if(act==="edit"){ toast($toastB,"(시안) 위 §6 편집기가 이 문서로 열립니다."); }
+});
+
+// ── 밀도 실측 ──
+function px(el){ return el ? Math.round(el.getBoundingClientRect().height) : 0; }
+function measureAll(){
+  var stage=document.getElementById("editStage");
+  var rows=[["st-top",document.querySelector(".st-top")],["st-warn",document.querySelector(".st-warn")],
+    ["템플릿 서랍(열림 기준)",$tplDrawer],["연계 템플릿 표",$linkedTpl],["첨부 목록",document.getElementById("attachStrip")],
+    ["이력 표",$histDrawer],["edit-split",document.getElementById("dSplit")],["상태바",$statBar]];
+  var total=px(stage);
+  if(!baseline) baseline={ total:total, rows:rows.map(function(r){return px(r[1]);}) };
+  var lineHeightPx = parseFloat(getComputedStyle($body).lineHeight)||18.75;
+  var textareaH = px($body);
+  var lines1080 = Math.max(0, Math.floor(textareaH/lineHeightPx));
+  var chromeGuess = 77; // docs-hub-v4-workspace 실측 셸 높이(재사용)
+  var overhead = total - textareaH; // 지금 프레임에서 편집칸 빼고 나머지 전부
+  var full1080textarea = Math.max(0, 1080 - chromeGuess - overhead);
+  var lines1080calc = Math.max(0, Math.floor(full1080textarea/lineHeightPx));
+  var html = "<b>#editStage 지금 총 높이: "+total+"px</b>"+
+    (baseline.total!==total?" (첫 로드 대비 "+(total>baseline.total?"+":"")+(total-baseline.total)+"px)":" (첫 로드 상태)")+
+    "<table>"+rows.map(function(r,i){ var h=px(r[1]), d=h-baseline.rows[i];
+      return "<tr><td class=\"k\">"+r[0]+"</td><td class=\"v\">"+h+"px</td><td class=\"delta\">"+(d!==0?(d>0?"+":"")+d+"px":"")+"</td></tr>"; }).join("")+
+    "<tr><td class=\"k\">원문 line-height(계산됨)</td><td class=\"v\">"+lineHeightPx.toFixed(1)+"px</td><td class=\"delta\"></td></tr>"+
+    "<tr><td class=\"k\">지금 이 프레임의 원문 칸 높이</td><td class=\"v\">"+textareaH+"px → "+Math.floor(textareaH/lineHeightPx)+"줄</td><td class=\"delta\"></td></tr>"+
+    "<tr><td class=\"k\"><b>1920×1080 가정 시 원문 줄 수(계산)</b></td><td class=\"v\"><b>"+lines1080calc+"줄</b></td><td class=\"delta\">"+full1080textarea+"px÷"+lineHeightPx.toFixed(1)+"</td></tr>"+
+    "</table>";
+  document.getElementById("measureBox").innerHTML = html;
+  var t=document.getElementById("cmpTpl");
+  if(t) t.textContent = $tplDrawer.classList.contains("on")
+    ? px($tplDrawer)+"px("+ALL_TPL.length+"행×~"+Math.round(px($tplDrawer)/ALL_TPL.length)+"px)"
+    : "닫힘(위 📋 업무 템플릿을 눌러 보세요)";
+  var a=document.getElementById("cmpAtt");
+  if(a) a.textContent = attachments.length
+    ? px(document.getElementById("attachStrip"))+"px("+attachments.length+"행)"
+    : "0장 — 힌트줄만 "+px(document.getElementById("attachStrip"))+"px(위 원문 칸에 캡처를 붙여 보세요)";
+  var h=document.getElementById("cmpHist");
+  if(h) h.textContent = $histDrawer.classList.contains("on") ? px($histDrawer)+"px(표 3행)" : "닫힘(위 🕘 이력을 눌러 보세요)";
+}
+function measureSide(){
+  var items=document.querySelectorAll(".side-sim .snode").length;
+  var h=px(document.querySelector(".side-sim"));
+  document.getElementById("sideMeasure").innerHTML = "<b>사이드바 실측</b><table>"+
+    "<tr><td class=\"k\">항목 수</td><td class=\"v\">"+items+"개</td><td class=\"delta\"></td></tr>"+
+    "<tr><td class=\"k\">전체 높이(구분선 포함)</td><td class=\"v\">"+h+"px</td><td class=\"delta\">이전 6항목 대비 +3항목</td></tr>"+
+    "<tr><td class=\"k\">항목당 평균</td><td class=\"v\">"+Math.round(h/items)+"px</td><td class=\"delta\"></td></tr>"+
+    "</table>";
+}
+
+// ── 초기화 ──
+drawTemplates(); drawLinked(); drawHistory(); drawAttachments(); renderDet();
+$body.value=""; renderPreview(); updateStatBarInstant();
+setTimeout(function(){ measureAll(); measureSide(); }, 60);
+window.addEventListener("resize", function(){ measureAll(); measureSide(); });
+})();
+</script>
+</body>
+</html>

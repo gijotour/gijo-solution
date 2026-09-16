@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「문서 단일 창구」 시안 (추천 1개) · 프로 셸 · 흰 바탕
+  경로: mockups/docs-single-entry/시안.html · gijo-mockup(읽기 전용) · 제품 코드는 한 줄도 건드리지 않았다.
+
+  ── 배경(사장님 지시 2건) ──────────────────────────────────────────────────
+  ① 2026-08-20 QA 중: "(문서함·내문서·Smart MD) 3개의 연관성이 있다면 하나로 가면 되지 않을까?"
+  ② 같은 날 추가: "문서들 — 취약점 파일부터 보안제품 매뉴얼 등은 내문서에서 관리하는 건
+     어떠한지 고민해줘."
+  메인이 이미 보고한 추천 방향(이 시안이 그리는 틀): 창구는 「내 문서」 화면 하나로 키우되,
+  저장 성격 3부류는 유지한다 — ① 내 것(개인 격리) ② 회사 지식(RAG 지식창고)
+  ③ 반입 원본(스캐너·장비 출력 — 발견·수집 파싱·등록의 원료). 올릴 때 목적지를 고른다(기본=내 것).
+  격리 원칙 절대 유지, 자유 입력칸 금지(검색은 필터 전용).
+
+  ── 지금 실제로 무엇을 하는지(읽기로 확인 — 추측 아님, 2026-08-20 기준) ──────────────
+  · client/src/renderer/pages/mydocs.html:8-14(격리 원칙 주석)·58-73(헤더·행)·142-163(가져오기,
+    personalDocsCreate 직접 호출 — 분류를 거치지 않는 「목적지 확정 업로드」 선례가 **이미 있다**)
+  · client/src/renderer/pages/docbox.html:1-16(문서함 주석)·170-215(GROUP: mine/guide/policy 트리 —
+    mine은 personalDocsList()를 mydocs와 **따로 또 부른다**, 217-253)·300-306(요청 만들기 KINDS —
+    문서 저장이 아니라 버그·기능 요청 산출물 생성 도구)
+  · server/src/engine/docbox.ts:1-58 — guide/policy는 **고객이 올린 문서가 아니라** docs-manifest.json에
+    미리 박힌 제품 내장 매뉴얼(사용자 매뉴얼·아키텍처 개요 등). 업로드·삭제·등급 개념이 없다.
+  · client/src/renderer/pages/memory.html:296-301(패널 제목 "📚 올린 문서 확인·관리")·
+    631-669(업무영역 5분류+열람등급 O/S/C)·712-757(목록+상세: 조각수·bge-m3·범위·연결·원본 열기·
+    삭제 2옵션) — 이것이 실제 「회사 지식(RAG)」 관리 UI의 전부이자 가장 정교한 부분이다.
+  · client/src/renderer/pages/console.js:1584-1601(＋ 파일 올리기 — "인입 창구는 콘솔 ＋ 하나다
+    (2026-07-27 결정)", UPLOAD_TYPES 7종)·1612-1666(handleUpload — 자동 분류 후
+    vulnscan/product-manual/analysis/memory 넷 중 하나로 라우팅, 확신 낮으면 사람에게 물음)
+  · client/src/renderer/pages/nav.js:65-90(TOP: 대시보드·팀 사무실(창)·문서함(창, hidden)·
+    내 문서(page)·Smart MD(창)·작업 내역 — 다섯 진입로가 이미 나뉘어 있다)
+  · server/src/engine/personaldocs.ts:10,72,125-126 — 격리는 403이 아니라 **404**("있긴 있다"를
+    알리지 않는다) — 이 원칙은 새안에서도 한 글자도 안 바꾼다.
+  · client/src/renderer/pages/app.html:95-109(stage-on — 화면이 대화창 자리 전폭)·1224-1241(dockHead
+    "← 대화로" 바) · client/src/renderer/pages/pro-white.css:1-49(프로 흰 바탕 확정 토큰, 2026-08-20)
+  · mockups/pro-white/시안.html — 같은 날 확정된 프로 흰 바탕 셸 재현(레일 56px·상단줄 44px·무대)의
+    승인 선례. 이 파일의 appframe은 그 시안의 구조를 그대로 재사용한다(새 셸 문법을 만들지 않음).
+  · mockups/smartmd-wiki/시안.html:816-823 "다음 단계 후보" — "문서함(창) 「내 문서」 탭과의 통합
+    정리 — 지금은 진입로 2개(창+카드/무대)가 같은 백엔드를 보는 상태로 둔다"라고 **이미 이 간극을
+    적어 두었다.** 이번 시안은 그 후속 조치다(새로 발견한 문제가 아니라 예고된 숙제).
+
+  ── 설계 전 조사(2026-08-20 웹 검색) ──────────────────────────────────────────
+  [외부 1] SaaS UI Design, "SaaS File Upload & Drag-and-Drop UX Patterns (2026)"
+    https://www.saasui.design/blog/saas-file-upload-ux-patterns
+    핵심: "네이티브 파일 선택 대화상자를 여는 버튼이 가장 보편적으로 이해되는 입구다" ·
+    "여러 화면에 흩어진 업로드 인터페이스를 하나로 모으면 마찰이 준다."
+    → 근거: 업로드 **버튼**은 화면마다 하나씩 남겨도 되지만(mydocs의 📥·console.js의 ＋),
+      업로드 **결과를 관리·확인하는 화면**은 하나로 모은다 — 이번 시안이 정확히 그 구분이다.
+  [외부 2] Atlan, "LLM Knowledge Base vs RAG" / Archestra, "Knowledge base vs RAG"
+    https://atlan.com/know/llm-knowledge-base-vs-rag/ · https://archestra.ai/blog/knowledge-base-vs-rag
+    핵심: "대부분의 실패는 첫 관문에서 난다 — 원본이 일관성 없이 인입되면 구조가 사라지고 색인이
+    비슷비슷한 잡음 조각으로 채워진다" · "지식 베이스는 색인 위의 개념층 — **큐레이션된, 통제된**
+    문서·메타데이터 모음" · "보안 등급별로 지식 베이스를 분리 운영하는 것이 권고 사항이다."
+    → 근거: 「반입 원본」(스캐너 로그 등 미가공 데이터)과 「회사 지식」(사람이 골라 넣은, 등급이
+      매겨진 참고 자료)을 **한 목록으로 섞지 않는다** — 조사 결과와 정확히 같은 방향.
+  [내부 선례] Pinecone 멀티테넌시 권고(mockups/smartmd-wiki/시안.html §외부1에서 이미 인용·검증됨) —
+    "격리는 질의 계층에서 강제, 모델 판단에 맡기지 않는다." personaldocs.ts의 404 원칙이 이미 그
+    권고를 따르고 있다 — 새안은 이 계약을 유지만 한다(재발명하지 않음).
+
+  ── 이 파일이 하는 일 / 안 하는 일 ────────────────────────────────────────────
+  한다: 「내 문서」 화면 1개의 정보구조(탭 4+1·업로드 목적지 선택·목록/상세)를 프로 흰 바탕으로
+    그린다. 실제 색·치수는 pro-white.css·app.html·mydocs.html·memory.html·docbox.html에서 그대로
+    가져왔다. 탭 전환·검색 필터·목적지 칩은 **화면 상태 전환만** 실제로 동작한다(서버 호출 없음).
+  안 한다: 서버·IPC 설계(라우트 이름·DB 스키마)는 정하지 않는다. memory.html의 고급 기능(지식
+    그래프 관계·위생 점검 kbHygiene)은 "탭 안에 자리가 있다"만 보이고 세부는 구현 단계 몫이다.
+    문서함의 "요청 만들기"는 문서 저장 기능이 아니라서 이 통합의 범위 밖이다(§포기 참고).
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 문서 단일 창구 시안(프로 흰 바탕)</title>
+<style>
+  /* ── 문서 바깥 껍데기(제품과 무관한 설명용 페이지) — pro-white 시안과 같은 중립 톤 ── */
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#efeeea;color:#232220;line-height:1.6;}
+  .docwrap{max-width:1180px;margin:0 auto;padding:28px 20px 90px;}
+  .dochead h1{font-size:20px;margin:0 0 6px;color:#181614;}
+  .dochead .lead{font-size:13.5px;color:#5a5347;max-width:940px;}
+  .dochead .quote{margin-top:8px;font-size:12.75px;color:#7a7266;border-left:3px solid #c8beac;padding:4px 0 4px 10px;}
+  .banner{margin:16px 0 18px;background:#fff7e0;border:1px solid #e8d68f;color:#6b5a12;font-size:12.5px;font-weight:700;
+    border-radius:8px;padding:9px 13px;line-height:1.6;}
+
+  /* ── 앱 프레임(pro-white 시안 재사용 — app.html:54,61-83,132,213,1224-1241 그대로) ── */
+  .appframe{
+    --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+    --border:rgba(43,38,33,.12); --border-strong:rgba(43,38,33,.22);
+    --text:#2b2621; --muted:#6b6259; --muted-2:#726960;
+    --blue:#3b82f6; --blue-ink:#1d4f91;
+    --teal:#1eb980; --teal-ink:#086b43;
+    --amber:#f0a020; --amber-ink:#8f4d02;
+    --red:#e2483d; --red-ink:#b3241a;
+    --purple:#5b21b6;
+    --zebra:rgba(43,38,33,.035);
+    --shadow-stage:0 20px 34px rgba(31,27,20,.16);
+    font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    width:100%;height:788px;background:var(--bg);color:var(--text);
+    border:1px solid #ded5c4;border-radius:12px;overflow:hidden;
+    box-shadow:0 18px 40px rgba(60,52,36,.18);
+    display:flex;flex-direction:column;position:relative;margin-top:14px;
+  }
+  .appframe *{box-sizing:border-box;}
+
+  .af-top{flex:0 0 auto;height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .af-top .spacer{flex:1;}
+  .af-top .clock{font-size:12.25px;color:var(--muted);}
+  .af-top .status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--teal-ink);
+    background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);padding:3px 10px;border-radius:16px;}
+  .af-top .status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  .af-body{flex:1;min-height:0;display:flex;}
+  .af-rail{flex:0 0 56px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
+    border-right:1px solid var(--border);background:var(--panel-2);overflow-y:auto;}
+  .rr-item{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid var(--border);
+    color:var(--muted);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:default;
+    font-weight:800;flex:0 0 auto;}
+  .rr-item.plain{border-color:transparent;font-size:16px;}
+  .rr-item.hi{border-color:rgba(37,99,235,.55);color:var(--blue-ink);box-shadow:inset 0 0 0 1px rgba(37,99,235,.30);}
+  .rr-div{width:26px;height:1px;background:var(--border-strong);margin:6px 0;flex:0 0 auto;}
+  .rr-foot{margin-top:auto;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto;}
+  .rail-cap{font-size:10.25px;color:#9a9082;padding:6px 8px 0;text-align:center;line-height:1.5;}
+
+  .af-work{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--bg);}
+  .dockHead{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:4px 10px;font-size:12.5px;color:var(--muted);
+    background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .dockHead .back{font-size:12.25px;font-weight:700;color:var(--muted);background:transparent;
+    border:1px solid var(--border-strong);border-radius:7px;padding:4px 9px;cursor:default;font-family:inherit;}
+  .dockHead b{color:var(--text);}
+  .stage-screen{flex:1;min-height:0;margin-bottom:10px;box-shadow:var(--shadow-stage);background:var(--panel);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .stage-peek{flex:0 0 auto;height:10px;}
+
+  /* ══════════════ 여기부터 「내 문서」 화면 자체(시안 본체) ══════════════ */
+  .hub-main{padding:20px 24px 0;flex:0 0 auto;}
+  .hub-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  .hub-title{font-size:19px;font-weight:800;color:var(--text);line-height:1.3;}
+  .hub-title .ic{font-size:12.5px;color:var(--muted-2);font-weight:400;margin-left:6px;cursor:default;}
+  .hub-sub{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+  .hub-acts{display:flex;gap:8px;flex:0 0 auto;}
+  .hbtn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+    padding:8px 14px;border-radius:8px;font-size:12.75px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;}
+  .hbtn:hover{border-color:var(--blue);}
+  .hbtn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .hbtn.primary:hover{background:#2f6fe0;}
+
+  /* 목적지 선택(신설 — mydocs.html의 「📥 가져오기 = 개인 확정」 선례를 3방향으로 확장) */
+  .dest-picker{display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+  .dest-picker.on{display:flex;}
+  .dest-picker .lbl{font-size:12px;color:var(--muted-2);font-weight:700;margin-right:2px;}
+  .dchip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+    padding:7px 14px;border-radius:20px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .dchip:hover{border-color:var(--blue);}
+  .dchip.on{background:rgba(37,99,235,.10);border-color:var(--blue);color:var(--blue-ink);}
+  .dest-note{display:none;margin-bottom:12px;font-size:12.25px;color:var(--text);line-height:1.75;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;}
+  .dest-note.on{display:block;}
+  .dest-note .warnbox{border-left:3px solid var(--amber);background:#fdf1e2;border-radius:6px;
+    padding:8px 11px;margin-top:8px;color:var(--amber-ink);font-weight:700;font-size:12px;line-height:1.7;}
+  .dest-note .warnbox .wbtn{margin-top:6px;display:flex;gap:6px;}
+  .dest-note .warnbox button{font-family:inherit;font-size:11.75px;font-weight:700;padding:4px 10px;border-radius:6px;
+    cursor:default;border:1px solid var(--border-strong);background:var(--panel);color:var(--text);}
+
+  /* 탭(4부류+전체) — mydocs.html .seg를 5칸으로 확장, 치수 불변 */
+  .hub-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+  .hub-tabs button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+    padding:7px 14px;border-radius:18px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;}
+  .hub-tabs button b{font-weight:800;}
+  .hub-tabs button.on{background:rgba(37,99,235,.10);border-color:var(--blue);color:var(--blue-ink);}
+
+  .hub-search-row{margin-bottom:10px;}
+  .hub-search{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);
+    border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--text);outline:none;font-family:inherit;line-height:1;}
+  .hub-search::placeholder{color:var(--muted-2);}
+  .hub-search:focus{border-color:var(--blue);}
+
+  .hub-body{flex:1;min-height:0;display:flex;padding:0 24px;gap:14px;}
+  .hub-body.split .hub-list{flex:0 0 300px;}
+  .hub-body:not(.split) .hub-list{flex:1 1 auto;}
+  .hub-list{overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;min-height:0;}
+  .hub-detail{flex:1;min-width:0;overflow-y:auto;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:16px 18px;display:none;}
+  .hub-body.split .hub-detail{display:block;}
+
+  .hrow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);
+    cursor:pointer;line-height:1;}
+  .hrow:last-child{border-bottom:0;}
+  .hrow:hover{background:var(--zebra);}
+  .hrow.sel{background:rgba(37,99,235,.07);box-shadow:inset 3px 0 0 var(--blue);}
+  .hrow .bkt{flex:0 0 auto;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  .bkt.mine{background:rgba(43,38,33,.06);color:var(--muted);}
+  .bkt.company{background:#e3f6ec;color:var(--teal-ink);}
+  .bkt.raw{background:#eaf1fb;color:var(--blue-ink);}
+  .bkt.help{background:rgba(91,33,182,.09);color:var(--purple);}
+  .hrow .t{flex:1 1 auto;font-weight:700;color:var(--text);font-size:12.75px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hrow .meta{flex:0 0 auto;font-size:11.75px;color:var(--muted-2);white-space:nowrap;}
+  .hrow .grade{flex:0 0 auto;font-size:11px;font-weight:800;padding:1px 7px;border-radius:9px;}
+  .grade.O{background:#e3f6ec;color:var(--teal-ink);}
+  .grade.S{background:#fdf1e2;color:var(--amber-ink);}
+  .grade.C{background:#fdeceb;color:var(--red-ink);}
+  .hrow .act{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--blue-ink);}
+  .grp-h{padding:8px 14px 6px;font-size:11.5px;font-weight:800;color:var(--muted-2);background:var(--panel-2);
+    border-bottom:1px solid var(--border);}
+
+  .hd-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.4;}
+  .hd-meta{font-size:12px;color:var(--muted-2);line-height:1.8;margin-bottom:10px;}
+  .hd-metric{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;}
+  .hd-m{flex:1;padding:8px 11px;border-right:1px solid var(--border);}
+  .hd-m:last-child{border-right:0;}
+  .hd-m b{display:block;font-size:14px;color:var(--text);}
+  .hd-m span{font-size:11px;color:var(--muted-2);}
+  .hd-sec{font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;padding:9px 11px;
+    background:var(--panel-2);border-radius:8px;}
+  .hd-acts{display:flex;gap:8px;flex-wrap:wrap;}
+  .hd-acts button{font-family:inherit;font-size:12px;font-weight:700;padding:6px 12px;border-radius:7px;
+    cursor:default;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+  .hd-acts button.danger{color:var(--red-ink);border-color:rgba(179,36,26,.3);}
+  .hd-body-text{font-size:12.5px;color:var(--text);line-height:1.85;}
+  .hd-body-text h3{font-size:13px;margin:14px 0 6px;color:var(--blue-ink);}
+
+  .hub-note{flex:0 0 auto;padding:9px 24px 16px;font-size:11.75px;color:var(--muted-2);line-height:1.7;}
+  .hub-note b{color:var(--text);}
+
+  /* ── 설명 패널(항상 표시, pro-white/smartmd-wiki 시안과 같은 결) ── */
+  .notes{margin-top:34px;}
+  .notes h2{font-size:16.5px;margin:32px 0 10px;color:#181614;border-bottom:2px solid #ded5c4;padding-bottom:6px;}
+  .notes h2:first-child{margin-top:0;}
+  .notes p{font-size:13px;color:#3f3a32;max-width:960px;}
+  .note-card{background:#fff;border:1px solid #ded5c4;border-radius:10px;padding:14px 16px;margin:10px 0;}
+  .spec-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 4px;}
+  .spec-table th{text-align:left;background:#f3efe6;color:#5a5347;font-weight:800;padding:6px 10px;
+    border:1px solid #ded5c4;font-size:11.75px;}
+  .spec-table td{padding:6px 10px;border:1px solid #e7e1d4;vertical-align:middle;}
+  .spec-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .pass{color:#0a7a4d;font-weight:800;}
+  .warn-txt{color:#8f4d02;font-weight:800;}
+  .fail{color:#b3241a;font-weight:800;}
+  .checklist{list-style:none;margin:8px 0;padding:0;}
+  .checklist li{font-size:13px;padding:5px 0 5px 26px;position:relative;line-height:1.7;}
+  .checklist li b.ok{position:absolute;left:0;color:#0a7a4d;}
+  .checklist li b.mid{position:absolute;left:0;color:#8f4d02;}
+  code{background:#f3efe6;border:1px solid #e7e1d4;border-radius:4px;padding:0 4px;font-size:12px;}
+  footer.doc-foot{max-width:960px;margin:36px auto 0;padding:0 0 10px;font-size:11.25px;color:#7a7266;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+  <div class="dochead">
+    <h1>GIJO AS — 문서 단일 창구 시안 · 추천 1개</h1>
+    <p class="lead">문서함(창)·내 문서·Smart MD·(콘솔 ＋로 올라간 회사 지식/스캐너 파일)로 흩어져
+      있던 "내가 올린 것들"을 <b>「내 문서」한 화면</b>으로 모은다. 저장 성격은 여전히 셋으로
+      나눈다 — 👤 내 것(개인 격리) · 🏢 회사 지식(RAG) · 🩹 반입 원본(스캐너·장비 출력). 프로 셸
+      확정 배색(2026-08-20, 흰 바탕)을 기준으로 그렸다.</p>
+    <p class="quote">"(문서함·내문서·Smart MD) 3개의 연관성이 있다면 하나로 가면 되지 않을까?" ·
+      "취약점 파일부터 보안제품 매뉴얼 등은 내문서에서 관리하는 건 어떠한지 고민해줘" —
+      사장님, 2026-08-20</p>
+  </div>
+
+  <div class="banner">⚠ 이 페이지는 시안입니다 — <b>탭 전환·검색 필터·업로드 목적지 칩</b>은 화면
+    상태만 실제로 바뀝니다(서버 호출 없음). 행 안의 개별 버튼(AI 포함·공유·삭제·원본 열기 등)은
+    실제 기능의 이름만 보여줄 뿐 눌러도 동작하지 않습니다.</div>
+
+  <div class="appframe" id="appFrame">
+    <div class="af-top">
+      <div class="spacer"></div>
+      <div class="clock">14:32</div>
+      <div class="status"><span class="dot"></span>서버 정상</div>
+    </div>
+    <div class="af-body">
+      <nav class="af-rail">
+        <button class="rr-item plain" title="전체 메뉴 (Ctrl+K) — 「내 문서」는 여기 카드로 엽니다">☰</button>
+        <button class="rr-item plain" title="작업 내역">🕘</button>
+        <button class="rr-item plain" title="즐겨찾기">⭐</button>
+        <button class="rr-item plain" title="열려 있는 창 목록">🗔</button>
+        <button class="rr-item plain" title="새 대화 시작">💬</button>
+        <div class="rr-div"></div>
+        <button class="rr-item hi" title="[감독] 오케스트레이터">🧭</button>
+        <button class="rr-item" title="[스캔] 스캔 에이전트">◣</button>
+        <button class="rr-item" title="[분석] 분석 에이전트">◎</button>
+        <button class="rr-item" title="[보고] 보고서 에이전트">▣</button>
+        <button class="rr-item" title="[인텔] 위협 인텔 에이전트">🛰</button>
+        <button class="rr-item" title="[지식] 표준·지침 정리 에이전트">📚</button>
+        <div class="rr-div"></div>
+        <button class="rr-item" title="임베딩 엔진(bge-m3)">E</button>
+        <button class="rr-item" title="RAG 검색">R</button>
+        <button class="rr-item" title="가드레일">G</button>
+        <button class="rr-item" title="LoRA 전문가 어댑터">L</button>
+        <div class="rr-foot">홍</div>
+      </nav>
+
+      <div class="af-work">
+        <div class="dockHead">
+          <button class="back">← 대화로</button>
+          <b>내 문서</b>
+        </div>
+
+        <div class="stage-screen">
+          <div class="hub-main">
+            <div class="hub-head">
+              <div>
+                <div class="hub-title">내 문서 <span class="ic" title="사용법·개인/회사 차이는 챗봇에게 물어보세요(ⓘ 자리 — 이 시안은 자리만 표시)">ⓘ</span></div>
+                <div class="hub-sub">개인 메모부터 회사 지식·스캐너 파일까지 — 올린 문서는 모두 여기서 보입니다.
+                  다른 담당자의 「내 것」은 보이지 않습니다.</div>
+              </div>
+              <div class="hub-acts">
+                <button class="hbtn primary" id="btnUpload">📥 파일 올리기</button>
+                <button class="hbtn" id="btnWrite" title="Smart MD Studio(문서 작성 창)를 엽니다 — 지금과 동일, 변화 없음">✍ Smart MD로 쓰기</button>
+              </div>
+            </div>
+
+            <div class="dest-picker" id="destPicker">
+              <span class="lbl">어디로 올릴까요?</span>
+              <button class="dchip on" data-d="mine">👤 내 것 (기본)</button>
+              <button class="dchip" data-d="company">🏢 회사 지식</button>
+              <button class="dchip" data-d="raw">🩹 스캐너·장비 파일</button>
+            </div>
+            <div class="dest-note" id="destNote"></div>
+
+            <div class="hub-tabs" id="hubTabs">
+              <button data-t="all" class="on">전체 <b>10</b></button>
+              <button data-t="mine">👤 내 것 <b>4</b></button>
+              <button data-t="company">🏢 회사 지식 <b>5</b></button>
+              <button data-t="raw">🩹 반입 원본 <b>4</b></button>
+              <button data-t="help">📘 제품 도움말 <b>4</b></button>
+            </div>
+            <div class="hub-search-row">
+              <input class="hub-search" id="hubSearch" placeholder="🔍 문서 검색 — 제목·파일명에서 찾습니다(지금 탭 안에서만 좁힙니다)">
+            </div>
+          </div>
+
+          <div class="hub-body" id="hubBody">
+            <div class="hub-list" id="hubList"></div>
+            <div class="hub-detail" id="hubDetail"></div>
+          </div>
+          <div class="hub-note" id="hubNote">다른 담당자의 <b>「내 것」</b> 문서는 여기 보이지 않습니다 — 서버가 계정별로 가릅니다(있다/없다가 아니라 <b>「그런 문서가 없습니다」</b>로, personaldocs.ts:126).</div>
+        </div>
+        <div class="stage-peek"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 설명 패널 ══════════════ -->
+  <div class="notes">
+
+    <h2>1. 지금 3~4곳 → 새안 1곳 대응표</h2>
+    <div class="note-card">
+      <table class="spec-table">
+        <thead><tr><th>지금</th><th>실제로 하는 일</th><th>새안 위치</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>문서함(창) — <code>mine:</code> 트리</td>
+            <td>personalDocsList()를 mydocs와 <b>따로 또</b> 호출(docbox.html:245-250)</td>
+            <td>👤 내 것 탭에 흡수</td>
+            <td class="pass">같은 데이터 이중 호출 해소</td></tr>
+          <tr><td>문서함(창) — 사용 안내/업무 지침</td>
+            <td>docs-manifest.json 제품 내장 매뉴얼(docbox.ts:43-58) — <b>고객 업로드 아님</b>, 읽기전용</td>
+            <td>📘 제품 도움말 탭</td>
+            <td>성격이 달라 배지도 다르게(보라) 구분, 삭제·등급 없음</td></tr>
+          <tr><td>문서함(창) — 요청 만들기</td>
+            <td>버그·기능 요청을 .md 파일로 만들어 내려받기(docbox.html:300-306,554-612)</td>
+            <td class="warn-txt">이번 통합 범위 밖</td>
+            <td>문서 저장이 아니라 산출물 생성 도구 — 문서함(창) 자체를 없앨 때 새 자리가 필요(§포기)</td></tr>
+          <tr><td>내 문서(mydocs.html)</td>
+            <td>personalDocs CRUD·공유·AI 참고 토글·.md 가져오기</td>
+            <td>👤 내 것 탭</td>
+            <td class="pass">그대로 이식 — 이름·조작 안 바뀜</td></tr>
+          <tr><td>Smart MD(문서 작성 창)</td>
+            <td>openSmartMd() — 별도 BrowserWindow에서 씀</td>
+            <td>👤 내 것 탭의 ✍ 버튼</td>
+            <td>변화 없음 — 쓰기는 계속 별도 창(기존 「(창)」 예외 규약)</td></tr>
+          <tr><td>메모리 화면 「📚 올린 문서 확인·관리」</td>
+            <td>업무영역 5분류·열람등급 O/S/C·조각수·관계·원본 열기·삭제 2옵션(memory.html:296-757)</td>
+            <td>🏢 회사 지식 탭</td>
+            <td>가장 정교한 기존 UI — <b>구조 그대로 옮긴다</b>, 재발명 안 함</td></tr>
+          <tr><td>콘솔 ＋ 업로드(자동 분류)</td>
+            <td>uploadAuto() → vulnscan/product-manual/analysis/memory 4갈래 라우팅(console.js:1592-1666)</td>
+            <td>🩹 반입 원본 탭에 <b>영수증</b>으로 기록 + 결과 화면 바로가기</td>
+            <td>업로드 <b>입구</b>는 유지(2026-07-27 결정 존중) — 신설은 <b>조회·관리</b>뿐(§포기)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>2. 왜 이 안인지</h2>
+    <div class="note-card">
+      <p><b>왜 화면을 하나로 모았나</b> — mydocs.html 자체 주석이 "격리가 이 화면의 전부다"라고
+        말하는데, 정작 개인 문서 목록은 문서함(창)이 <b>따로 또</b> 부르고 있었다(docbox.html:245-250).
+        같은 데이터를 두 창이 각자 불러오면 "내가 올린 게 다 어디 갔지"를 담당자가 직접 기억해야
+        한다 — 그 탐색 비용이 이번 QA 질문("연관성이 있다면 하나로")의 실체다. 조사 결과(외부1)도
+        "여러 화면에 흩어진 업로드 관련 인터페이스를 하나로 모으면 마찰이 준다"는 같은 결론이다.</p>
+      <p><b>왜 3부류를 유지했나(전부 개인화도, 전부 지식창고화도 안 함)</b>:</p>
+      <ul class="checklist">
+        <li><b class="ok">✓</b> <b>전부 「내 것」으로 만들지 않은 이유</b> — personalDocs는 검색이
+          <b>내 질문에만</b> 근거로 나오게 하드 격리한다(mydocs.html:11). 취약점 스캔 원본·보안제품
+          매뉴얼을 개인 것으로 넣으면, 인수인계 때 다음 담당자에게 "그런 문서가 없습니다"(404)로
+          보인다 — 회사 자산인데 개인 소유가 되어 버리는 사고다.</li>
+        <li><b class="ok">✓</b> <b>전부 「회사 지식(RAG)」으로 만들지 않은 이유</b> — 개인 메모(초안·
+          잡담성 조사노트)까지 전역 검색 근거로 들어가면 다른 담당자 질문에 부정확한 개인 견해가
+          섞인다. 이 제품은 이미 그 사고를 겪었다(타사 문서 53%가 낌 — RAG 오염 전례,
+          project_rag_contamination). 조사 결과(외부2)도 "지식 베이스는 큐레이션된, 통제된 모음"
+          이어야 하고 "보안 등급별로 분리 운영"을 권고한다 — 아무거나 다 넣는 것과 정반대다.</li>
+        <li><b class="ok">✓</b> <b>스캐너 원본을 「문서(마크다운)」로 다루지 않은 이유</b> —
+          Nessus CSV·syslog는 사람이 읽는 문서가 아니라 <b>파싱해서 finding/이벤트로 바뀌는
+          원료</b>다. 문서 뷰어에 넣으면 정작 쓸모 있는 형태(우선순위 표·이벤트 목록)를 감춘다.
+          그래서 반입 원본 탭은 "무엇으로 판정됐고 어디로 갔는지"만 보여주는 <b>영수증</b>이고,
+          실제 데이터는 기존 화면(발견·수집/통합 분석/보안제품 등록부)에서 본다 — 새 뷰어를
+          만들지 않았다.</li>
+      </ul>
+    </div>
+
+    <h2>3. 무엇을 포기했는지</h2>
+    <div class="note-card">
+      <ul class="checklist">
+        <li><b class="mid">△</b> <b>완전한 단일 입구는 포기했다</b> — 콘솔 ＋(2026-07-27 "파일은
+          ＋ 한 곳으로")는 그대로 두고, 이 화면에 업로드 버튼을 하나 더 놓았다. 다만 새 개념은
+          아니다 — mydocs.html의 📥 가져오기가 이미 personalDocsCreate를 <b>목적지 확정 상태로
+          직접 호출</b>하는 선례다(mydocs.html:142-163, 분류를 거치지 않음). 역할을 나눴다:
+          <b>콘솔 ＋</b>는 "대화 중 자연스러운 투입"(추측 후 확인), <b>이 화면 버튼</b>은
+          "정리해서 넣기"(목적지 직접 지정). 완전히 겹치지 않는다.</li>
+        <li><b class="mid">△</b> <b>문서함의 「요청 만들기」는 새 자리를 못 찾았다</b> — 문서 저장이
+          아니라 버그·기능 요청 산출물을 만드는 도구라 이번 통합 대상이 아니다. 문서함(창)을
+          실제로 없애려면 이 기능이 옮겨갈 자리를 <b>별도로 결정</b>해야 한다(이 시안 범위 밖).</li>
+        <li><b class="mid">△</b> <b>memory.html의 고급 기능을 전부 재현하지 않았다</b> — 지식 그래프
+          관계("이 파일이 만든 연결")·위생 점검(kbHygiene 중복/충돌 탐지)은 회사 지식 탭 상세
+          패널에 <b>자리만</b> 그렸다. 세부 상호작용·문구는 구현 단계에서 그대로 옮긴다(재발명
+          안 함).</li>
+        <li><b class="mid">△</b> <b>반입 원본의 「원본 다시 내려받기」는 조건부다</b> — 서버가
+          스캐너 원본 파일 자체를 얼마나 보존하는지 이 시안 조사로는 확인하지 못했다. 있다면
+          붙이고 없다면 "원문은 파싱 후 보관하지 않습니다"로 정직하게 표시해야 한다 — 구현 착수
+          전 반드시 확인할 것(가짜 버튼 금지 원칙).</li>
+        <li><b class="mid">△</b> <b>검색은 필터 전용으로 고정했다</b> — 자유 명령어를 받지 않는다
+          (지시는 대화창 원칙). "최근 것만", "김보안이 올린 것" 같은 자연어 질의는 이 화면이 아니라
+          콘솔에서 묻게 유도한다(챗봇 라우팅 범위, 이 시안이 새로 만들지 않음).</li>
+      </ul>
+    </div>
+
+    <h2>4. 밀도 숫자</h2>
+    <div class="note-card">
+      <p>아래는 이 파일에 실제로 선언한 padding·line-height 값을 그대로 합산한 것이다. 원본
+        화면(mydocs.html 등)은 줄 높이를 명시하지 않아, 같은 기준으로 비교하기 위해 한글 본문
+        관례치 <b>1.4</b>를 동일하게 가정했다(둘 다 같은 가정이라 비교가 공정하다). 실측 렌더링이
+        아니라 <b>계산값</b>이다 — 구현 단계에서 실앱으로 다시 확인할 것.</p>
+      <table class="spec-table">
+        <thead><tr><th>구역</th><th>지금(mydocs.html)</th><th>새안(이 파일)</th><th>증감</th></tr></thead>
+        <tbody>
+          <tr><td>머리(제목+부제+버튼줄)</td>
+            <td class="num">약 62px<br><span style="color:#8a8171;font-size:11px">title 19px→26.6 + gap4 + sub 12.5px→17.5 + margin14</span></td>
+            <td class="num">약 62px<br><span style="color:#8a8171;font-size:11px">같은 컴포넌트 재사용, 버튼 1개 추가는 가로만 씀</span></td>
+            <td class="num pass">0</td></tr>
+          <tr><td>세그먼트(부류 선택)</td>
+            <td class="num">약 41px<br><span style="color:#8a8171;font-size:11px">3칸, pad7+7+font12.25→17.15+margin12</span></td>
+            <td class="num">약 41px<br><span style="color:#8a8171;font-size:11px">5칸이지만 줄바꿈 없이 가로로 늘어남 — 세로는 불변</span></td>
+            <td class="num pass">0</td></tr>
+          <tr><td>검색창</td>
+            <td class="num">없음</td>
+            <td class="num">약 44px<br><span style="color:#8a8171;font-size:11px">pad8+8+font12.5→17.5+margin10</span></td>
+            <td class="num warn-txt">+44px(신설)</td></tr>
+          <tr><td>목록 행 1개</td>
+            <td class="num">약 39px<br><span style="color:#8a8171;font-size:11px">pad10+10+font13→18.2+border1</span></td>
+            <td class="num">약 39px<br><span style="color:#8a8171;font-size:11px">같은 .hrow 컴포넌트, 부류 배지만 앞에 붙음(가로)</span></td>
+            <td class="num pass">0(행당)</td></tr>
+          <tr><td>하단 격리 문구</td>
+            <td class="num">약 26px</td>
+            <td class="num">약 26px</td>
+            <td class="num pass">0</td></tr>
+          <tr><td><b>화면당 고정 틀 합계</b>(문서 8건 표시 기준)</td>
+            <td class="num"><b>약 501px</b><br><span style="color:#8a8171;font-size:11px">62+41+8×39+26+본문 padding60</span></td>
+            <td class="num"><b>약 545px</b><br><span style="color:#8a8171;font-size:11px">62+41+44+8×39+26+본문 padding60</span></td>
+            <td class="num warn-txt">+44px(+8.8%) — 검색창 1개뿐</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:8px"><b>문서 1건당 밀도는 그대로다(0px)</b> — 같은 <code>.hrow</code> 행
+        컴포넌트를 재사용해서, 문서가 몇 건이든 행 하나의 세로 값은 바뀌지 않는다. 화면 전체에 새로
+        얹는 것은 검색창 44px 하나뿐이고, 문서 수가 늘수록 이 44px의 비중은 0에 가까워진다(예:
+        50건 표시 시 전체 1,979px 중 2.2%).</p>
+      <p><b>반대로 사라지는 것</b>(정밀 측정 아님, 실제 코드 padding에서 근거만 뽑음) — 문서함(창)을
+        따로 열 때 그 화면만의 헤더+검색+하단 상태줄이 <b>약 117px</b> 든다(docbox.html:19-27
+        ident+search 약 84px, :106 status줄 약 33px). 메모리 화면의 「📚 올린 문서」 패널 헤더도
+        별도로 최소 수십 px가 든다(정확한 값은 실측 필요). 이 시안이 승인되면 <b>그 화면들을 여는
+        맥락 전환 자체</b>(창 전환·다시 찾기)가 없어진다 — 이건 px로 셀 수 없지만 QA 관찰
+        ("연관성이 있다면 하나로")이 가리키는 진짜 비용이다.</p>
+    </div>
+
+    <h2>5. 제품 원칙 자가점검</h2>
+    <div class="note-card">
+      <ul class="checklist">
+        <li><b class="ok">✓</b> <b>격리 원칙</b> — 「내 것」은 여전히 personalDocs 그대로다. 남의
+          문서는 404(personaldocs.ts:126, "그런 문서가 없습니다") — 화면을 합쳐도 서버 격리 계약은
+          한 글자도 안 바꾼다.</li>
+        <li><b class="ok">✓</b> <b>회사 지식 전환 전 경고</b> — 「🏢 회사 지식」목적지를 고르면
+          업로드 전에 "전 담당자와 AI가 함께 봅니다" 경고가 먼저 뜬다(destNote 데모, 기존
+          docbox.html toggleRag 경고 문구·패턴 재사용 — 새로 안 지음).</li>
+        <li><b class="ok">✓</b> <b>지시는 대화창 · 새 입력칸 금지</b> — 이 화면의 유일한 텍스트
+          칸은 검색(필터 전용, readonly 취급). 목적지 선택도 자유 텍스트가 아니라 칩 3개 중
+          고르는 것이다.</li>
+        <li><b class="mid">△</b> <b>화면 설명은 챗봇/ⓘ로</b> — 화면엔 정체성 한 줄("개인 메모부터
+          회사 지식·스캐너 파일까지…")과 격리 경고 한 줄만 뒀다. ⓘ 아이콘 자리는 그렸지만 실제
+          screenguide 패널 문구는 구현 단계에서 쓴다(이 시안이 미리 지어내지 않음).</li>
+        <li><b class="ok">✓</b> <b>자체완결 HTML</b> — 외부 CDN·웹폰트·원격 이미지 없음. 색은
+          pro-white.css의 확정 토큰(2026-08-20)을 그대로 복사했다.</li>
+        <li><b class="ok">✓</b> <b>정직한 구현</b> — 상단 배너로 "탭·검색·목적지 칩만 동작"을
+          고지했다. 행 안의 개별 버튼은 실제 동작하지 않는다고 표기했다(§안 하는 일).</li>
+        <li><b class="mid">△</b> <b>파일은 ＋ 한 곳으로(2026-07-27)</b> — 완전 준수는 아니다.
+          입구가 하나 늘었다는 사실을 §포기에 명시했고, 역할(대화 중 투입 vs 정리해서 넣기)로
+          구분해 충돌을 줄였다 — 최종 판단은 사장님 승인 몫으로 남긴다.</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<footer class="doc-foot">
+  mockups/docs-single-entry/시안.html · gijo-mockup · 2026-08-20 · 제품 코드 미수정(읽기만 함:
+  client/src/renderer/pages/mydocs.html·docbox.html·memory.html·console.js·nav.js·app.html·
+  pro-white.css, server/src/engine/docbox.ts·personaldocs.ts). 표는 위 파일들의 실제 padding·
+  font-size·line 번호에서 옮겨 적었다 — 새로 지어낸 값이 아니다.
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── 예시 데이터(전부 화면 텍스트일 뿐, API 응답 아님) ──────────────────────
+  var DATA = {
+    mine: [
+      { t: "인수인계 체크리스트 초안.md", meta: "개인 · 오늘 11:20" },
+      { t: "9월 침투테스트 사전조사 메모.md", meta: "개인 · 어제 16:03" },
+      { t: "고객 미팅 메모_A사.md", meta: "개인 · 8/15" },
+      { t: "월간 보고 초안.md", meta: "🏢 공유(AI 미포함) · 8/12" }
+    ],
+    company: [
+      { grp: "취약점", t: "2026 상반기 침투테스트 결과 요약.md", grade: "C", meta: "8/20 09:47 · 김보안 · 34조각",
+        detail: "기밀(C) 등급 — 취약점 그룹. bge-m3 임베딩 34조각. 전역(공유) 범위 · 업로드 2026-08-20 09:47 · 올린이 김보안." },
+      { grp: "장비운영", t: "Cisco_ASA_9.x_운영매뉴얼.pdf", grade: "O", meta: "8/18 · 22조각",
+        detail: "공개(O) 등급 — 장비운영 그룹. bge-m3 임베딩 22조각. 원본 열기로 PDF 원문을 다시 볼 수 있습니다." },
+      { grp: "사내규정", t: "정보보안_운영지침_v4.md", grade: "S", meta: "8/10 · 15조각",
+        detail: "민감(S) 등급 — 사내규정 그룹. bge-m3 임베딩 15조각." },
+      { grp: "위협대응", t: "랜섬웨어_초동대응_절차.md", grade: "S", meta: "8/02 · 9조각",
+        detail: "민감(S) 등급 — 위협대응 그룹. bge-m3 임베딩 9조각." },
+      { grp: "일반", t: "2026 보안 트렌드 리포트.pdf", grade: "O", meta: "7/28 · 41조각",
+        detail: "공개(O) 등급 — 일반 그룹. bge-m3 임베딩 41조각." }
+    ],
+    raw: [
+      { t: "Nessus_scan_20260819.csv", badge: "🩹 취약점 리포트", meta: "오늘 14:02",
+        detail: "finding 12건 등록(호스트 5) · 비인증(원격) 스캔 2대 포함 — 로컬 취약점을 놓쳤을 수 있습니다.",
+        link: "→ 발견·수집에서 보기" },
+      { t: "IPS_syslog_20260818.txt", badge: "🚨 보안 로그 원본", meta: "어제 22:15",
+        detail: "탐지 규칙에 걸려 통합 분석 이벤트 7건을 등록했습니다.",
+        link: "→ 통합 분석에서 보기" },
+      { t: "AhnLab_EPP_v7_사용설명서.pdf", badge: "🛡 보안제품 자산", meta: "어제 10:31",
+        detail: "'AhnLab EPP' 제품이 새로 등록되고 이 파일이 로그 매뉴얼로 연결됐습니다.",
+        link: "→ 보안제품 등록부에서 보기" },
+      { t: "방화벽_반기점검_리포트.xlsx", badge: "📈 운영 리포트", meta: "8/08",
+        detail: "탐지 규칙에 해당하는 항목이 없어 분석 이벤트는 만들지 않았습니다 — 원문은 보관 중입니다.",
+        link: "(이동할 곳 없음)" }
+    ],
+    help: [
+      { t: "사용자 매뉴얼", meta: "제품 내장 · 읽기전용", detail: "제품을 처음 쓰는 담당자를 위한 사용자 매뉴얼입니다(guide)." },
+      { t: "보안담당자 실무매뉴얼", meta: "제품 내장 · 읽기전용", detail: "보안담당자 실무 절차 매뉴얼입니다(guide)." },
+      { t: "아키텍처 개요", meta: "제품 내장 · 읽기전용", detail: "GIJO AS의 아키텍처 개요 문서입니다(policy)." },
+      { t: "취약점관리 지침", meta: "제품 내장 · 읽기전용", detail: "취약점 관리 업무 지침입니다(policy)." }
+    ]
+  };
+  var ALL = []
+    .concat([{ b: "raw", ic: "🩹", t: "Nessus_scan_20260819.csv", meta: "오늘 14:02 · 취약점 12건 등록 → 발견·수집" }])
+    .concat([{ b: "mine", ic: "👤", t: "인수인계 체크리스트 초안.md", meta: "오늘 11:20 · 개인" }])
+    .concat([{ b: "company", ic: "🏢", t: "2026 상반기 침투테스트 결과 요약.md", meta: "오늘 09:47 · 기밀 · 취약점" }])
+    .concat([{ b: "raw", ic: "🚨", t: "IPS_syslog_20260818.txt", meta: "어제 22:15 · 이벤트 7건 등록 → 통합 분석" }])
+    .concat([{ b: "mine", ic: "👤", t: "9월 침투테스트 사전조사 메모.md", meta: "어제 16:03 · 개인" }])
+    .concat([{ b: "raw", ic: "🛡", t: "AhnLab_EPP_v7_사용설명서.pdf", meta: "어제 10:31 · 신규 제품 등록 → 보안제품 등록부" }])
+    .concat([{ b: "company", ic: "🏢", t: "Cisco_ASA_9.x_운영매뉴얼.pdf", meta: "8/18 · 공개 · 장비운영" }])
+    .concat([{ b: "mine", ic: "👤", t: "고객 미팅 메모_A사.md", meta: "8/15 · 개인" }])
+    .concat([{ b: "company", ic: "🏢", t: "정보보안_운영지침_v4.md", meta: "8/10 · 민감 · 사내규정" }])
+    .concat([{ b: "raw", ic: "📈", t: "방화벽_반기점검_리포트.xlsx", meta: "8/08 · 탐지 규칙 해당 없음(원문만 보관)" }]);
+
+  var BKT_LABEL = { mine: "👤 내 것", company: "🏢 회사 지식", raw: "🩹 반입 원본", help: "📘 도움말" };
+
+  function esc(s) { var d = document.createElement("i"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
+
+  var curTab = "all";
+  var body = document.getElementById("hubBody");
+  var list = document.getElementById("hubList");
+  var detail = document.getElementById("hubDetail");
+
+  function renderAll(filter) {
+    body.classList.remove("split");
+    var rows = ALL.filter(function (r) { return !filter || r.t.toLowerCase().indexOf(filter) !== -1; });
+    list.innerHTML = rows.map(function (r) {
+      return '<div class="hrow"><span class="bkt ' + r.b + '">' + r.ic + " " + esc(BKT_LABEL[r.b]) + '</span>' +
+        '<span class="t">' + esc(r.t) + '</span><span class="meta">' + esc(r.meta) + "</span></div>";
+    }).join("") || '<div style="padding:24px;text-align:center;color:var(--muted-2);font-size:12.5px">일치하는 문서가 없습니다.</div>';
+  }
+
+  function renderMine(filter) {
+    body.classList.remove("split");
+    var rows = DATA.mine.filter(function (r) { return !filter || r.t.toLowerCase().indexOf(filter) !== -1; });
+    list.innerHTML = rows.map(function (r) {
+      return '<div class="hrow"><span class="t">' + esc(r.t) + '</span><span class="meta">' + esc(r.meta) + "</span>" +
+        '<span class="meta" style="color:var(--blue-ink);font-weight:700">AI 포함 · 공유 · ⬇ · ✕</span></div>';
+    }).join("");
+  }
+
+  function renderCompany(filter) {
+    body.classList.add("split");
+    var groups = {};
+    DATA.company.forEach(function (r) { (groups[r.grp] = groups[r.grp] || []).push(r); });
+    var html = "";
+    Object.keys(groups).forEach(function (g) {
+      var rows = groups[g].filter(function (r) { return !filter || r.t.toLowerCase().indexOf(filter) !== -1; });
+      if (!rows.length) return;
+      html += '<div class="grp-h">🗂 ' + esc(g) + " · " + rows.length + "개</div>";
+      html += rows.map(function (r) {
+        return '<div class="hrow" data-detail="' + esc(r.detail) + '" data-title="' + esc(r.t) + '" data-kind="company">' +
+          '<span class="t">' + esc(r.t) + '</span>' +
+          '<span class="grade ' + r.grade + '">' + r.grade + "</span>" +
+          '<span class="meta">' + esc(r.meta) + "</span></div>";
+      }).join("");
+    });
+    list.innerHTML = html || '<div style="padding:24px;text-align:center;color:var(--muted-2);font-size:12.5px">일치하는 문서가 없습니다.</div>';
+    var first = list.querySelector(".hrow");
+    if (first) selectDetail(first);
+  }
+
+  function renderRaw(filter) {
+    body.classList.remove("split");
+    var rows = DATA.raw.filter(function (r) { return !filter || r.t.toLowerCase().indexOf(filter) !== -1; });
+    list.innerHTML = rows.map(function (r) {
+      return '<div class="hrow"><div style="flex:1;min-width:0"><div class="t">' + esc(r.badge) + " " + esc(r.t) + '</div>' +
+        '<div class="meta" style="margin-top:2px">' + esc(r.detail) + "</div></div>" +
+        '<span class="act">' + esc(r.link) + "</span></div>";
+    }).join("");
+  }
+
+  function renderHelp(filter) {
+    body.classList.add("split");
+    var rows = DATA.help.filter(function (r) { return !filter || r.t.toLowerCase().indexOf(filter) !== -1; });
+    list.innerHTML = rows.map(function (r) {
+      return '<div class="hrow" data-detail="' + esc(r.detail) + '" data-title="' + esc(r.t) + '" data-kind="help">' +
+        '<span class="bkt help">📘</span><span class="t">' + esc(r.t) + '</span>' +
+        '<span class="meta">' + esc(r.meta) + "</span></div>";
+    }).join("");
+    var first = list.querySelector(".hrow");
+    if (first) selectDetail(first);
+  }
+
+  function selectDetail(row) {
+    Array.prototype.forEach.call(list.querySelectorAll(".hrow"), function (r) { r.classList.remove("sel"); });
+    row.classList.add("sel");
+    var kind = row.getAttribute("data-kind");
+    var title = row.getAttribute("data-title");
+    var d = row.getAttribute("data-detail");
+    if (kind === "company") {
+      detail.innerHTML =
+        '<div class="hd-title">' + esc(title) + "</div>" +
+        '<div class="hd-meta">' + esc(d) + "</div>" +
+        '<div class="hd-metric"><div class="hd-m"><b>bge-m3</b><span>임베딩 모델</span></div>' +
+        '<div class="hd-m"><b>전역</b><span>검색 범위</span></div>' +
+        '<div class="hd-m"><b>임베딩됨 ✓</b><span>상태</span></div></div>' +
+        '<div class="hd-sec">🔗 이 파일이 만든 연결(지식 그래프 — 자리만, 세부는 memory.html 그대로 이식 예정)</div>' +
+        '<div class="hd-acts"><button>📂 원본 열기</button><button>영역 수정 ▾</button>' +
+        '<button class="danger">AI 지식에서 빼기</button><button class="danger">원본까지 삭제</button></div>';
+    } else {
+      detail.innerHTML =
+        '<div class="hd-title">📘 ' + esc(title) + "</div>" +
+        '<div class="hd-meta">제품 내장 · 읽기전용 · docs-manifest.json</div>' +
+        '<div class="hd-body-text"><h3>미리보기</h3><p>' + esc(d) + " 실제 내용은 문서함(창)과 같은 렌더러(gijomd.js)로 그립니다.</p></div>";
+    }
+  }
+
+  list.addEventListener("click", function (ev) {
+    var row = ev.target.closest(".hrow[data-detail]");
+    if (row) selectDetail(row);
+  });
+
+  function render() {
+    var filter = (document.getElementById("hubSearch").value || "").trim().toLowerCase();
+    if (curTab === "all") renderAll(filter);
+    else if (curTab === "mine") renderMine(filter);
+    else if (curTab === "company") renderCompany(filter);
+    else if (curTab === "raw") renderRaw(filter);
+    else if (curTab === "help") renderHelp(filter);
+  }
+
+  document.getElementById("hubTabs").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button");
+    if (!b) return;
+    Array.prototype.forEach.call(document.querySelectorAll("#hubTabs button"), function (x) { x.classList.remove("on"); });
+    b.classList.add("on");
+    curTab = b.getAttribute("data-t");
+    document.getElementById("hubSearch").value = "";
+    render();
+  });
+  document.getElementById("hubSearch").addEventListener("input", render);
+
+  // ── 업로드 목적지 선택 데모 ────────────────────────────────────────────
+  var NOTE = {
+    mine: '파일 선택 대화상자가 열리고, 고른 파일이 즉시 <b>「내 것」</b>에 저장됩니다(개인 문서 —' +
+      ' 내 질문에만 근거로 나옵니다). 지금과 같은 동작입니다(mydocs.html 📥 가져오기 ·' +
+      ' personalDocsCreate 그대로).',
+    company: '파일 선택 대화상자가 열립니다. <b>업무영역(취약점/장비운영/사내규정/위협대응/일반)</b>과' +
+      ' <b>열람등급(공개/민감/기밀)</b>을 고른 뒤 저장 전에 아래 확인을 먼저 보여줍니다.' +
+      '<div class="warnbox">⚠ 이 문서를 회사 지식으로 올리면 <b>전 담당자와 AI가 함께 봅니다.</b> 계속할까요?' +
+      '<div class="wbtn"><button>그래도 올리기</button><button>취소</button></div></div>',
+    raw: '파일을 고르면 자동으로 유형을 판별합니다(취약점 리포트 · 보안 로그 원본 · 운영 리포트 ·' +
+      ' 보안제품 자산 · 로그 매뉴얼) — 확신이 낮으면 지금처럼 대화창에서 고르게 물어봅니다' +
+      '(콘솔 ＋와 같은 판별 로직 · uploadAuto). 등록된 뒤에는 이 화면의 <b>🩹 반입 원본</b> 탭에' +
+      ' 영수증으로 남습니다.'
+  };
+  var destPicker = document.getElementById("destPicker");
+  var destNote = document.getElementById("destNote");
+  document.getElementById("btnUpload").addEventListener("click", function () {
+    destPicker.classList.toggle("on");
+    if (!destPicker.classList.contains("on")) destNote.classList.remove("on");
+  });
+  destPicker.addEventListener("click", function (ev) {
+    var b = ev.target.closest(".dchip");
+    if (!b) return;
+    Array.prototype.forEach.call(destPicker.querySelectorAll(".dchip"), function (x) { x.classList.remove("on"); });
+    b.classList.add("on");
+    destNote.innerHTML = NOTE[b.getAttribute("data-d")] || "";
+    destNote.classList.add("on");
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

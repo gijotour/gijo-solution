@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 답마다 「틀렸어요」 → 결재판 항목 (추천 시안 1개)</title>
+<!--
+  ============================================================================================
+  mockups/wrong-flag/시안.html — 자체완결(외부 자원 0). 스크립트는 자기 높이 재기만 한다.
+  승인 근거: 2026-09-07 사장님 「크로드 너가 할 수 있는 것까진 다 해주고, 사용자와 내부 LLM+사용자가
+            이용해서 제품 운용할 수 있도록 하자」·「우리 결재판도 있으니」
+            + 2026-08-22 「시안은 추천안 1개로 바로 진행」 결정.
+  계획서 위치: 중-1(파일럿 실사용 피드백 루프 — 오답·미답 지적을 회귀셋으로 흡수)의 **뒷절반**.
+              앞절반(접수)은 2026-07-29에 이미 만들어졌고, 뒷절반(처리)이 통째로 비어 있다.
+  제품 코드는 한 줄도 안 바꿨다. 읽기만 했다.
+  ============================================================================================
+-->
+<style>
+/* 색은 전부 기존 토큰 — 새 색을 만들지 않았다(approvals.html :root에서 그대로 복사). */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;
+  --teal:#1eb980;--purple:#8b7cf0;--red-ink:#f5928a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+     font-size:13px;line-height:1.65;padding:22px 26px 60px;}
+h1{font-size:20px;font-weight:800;color:#fff;}
+h2{font-size:14.5px;font-weight:800;color:#fff;margin:26px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+h3{font-size:12.75px;font-weight:800;color:var(--blue-light);margin:14px 0 6px;}
+p{margin:6px 0;color:var(--text);}
+.sub{font-size:12.5px;color:var(--muted);}
+.lead{max-width:1180px;}
+b,strong{color:#fff;font-weight:800;}
+code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:0 4px;font-size:12.25px;color:var(--blue-light);}
+ul{margin:5px 0 8px 18px;} li{margin:3px 0;}
+table{border-collapse:collapse;width:100%;max-width:1180px;font-size:12.25px;margin:8px 0 4px;display:block;overflow-x:auto;}
+th{background:var(--panel-2);color:var(--muted);text-align:left;font-weight:700;}
+th,td{border:1px solid var(--border);padding:5px 8px;vertical-align:top;}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:10px 0;max-width:1180px;}
+.card-h{font-size:12.75px;font-weight:800;color:#fff;margin:-14px -16px 10px;padding:7px 12px;border-bottom:1px solid var(--border);}
+.warn{border-color:rgba(240,160,32,.35);background:rgba(240,160,32,.06);}
+.good{border-color:rgba(30,185,128,.35);background:rgba(30,185,128,.06);}
+.bad{border-color:rgba(226,72,61,.35);background:rgba(226,72,61,.06);}
+.tag{display:inline-block;font-size:11px;font-weight:800;border-radius:4px;padding:1px 6px;}
+.t-old{color:var(--muted-2);background:rgba(255,255,255,.07);}
+.t-new{color:var(--teal);background:rgba(30,185,128,.16);}
+.t-warn{color:var(--amber);background:rgba(240,160,32,.16);}
+.t-bad{color:var(--red-ink);background:rgba(226,72,61,.18);}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:1180px;align-items:start;}
+@media (max-width:1000px){.two{grid-template-columns:1fr;}}
+.stage{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;}
+.stage-h{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:8px;display:flex;gap:8px;align-items:center;}
+.measure{font-size:11.5px;color:var(--muted-2);font-variant-numeric:tabular-nums;}
+
+/* ── 대화창 부품 CSS — console.js / chatparts.js 원문 값 그대로 복사(값을 지어내지 않았다) ── */
+.cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);flex-wrap:wrap;}
+.cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}
+.cs-row .cb{flex:1;min-width:0;}
+.cs-row .cn{font-size:12px;font-weight:800;color:var(--muted,#b3ada4);margin-bottom:2px;}
+.cs-row .cm{font-size:12.5px;color:var(--text,#e9e7e2);word-break:break-word;line-height:1.62;}
+.gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--teal,#6fdcb5);}
+.dim-est{color:var(--muted-2,#a49d95);text-decoration:underline dotted rgba(240,160,32,.6);text-underline-offset:2px;text-decoration-thickness:1px;cursor:help;}
+/* .cs-flag — console.js:193~196 원문. 목업에서는 hover 없이 늘 보이게 두어 높이를 잴 수 있게 했다. */
+.cs-flag{display:inline-block;margin-top:4px;font-size:11.75px;font-weight:700;color:var(--muted-2,#a49d95);
+  background:none;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 8px;cursor:pointer;min-height:24px;font-family:inherit;}
+.cs-flag:hover{color:var(--amber,#f0a020);border-color:rgba(245,158,11,.45);}
+.cs-flag.done{color:var(--teal,#1eb980);border-color:rgba(30,185,128,.4);cursor:default;}
+/* 지금 판의 뜬 카드 — console.js openFlagCard()의 인라인 style 값 그대로(width:300px 등). */
+.oldcard{width:300px;background:var(--panel,#30302e);border:1px solid var(--border-strong);border-radius:10px;
+  box-shadow:0 18px 44px rgba(0,0,0,.55);padding:12px 13px;margin-top:6px;}
+.oldcard .oc-h{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px;}
+.oldcard .oc-q{flex:1;min-width:0;font-size:12px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.oldcard .oc-k{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.oldcard .oc-kb{background:none;border:1px solid var(--border);border-radius:999px;padding:4px 10px;color:var(--text);font-size:12.25px;min-height:24px;font-family:inherit;}
+.oldcard .oc-kb.on{border-color:var(--amber);color:var(--amber);}
+.oldcard .oc-hint{font-size:11.75px;color:var(--muted-2);margin-bottom:9px;min-height:13px;}
+.oldcard textarea{width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;
+  color:var(--text);font-size:12.5px;resize:vertical;font-family:inherit;margin-bottom:7px;}
+.oldcard .oc-note{font-size:11.5px;color:var(--muted-2);margin:5px 0 10px;}
+.oldcard .oc-b{display:flex;justify-content:flex-end;gap:7px;}
+.oldcard .oc-b button{border-radius:7px;padding:5px 12px;font-size:12.5px;font-family:inherit;cursor:pointer;}
+.oldcard .oc-cancel{background:none;border:1px solid var(--border);color:var(--muted);}
+.oldcard .oc-send{background:var(--blue);border:none;color:#fff;font-weight:700;}
+
+/* ── 제안 판: 꼬리 한 줄로 펼침 (새 색 없음 · gcp-next / gcp-nc 값 재사용) ── */
+.wf-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;}
+.wf-k{font-size:12px;color:var(--text,#e9e7e2);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);
+  border-radius:14px;padding:3px 10px;cursor:pointer;font-family:inherit;min-height:24px;}
+.wf-k:hover{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4);}
+.wf-k.on{background:rgba(240,160,32,.16);border-color:rgba(240,160,32,.5);color:var(--amber);font-weight:700;}
+.wf-k .why{font-size:11px;color:var(--muted-2);font-weight:400;}
+.wf-memo{flex:1;min-width:120px;background:var(--panel-2,#1f1e1d);border:1px solid rgba(255,255,255,.16);
+  border-radius:7px;padding:3px 9px;color:var(--text);font-size:12px;font-family:inherit;outline:none;height:24px;}
+.wf-memo:focus{border-color:var(--blue);}
+.wf-go{font-size:12px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.10);
+  border:1px solid rgba(59,130,246,.30);border-radius:7px;padding:2px 9px;cursor:pointer;font-family:inherit;min-height:24px;}
+.wf-go:hover{background:rgba(59,130,246,.20);}
+.wf-undo{font-size:11.75px;font-weight:700;color:var(--muted);background:none;border:none;
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-family:inherit;padding:0 2px;}
+
+/* ── 결재판(approvals.html) 부품 — 원문 CSS 값 그대로 ── */
+.rv-wrap{display:grid;grid-template-columns:360px 1fr;gap:14px;}
+@media (max-width:1000px){.rv-wrap{grid-template-columns:1fr;}}
+.rv-list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:7px 10px;}
+.rv-filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;}
+.fchip{font-size:12.25px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;}
+.fchip.on{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.5);color:#fff;font-weight:700;}
+.rv-seg{display:flex;gap:5px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.rv-row{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
+.rv-row:hover{background:var(--panel);}
+.rv-row.on{background:var(--panel);border-color:rgba(59,130,246,.4);}
+.rv-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.rv-rmain{flex:1;min-width:0;}
+.rv-rt{font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rv-rs{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rv-detail{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px 22px;}
+.field{margin-bottom:10px;}
+.field label{display:block;font-size:11.75px;color:var(--muted-2);margin-bottom:3px;}
+.inp{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:6px 9px;
+  color:var(--text);font-size:12.5px;font-family:inherit;outline:none;}
+textarea.inp{resize:vertical;line-height:1.6;}
+.btn{font-size:12px;font-weight:700;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);font-family:inherit;}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+.btn.reject{background:rgba(226,72,61,.14);border-color:rgba(226,72,61,.45);color:var(--red-ink);}
+.btn.verify{background:rgba(139,124,240,.14);border-color:rgba(139,124,240,.45);color:#b6acf7;}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.quote{border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:6px;}
+.quote .qd{font-size:11.5px;color:var(--muted-2);margin-bottom:3px;}
+.quote .qt{font-size:12.25px;line-height:1.75;color:#cdd4e6;}
+.draftbox{border:1px solid rgba(139,124,240,.35);background:rgba(139,124,240,.06);border-radius:9px;padding:9px 11px;margin-bottom:10px;}
+.draftbox .dh{font-size:12px;font-weight:800;color:#b6acf7;margin-bottom:4px;}
+.nodraft{border-color:var(--border-strong);background:rgba(255,255,255,.03);}
+.nodraft .dh{color:var(--muted-2);}
+.mini{font-size:11.5px;color:var(--muted-2);}
+.chk{list-style:none;margin-left:0;}
+.chk li{padding-left:20px;position:relative;}
+.chk li::before{content:"✔";position:absolute;left:0;color:var(--teal);font-weight:800;}
+.chk li.x::before{content:"✕";color:var(--red-ink);}
+.chk li.q::before{content:"?";color:var(--amber);}
+.note{font-size:12.25px;color:var(--muted);border-left:2px solid var(--border-strong);padding-left:9px;margin:6px 0;}
+</style>
+</head>
+<body>
+
+<h1>답마다 「틀렸어요」 → 결재판 항목</h1>
+<p class="sub lead">추천 시안 1개 · 2026-09-07 · 계획서 <b>중-1</b>(파일럿 실사용 피드백 루프 — 오답·미답 지적을 회귀셋으로 흡수)의 <b>뒷절반</b>.
+자율 운용 루프: 담당자가 답 옆에서 틀림을 짚고 → 결재판에서 승인·수정·요청을 처리하고 → 내부 LLM은 <b>분류·초안·제안만</b> 한다.</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§0. 먼저 밝힐 것 — 이 기능은 <span class="tag t-warn">절반이 이미 있다</span></h2>
+<div class="card lead">
+<div class="card-h">코드를 읽고 확인한 사실 (2026-09-07 · 소스 실측)</div>
+<table>
+<tr><th style="width:230px">있는 것</th><th style="width:300px">어디에</th><th>상태</th></tr>
+<tr><td>「▶ 이 답 이상해요」 버튼</td><td><code>console.js:843 attachFlag()</code> · CSS <code>.cs-flag</code> 193~196</td><td><span class="tag t-new">동작함</span> 호버/포커스로 드러남</td></tr>
+<tr><td>지적 접수 카드(뜬 카드 300px)</td><td><code>console.js:499 openFlagCard()</code></td><td><span class="tag t-new">동작함</span> 갈래 3(wrong·missing·style)+메모+정답</td></tr>
+<tr><td>접수 표 <code>answer_feedback</code></td><td><code>server/src/engine/answerfeedback.ts:22</code></td><td><span class="tag t-new">동작함</span> 질문·답 본문까지 남는다</td></tr>
+<tr><td>상태 <code>open / promoted / dismissed</code></td><td>같은 파일 <code>setFeedbackStatus</code></td><td><span class="tag t-new">API 있음</span> admin 전용</td></tr>
+<tr><td>회귀 문항 초안 API</td><td><code>GET /api/answer-feedback/gate-cases</code></td><td><span class="tag t-new">API 있음</span></td></tr>
+</table>
+<table>
+<tr><th style="width:230px">없는 것 (이 시안이 채우는 자리)</th><th>실측 근거</th></tr>
+<tr><td><b>접수된 지적을 처리하는 화면이 0개</b></td><td><code>answerFeedbackApi</code> 소비자 전수 조사: <code>preload.ts:455 sendAnswerFeedback</code>(보내기)만 배선. <b>목록·상태변경을 부르는 화면 코드가 한 줄도 없다.</b></td></tr>
+<tr><td><b>회귀 문항 초안 API의 소비자가 0개</b></td><td><code>gate-cases</code> 전수 조사 결과 <b>정의된 라우트 한 곳뿐</b> — <code>tools/</code> 어디에서도 안 부른다.</td></tr>
+<tr><td><b>내부 LLM 수정 초안 없음</b></td><td>접수 시점에 모델을 부르는 코드 없음.</td></tr>
+<tr><td><b>승인 문답으로 되먹임되는 길 없음</b></td><td><code>learncandidates.decideLearnCandidate</code>는 <code>cl:</code>·<code>ws:</code> 두 출처만 안다 — 지적 출처가 없다.</td></tr>
+<tr><td><b>분리창·위젯에는 버튼 자체가 없다</b></td><td><code>attachFlag</code> 호출부는 <code>console.js:1812</code> <b>단 한 곳</b>. <code>chatwidget.js</code>에 없고, console.js 안에서도 이어보기 복원(1894)·기타 답 경로(2101·2320)에 안 붙는다.</td></tr>
+</table>
+<p class="note">즉 지금 제품은 <b>「지적은 버리지 않는다」고 파일 머리에 적어 놓고, 실제로는 아무도 안 보는 표에 쌓고 있다.</b>
+이 저장소가 반복해 겪은 「생산자만 있고 소비자가 없다」의 거울상이다. 그래서 이 시안의 주된 일은 <b>새 버튼을 만드는 것이 아니라 출구를 뚫는 것</b>이다.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§1. 왜 이 안인가 — 핵심 결정 5개</h2>
+
+<div class="card lead">
+<div class="card-h">결정 1 — 「결재판」이 <b>둘</b>이라, 어느 쪽도 그대로는 못 쓴다</div>
+<table>
+<tr><th style="width:190px">후보</th><th style="width:330px">실제 모양(소스)</th><th>왜 못 쓰나</th></tr>
+<tr><td>대화창 결재판<br><span class="mini">console.js <code>.cs-ap</code></span></td>
+    <td>쓰기 도구 <b>실행 직전</b> 승인. 대화 안에서 값 고치고 승인하면 그 자리에서 실행. <b>줄이 남지 않는다.</b></td>
+    <td>지적은 <b>나중에 검토</b>할 일이다. 실행 직전 승인판은 대기열이 아니다.</td></tr>
+<tr><td>조치·승인 판<br><span class="mini">approvals.html(=fix.html?panel=approvals)</span></td>
+    <td>항목 = 스캔 finding. 키가 <code>(assetId, findingKey)</code>. 상태 6종. <b><code>kind</code> 칸이 없다.</b></td>
+    <td>항목을 섞으면 <b>VEX 내보내기·심각도 막대·지연/미배정 숫자·SBOM 제외</b>가 전부 오염된다. 가짜 assetId를 넣는 순간 국제 표준 파일에 거짓이 실린다.</td></tr>
+</table>
+<p><b>그래서 이렇게 한다:</b> <b>화면(창구)은 안 늘린다 — approvals.html 안에 「종류 세그먼트」를 한 줄 더한다.</b>
+목록 위 필터 띠(<code>.rv-filt</code>) 바로 위에 <span class="tag t-old">🔧 취약점 조치</span> <span class="tag t-old">💬 답 지적</span> 두 칸을 두고,
+세그먼트를 바꾸면 <b>같은 자리</b>(<code>#rvList</code> / <code>#rvDetail</code>)가 통째로 다른 종류를 그린다.
+숫자는 각자 센다 — <b>답 지적 건수는 「조치대상」에 절대 더하지 않는다.</b></p>
+<p class="mini">왜 「세그먼트」인가: 같은 목록에 두 모델을 섞으면 「같은 이름으로 다른 것을 센다」가 재발한다(approvals.ts 머리에 그 사고가 세 군데 적혀 있다).
+갈라 놓으면 한 화면 안이면서도 잣대가 안 섞인다.</p>
+</div>
+
+<div class="card lead">
+<div class="card-h">결정 2 — <b>「사실」은 대화창에서, 「판단」은 결재판에서</b> (과제 갈래 3개와 종류 3개를 안 붙인다)</div>
+<p>과제는 대화창 갈래 3개(자료 없음·규정 다름·그냥 틀림)와 결재판 종류 3개(ⓐ수정승인·ⓑ문서요청·ⓒ개발전달)를 나란히 두었다.
+<b>하지만 담당자는 답을 보는 순간 「이게 제품 결함인가」를 알 수 없다.</b> 그 판단은 근거 조각과 초안을 나란히 본 뒤에야 선다.</p>
+<table>
+<tr><th style="width:180px">대화창 갈래(사실)</th><th style="width:150px">→ 처음 종류</th><th>누가 바꾸나</th></tr>
+<tr><td>📄 자료가 없어서</td><td>ⓑ 문서 올리기 요청</td><td rowspan="3">결재판에서 <b>담당자만</b> 종류를 바꾼다.<br>「이건 답으로 못 고친다」 → <b>ⓒ 개발팀 전달</b> 버튼.<br><b>내부 LLM은 종류를 바꿀 수 없다</b>(갈래를 뒤집을 권한 없음).</td></tr>
+<tr><td>📋 사내 규정과 달라서</td><td>ⓐ 답 수정 승인</td></tr>
+<tr><td>❌ 그냥 틀림</td><td>ⓐ 답 수정 승인</td></tr>
+</table>
+<p class="mini">덤: 「📄 자료가 없어서」는 <b>서버가 이미 알고 있다.</b> <code>noevidence.근거없음종류판정</code>이 답에 <code>자료없음·자료요청·지정범위·근거약함·숫자무근거</code> 다섯 종 중 하나를 붙이고,
+그 값은 이미 <code>r.근거없음</code>으로 대화창에 내려온다(<code>console.ts:205</code>). 배너가 <code>자료없음</code>·<code>자료요청</code>이면 그 갈래를 <b>미리 눌러 둔다</b> — 담당자가 한 번 덜 누른다.</p>
+</div>
+
+<div class="card lead">
+<div class="card-h">결정 3 — 수정 초안의 재료는 <b>그 답이 실제로 인용한 조각</b>이다. 다시 검색하지 않는다</div>
+<p>대화창은 이미 <code>quotes: {documentId, text}[]</code>(근거 원문)와 <code>sources: string[]</code>(문서 이름)을 손에 쥐고 있다(<code>api/console.ts:72,75</code>).
+표시할 때 <b>그 조각을 그대로 서버로 보낸다.</b></p>
+<ul>
+<li><b>왜 재검색을 안 하나</b> — 다시 검색하면 원 답이 쓴 조각과 <b>다른 조각</b>이 나온다. 그러면 초안이 「그 답을 고친 것」이 아니라 <b>딴 답</b>이 된다.
+같은 함정이 이미 코드에 적혀 있다: 「대화창이 두 번째 잣대가 되면 답과 칩이 딴말을 한다」(console.js 사례 칩 주석).</li>
+<li><b>조각이 0개면 초안을 안 만든다</b> — 「초안 없음(근거 조각이 없던 답입니다)」이라고 적는다. <b>지어내지 않는다.</b>
+「등록하였습니다」를 지어낸 전례가 있어, 초안 자리에도 같은 규칙을 건다.</li>
+<li><b>초안은 저장되는 값이 아니다</b> — 저장되는 것은 담당자가 고쳐서 승인한 <b>최종문</b>이다. 초안은 그 옆에 <b>제안</b>으로만 남는다.</li>
+</ul>
+</div>
+
+<div class="card lead">
+<div class="card-h">결정 4 — 뜬 카드(300px)를 <b>한 줄</b>로 바꾼다</div>
+<p>지금 카드가 화면에 뜨는(<code>position:fixed</code>) 이유가 소스에 적혀 있다 — <b>「도킹 콘솔은 대화 영역이 90px 남짓이라 말풍선 안에 넣으면 잘린다」</b>.
+맞는 진단인데, <b>그건 카드가 300px일 때의 이야기다.</b> 갈래 3개 + 메모 한 칸을 <b>한 줄(24px)</b>로 줄이면 그 이유가 사라진다.</p>
+<ul>
+<li>대화 흐름을 <b>덮지 않는다</b>(뜬 카드는 아래 대화를 가린다).</li>
+<li>모달·<code>window.confirm</code> 아님 — 원래도 아니었고, 이 안도 아니다.</li>
+<li><b>접힘 +0px</b>: 「틀렸어요」 버튼은 지금과 똑같이 호버·포커스에서만 드러난다.</li>
+<li><b>펼침 +1줄</b>: 갈래·메모가 <b>버튼과 같은 줄</b>에 옆으로 붙는다(버튼이 사라지고 그 자리를 쓴다).</li>
+<li><b>되돌리기</b>: 보낸 뒤 「올림 · 결재판 열기 · 취소」 — 취소는 <code>dismissed</code>로 닫는 것이 아니라 <b>행을 지운다</b>(잘못 누른 것은 기록이 아니다).</li>
+</ul>
+</div>
+
+<div class="card lead">
+<div class="card-h">결정 5 — 버튼을 <b>chatparts.js로 옮긴다</b> (이 시안이 닫는 기존 결함)</div>
+<p><code>attachFlag</code>는 <code>console.js</code> 안에 살고 <b>호출부가 한 곳</b>이다. 결과로:</p>
+<ul>
+<li><b>분리창(⧉ 창으로)·화면 위젯</b>(<code>chatwidget.js</code>)에는 「틀렸어요」가 <b>아예 없다</b>. 그런데 그 위젯은 <b>결재판 화면 위에도 떠 있다</b>(<code>approvals.html:62 #gijoChatWidget</code>).</li>
+<li>이어보기로 되살린 답(<code>console.js:1894</code>)에도 안 붙는다 — 어제 답을 오늘 짚을 수 없다.</li>
+</ul>
+<p>이것이 <code>chatparts.js</code>가 존재하는 이유 그 자체다(파일 머리: 「같은 답인데 자리마다 붙는 것이 달랐다 … 담당자는 "아까는 됐는데?"가 된다」).
+<b><code>P.flag(el, {question, answer, quotes, sources, 근거없음}, submit)</code> 을 <code>gijoChatParts</code>에 추가</b>하고 양쪽이 부른다.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§2. 대화창 — 지금 판 ↔ 제안 판</h2>
+<p class="sub">CSS 값은 <code>console.js</code>·<code>chatparts.js</code> 원문에서 복사했다. 목업이라 호버 대신 늘 보이게 두었다(높이를 재려고).</p>
+
+<div class="two">
+  <!-- ── 지금 판 ── -->
+  <div class="stage">
+    <div class="stage-h"><span class="tag t-old">지금 판</span> console.js — 눌렀을 때</div>
+    <div id="oldRow" class="cs-row">
+      <div class="ci">🤖</div>
+      <div class="cb">
+        <div class="cn">기조 · 총괄</div>
+        <div class="cm">사내 백업 보존 기간은 <span class="dim-est" title="근거 없이 만들어진 값">90일</span>입니다. 규정상 주 1회 전체 백업을 받습니다.</div>
+        <div class="gcp-src">📄 근거 · 정보보호_운영지침_v3.pdf</div>
+        <button id="oldFlag" class="cs-flag" type="button">▶ 이 답 이상해요</button>
+        <div id="oldCard" class="oldcard">
+          <div class="oc-h">
+            <div class="oc-q">사내 백업 보존 기간은 90일입니다…</div><span style="color:var(--muted);font-size:13px">✕</span>
+          </div>
+          <div class="oc-k">
+            <button class="oc-kb on" type="button">❌ 틀린 답</button>
+            <button class="oc-kb" type="button">🔍 못 찾음</button>
+            <button class="oc-kb" type="button">💬 말투</button>
+          </div>
+          <div class="oc-hint">사실이 틀림</div>
+          <textarea rows="2" placeholder="무엇이 틀렸나요? (선택)"></textarea>
+          <textarea rows="2" placeholder="혹시 정답을 아신다면 (선택)"></textarea>
+          <div class="oc-note">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>
+          <div class="oc-b"><button class="oc-cancel" type="button">취소</button><button class="oc-send" type="button">전송</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="measure">뜬 카드(fixed) 높이 <b id="mOldCard">–</b>px · 답 줄 전체 <b id="mOldRow">–</b>px</div>
+    <p class="mini" style="margin-top:8px">보낸 뒤: 버튼이 「✓ 지적 접수됨」으로 굳고 <b>거기서 끝난다.</b> 어디로 갔는지 볼 곳이 없다.</p>
+  </div>
+
+  <!-- ── 제안 판 ── -->
+  <div class="stage">
+    <div class="stage-h"><span class="tag t-new">제안 판</span> chatparts.js P.flag — 눌렀을 때</div>
+    <div id="newRow" class="cs-row">
+      <div class="ci">🤖</div>
+      <div class="cb">
+        <div class="cn">기조 · 총괄</div>
+        <div class="cm">사내 백업 보존 기간은 <span class="dim-est" title="근거 없이 만들어진 값">90일</span>입니다. 규정상 주 1회 전체 백업을 받습니다.</div>
+        <div class="gcp-src">📄 근거 · 정보보호_운영지침_v3.pdf</div>
+        <div id="newLine" class="wf-line">
+          <button class="wf-k" type="button">📄 자료가 없어서</button>
+          <button class="wf-k on" type="button">📋 사내 규정과 달라서</button>
+          <button class="wf-k" type="button">❌ 그냥 틀림</button>
+          <input class="wf-memo" placeholder="한 줄 메모(선택) — 무엇이 틀렸나요">
+          <button class="wf-go" type="button">올리기</button>
+        </div>
+      </div>
+    </div>
+    <div class="measure">펼친 한 줄 높이 <b id="mNewLine">–</b>px · 답 줄 전체 <b id="mNewRow">–</b>px</div>
+
+    <div style="margin-top:12px">
+      <div class="stage-h" style="margin-bottom:6px"><span class="tag t-new">보낸 뒤</span> 같은 자리에서 상태로 바뀐다</div>
+      <div id="doneRow" class="cs-row" style="border-bottom:none">
+        <div class="ci">🤖</div>
+        <div class="cb">
+          <div class="cm" style="color:var(--muted-2)">…(같은 답)</div>
+          <div id="doneLine" class="wf-line">
+            <span class="cs-flag done" style="cursor:default">✓ 결재판에 올림 · <b style="color:var(--teal)">답 수정 승인</b></span>
+            <button class="wf-go" type="button">결재판 열기</button>
+            <button class="wf-undo" type="button">취소</button>
+          </div>
+        </div>
+      </div>
+      <div class="measure">올린 뒤 한 줄 높이 <b id="mDoneLine">–</b>px</div>
+    </div>
+  </div>
+</div>
+
+<div class="card lead warn" style="margin-top:12px">
+<div class="card-h">이 자리에서 <b>안 하는 것</b></div>
+<ul>
+<li><b>「정답을 아신다면」 칸을 대화창에서 뺐다.</b> 지금 카드에는 있는데(<code>expected</code>), 담당자에게 답을 <b>다시 쓰라고 시키는 칸</b>이다.
+그 일은 결재판에서 <b>LLM 초안을 고치는 형태</b>로 한다 — 빈 칸을 채우는 것보다 고치는 게 훨씬 싸다. <span class="tag t-warn">기존 값은 안 버린다</span> <code>expected</code> 칸은 표에 그대로 두고, 결재판의 「고친 답」이 그 칸에 들어간다.</li>
+<li><b>「💬 말투」 갈래를 대화창에서 뺐다</b> — 결재판 종류 셋 어디에도 안 붙고, 회귀 문항 감도 아니다(<code>feedbackAsGateCases</code>가 이미 <code>style</code>을 거른다).
+말투 지적은 <b>메모에 적으면 된다</b>. <span class="tag t-warn">기존 값은 안 버린다</span> <code>kind='style'</code>은 표에 남고 옛 행도 그대로 읽힌다.</li>
+</ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§3. 결재판 — 종류 세그먼트 한 줄과 항목 3종</h2>
+<p class="sub">화면 파일은 안 늘어난다. <code>approvals.html</code>(= <code>fix.html?panel=approvals</code>)의 목록 위에 세그먼트 한 줄만 얹는다.</p>
+
+<div class="rv-wrap" style="max-width:1180px">
+  <div class="rv-list-pane">
+    <div id="segRow" class="rv-seg">
+      <span class="fchip">🔧 취약점 조치 <b>4,890</b></span>
+      <span class="fchip on">💬 답 지적 <b>7</b></span>
+    </div>
+    <div class="rv-filt">
+      <span class="fchip on">대기 <b>5</b></span>
+      <span class="fchip">문서요청 <b>2</b></span>
+      <span class="fchip">개발전달 <b>1</b></span>
+      <span class="fchip">닫힘 <b>12</b></span>
+    </div>
+    <div id="rvRows">
+      <div class="rv-row on"><span class="rv-dot" style="background:var(--amber)"></span>
+        <div class="rv-rmain"><div class="rv-rt">ⓐ 답 수정 승인 — 백업 보존 기간</div>
+        <div class="rv-rs">📋 규정과 다름 · 김보안 · 2026-09-07 14:02 · 초안 있음</div></div></div>
+      <div class="rv-row"><span class="rv-dot" style="background:var(--blue)"></span>
+        <div class="rv-rmain"><div class="rv-rt">ⓑ 문서 올리기 요청 — 방화벽 정책 기준</div>
+        <div class="rv-rs">📄 자료 없음(배너: 자료요청) · 이운영 · 09-07 11:20</div></div></div>
+      <div class="rv-row"><span class="rv-dot" style="background:var(--purple)"></span>
+        <div class="rv-rmain"><div class="rv-rt">ⓒ 개발팀 전달 — 자산 수를 두 번 센다</div>
+        <div class="rv-rs">❌ 그냥 틀림 → 개발 · 박관제 · 09-06 17:44</div></div></div>
+      <div class="rv-row"><span class="rv-dot" style="background:var(--amber)"></span>
+        <div class="rv-rmain"><div class="rv-rt">ⓐ 답 수정 승인 — 사고 신고 시한</div>
+        <div class="rv-rs">📋 규정과 다름 · 김보안 · 09-06 09:11 · <b style="color:var(--muted-2)">초안 없음</b></div></div></div>
+    </div>
+  </div>
+
+  <div class="rv-detail" id="rvDetail">
+    <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:2px">ⓐ 답 수정 승인 — 백업 보존 기간</div>
+    <div class="mini" style="margin-bottom:12px">올린 사람 <b>김보안</b> · 2026-09-07 14:02 · 화면 <code>console</code> · 갈래 <b>📋 사내 규정과 달라서</b></div>
+
+    <div class="field"><label>원 질문 <span class="mini">(담당자가 실제로 물은 말 — 고칠 수 없다)</span></label>
+      <div class="inp" style="background:transparent">백업 보존 기간이 며칠이야?</div></div>
+
+    <div class="field"><label>원 답 <span class="mini">(그대로 보존 · <b style="color:var(--amber)">이 답은 학습 후보에서 뺀다</b>)</span></label>
+      <div class="inp" style="background:transparent;color:var(--muted)">사내 백업 보존 기간은 <span class="dim-est">90일</span>입니다. 규정상 주 1회 전체 백업을 받습니다.</div></div>
+
+    <div class="field"><label>담당자 메모</label><div class="inp" style="background:transparent">규정 개정으로 180일로 늘었습니다</div></div>
+
+    <div class="field"><label>이 답이 실제로 인용한 조각 <span class="mini">(초안의 재료 — 다시 검색하지 않았다)</span></label>
+      <div class="quote"><div class="qd">정보보호_운영지침_v3.pdf · 조각 #14</div>
+        <div class="qt">…백업은 <b>주 1회 전체 + 일 1회 증분</b>으로 수행하며, 보존 기간은 <b>180일</b>로 한다(2026 개정)…</div></div></div>
+
+    <div class="draftbox">
+      <div class="dh">🤖 내부 LLM 수정 초안 <span class="mini" style="font-weight:400">— 제안입니다. 고쳐서 승인하세요.</span></div>
+      <textarea class="inp" rows="3">사내 백업 보존 기간은 180일입니다(정보보호_운영지침_v3.pdf, 2026 개정). 백업은 주 1회 전체 + 일 1회 증분으로 수행합니다.</textarea>
+      <div class="mini" style="margin-top:5px">만든 두뇌 <code>qwen3-14b</code> · 14:02:11 · 근거 조각 1개로 만듦 · <b>저장되는 값은 위 칸의 최종문이지 초안이 아니다</b></div>
+    </div>
+
+    <div class="draftbox nodraft">
+      <div class="dh">초안 없음 <span class="mini" style="font-weight:400">— 이 답에는 인용한 조각이 없었습니다(근거 없이 답한 답).</span></div>
+      <div class="mini">지어내지 않습니다. 담당자가 직접 적거나, <b>ⓑ 문서 올리기 요청</b>으로 바꾸세요. <span class="tag t-old">다른 항목의 모습</span></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" type="button">✓ 승인 — 이 답을 승인 문답으로</button>
+      <button class="btn verify" type="button">📄 문서 요청으로 바꾸기</button>
+      <button class="btn verify" type="button">🛠 개발팀으로 보내기</button>
+      <button class="btn reject" type="button">🛡 반려(닫기)</button>
+    </div>
+    <div class="mini" style="margin-top:8px">⚠ 승인하면 <b>고친 답</b>이 승인 문답으로 쌓이고 <b>원 답은 학습 후보에서 빠집니다.</b>
+    반려하면 항목만 닫히고 <b>지적 기록은 남습니다</b>(무엇을 못 고쳤는지가 정보입니다).</div>
+  </div>
+</div>
+<div class="measure" style="margin-top:6px">세그먼트 줄 높이 <b id="mSeg">–</b>px · 목록 한 줄 높이 <b id="mRvRow">–</b>px(기존 <code>.rv-row</code>와 같은 값)</div>
+
+<div class="card lead">
+<div class="card-h">ⓑ·ⓒ 상세는 <b>같은 골격, 다른 꼬리</b> (칸을 새로 발명하지 않는다)</div>
+<table>
+<tr><th style="width:150px">종류</th><th style="width:300px">상세에 더 있는 것</th><th>승인이 일으키는 일</th></tr>
+<tr><td>ⓐ 답 수정 승인</td><td>인용 조각 · LLM 초안(고칠 수 있는 칸)</td><td>고친 답 → 승인 문답 저장 · 원 답 학습 제외 · 항목 <code>closed</code></td></tr>
+<tr><td>ⓑ 문서 올리기 요청</td><td><b>「무슨 자료가 없었나」 한 줄</b>(배너 종류로 미리 채움) + 넣을 자리 고르기(내 문서 / 지식)</td><td><b>문서함 올리기 카드를 연다</b>(mydocs 업로드) · 파일이 실제로 들어오면 항목이 닫힌다</td></tr>
+<tr><td>ⓒ 개발팀 전달</td><td>재현 한 줄 · 어느 화면 · 기대한 답</td><td><code>status='promoted'</code> · <b>회귀 문항 후보 목록에 실린다</b>(<code>/api/answer-feedback/gate-cases</code>)</td></tr>
+</table>
+<p class="mini">ⓑ의 「승인 = 문서함 카드 열기」는 <b>새 통로가 아니다</b> — 지금도 <code>자료요청배너</code>가 담당자에게
+「관련 매뉴얼·문서를 지식에 넣어 주세요 … 대화창에 "자료 넣는 법"이라고 물으면」이라고 <b>말로만</b> 안내한다. 그 말을 <b>버튼으로</b> 만든 것뿐이다.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§4. 밀도 숫자</h2>
+<div class="card lead warn">
+<div class="card-h">⚠ 아래 px는 <b>이 목업 페이지에서 잰 값</b>이다 — 제품에서 다시 잰다</div>
+<p class="mini">설치본을 열 수 없는 환경이라(게시·라이브 로그인 금지) 실제 화면에서 못 쟀다.
+대신 <b>글꼴·글자 크기·padding·border-radius를 제품 소스에서 그대로 복사</b>했고, 페이지 스크립트가 <code>getBoundingClientRect</code>로 스스로 잰다.
+제품 폭(도킹 콘솔 360~380px)에서는 줄바꿈이 달라 값이 흔들릴 수 있으니, 구현 전에 <b>실화면에서 재측정</b>한다.</p>
+<table>
+<tr><th style="width:300px">무엇</th><th style="width:110px">지금 판</th><th style="width:110px">제안 판</th><th style="width:110px">증감</th><th>근거</th></tr>
+<tr><td>답 꼬리 — <b>접힘</b>(안 눌렀을 때)</td><td class="n">0px</td><td class="n">0px</td><td class="n"><b style="color:var(--teal)">±0</b></td><td>둘 다 <code>.cs-flag{display:none}</code> — 호버·포커스에서만 드러난다</td></tr>
+<tr><td>답 꼬리 — 버튼만 보일 때</td><td class="n" id="dOldBtn">–</td><td class="n" id="dNewBtn">–</td><td class="n">±0</td><td>같은 <code>.cs-flag</code> 값(11.75px · padding 2/8 · min-height 24)</td></tr>
+<tr><td>답 꼬리 — <b>펼침</b></td><td class="n" id="dOldOpen">–</td><td class="n" id="dNewOpen">–</td><td class="n" id="dDiffOpen">–</td><td>지금=뜬 카드 300px 폭 · 제안=한 줄</td></tr>
+<tr><td>올린 뒤 상태 줄</td><td class="n" id="dOldDone">–</td><td class="n" id="dNewDone">–</td><td class="n" id="dDiffDone">–</td><td>지금은 버튼 글자만 바뀜 / 제안은 <b>결재판 열기·취소</b>가 붙는다</td></tr>
+<tr><td>답 줄 전체(말풍선 한 개)</td><td class="n" id="dOldRow">–</td><td class="n" id="dNewRow">–</td><td class="n" id="dDiffRow">–</td><td>목업 폭 기준</td></tr>
+<tr><td>결재판 세그먼트 줄(신설)</td><td class="n">0px</td><td class="n" id="dSeg">–</td><td class="n" id="dSegDiff">–</td><td><code>.fchip</code> 값 그대로(12.25px · padding 5/10) + 아래 구분선 6px</td></tr>
+<tr><td>결재판 목록 한 줄</td><td class="n" id="dRvRow">–</td><td class="n" id="dRvRow2">–</td><td class="n">±0</td><td><b>같은 <code>.rv-row</code></b>를 쓴다 — 답 지적 줄을 위해 새 행 모양을 안 만들었다</td></tr>
+</table>
+<p style="margin-top:8px"><b>한 줄 요약:</b> 대화창은 <b>평소 ±0px</b>, 펼쳤을 때만 한 줄. 뜬 카드가 사라져 <b>대화를 덮는 면적이 0</b>이 된다.
+결재판은 <b>세그먼트 한 줄</b>만 늘고 목록·상세는 기존 자리를 재사용한다.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§5. 그 값을 누가 넣는가 — 생산자 → 소비자</h2>
+<table style="max-width:1180px">
+<tr><th style="width:190px">칸</th><th style="width:330px">생산자(넣는 곳)</th><th>소비자(읽는 곳)</th></tr>
+<tr><td><code>question</code> / <code>answer</code></td><td>대화창이 화면에 있는 그 글자를 그대로 보냄 <span class="mini">(이미 그렇게 동작)</span></td><td>결재판 상세 · 회귀 문항 초안</td></tr>
+<tr><td><code>route</code> <span class="tag t-new">신설</span><br><span class="mini">fix / doc / dev</span></td><td>대화창 갈래 3개 → 처음 값 · <b>결재판에서 담당자만 변경</b></td><td>결재판 세그먼트·필터 칩 · 개발팀 목록 필터</td></tr>
+<tr><td><code>banner</code> <span class="tag t-new">신설</span></td><td><code>noevidence.근거없음종류판정</code>(서버) → <code>r.근거없음</code>(이미 내려옴)</td><td>ⓑ 갈래 미리 선택 · 「무슨 자료가 없었나」 첫 줄</td></tr>
+<tr><td><code>quotes</code> <span class="tag t-new">신설</span></td><td>대화창이 이미 쥔 <code>r.quotes[{documentId,text}]</code> — <b>재검색 안 함</b></td><td>초안 만들 재료 · 결재판 상세의 근거 상자</td></tr>
+<tr><td><code>draft</code> <span class="tag t-new">신설</span></td><td><b>표시 시점 1회</b>, <code>llm.chat()</code> · 조각 0개면 <code>null</code></td><td>결재판 상세의 고칠 수 있는 칸(기본값)</td></tr>
+<tr><td><code>draftModel</code> <span class="tag t-new">신설</span></td><td><code>llm.chat()</code>이 실제 쓴 모델 id</td><td>상세 아래 한 줄 <span class="mini">(어느 두뇌가 썼는지 — 🌐 외부지원 명패와 같은 규칙)</span></td></tr>
+<tr><td><code>fixed</code> <span class="tag t-new">신설</span></td><td><b>담당자</b>가 승인 버튼 누를 때의 칸 내용</td><td>승인 문답 저장 · 문항 초안의 <code>expect</code></td></tr>
+<tr><td><code>status</code></td><td>기존 <code>open/promoted/dismissed</code> <b>그대로 쓴다</b> + <code>fixed</code>(승인·수정 완료) 하나만 추가</td><td>결재판 필터 · 주간 요약 · <code>gate-cases</code></td></tr>
+<tr><td>승인 문답 행</td><td><b>새로 만들 것</b> — <code>learncandidates</code>가 <code>ws:</code>에서 하는 것과 같은 꼴(<code>insertLogStmt</code> + <code>emitChatLogRated</code>)</td><td>학습 후보함 · 기억 반입</td></tr>
+<tr><td>개발팀 목록</td><td><code>route='dev'</code> + <code>status='promoted'</code></td><td><b>지금 소비자 0</b> — <code>tools/</code>에 읽는 스크립트를 <b>같이 만든다</b>(안 만들면 이 시안도 「출구 없는 표」가 된다)</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§6. 결재판 기존 종류와 <b>같은 꼴인가</b> (과제 ⑧)</h2>
+<div class="card lead">
+<table>
+<tr><th style="width:210px">기존 것</th><th style="width:330px">모양</th><th>이 안이 맞췄나</th></tr>
+<tr><td><code>finding_approvals</code><br><span class="mini">approvals.ts</span></td>
+    <td>키 <code>(assetId, findingKey)</code> · <b><code>kind</code> 없음</b> · 상태 6종 · <code>reviewedBy</code>/<code>reviewedAt</code>/<code>note</code> · 판정에 <b>사유 필수</b>(반려·위험수용)</td>
+    <td><span class="tag t-bad">안 섞는다</span> 다른 표를 쓴다. <b>대신 관례는 그대로 가져왔다</b>: 처리자·처리시각·메모를 남기고, <b>반려에 사유를 요구</b>하고, <b>닫아도 기록은 안 지운다</b>.</td></tr>
+<tr><td><code>outbound_requests</code><br><span class="mini">remrequest.ts · 조치 요청서</span></td>
+    <td><code>kind: vuln-fix|patch|policy|bug</code> · <code>status: draft|sent|replied|noreply</code> · <code>targetKind/targetId/targetName</code> · <code>createdBy/createdAt</code></td>
+    <td><span class="tag t-new">이 꼴을 따랐다</span> <b>「종류(kind) + 상태(status) + 대상 + 만든이」</b>가 이 저장소의 요청 항목 표준형이다.
+    <code>answer_feedback</code>에 <code>route</code>(=kind)만 더하면 <b>같은 꼴</b>이 된다.</td></tr>
+<tr><td><code>learn_candidate_decisions</code></td><td><code>id · decision · decidedAt · decidedBy</code></td>
+    <td><span class="tag t-new">그대로 재사용</span> 승인 문답 저장은 이 경로의 <code>ws:</code> 분기와 <b>같은 함수 모양</b>으로 낸다(새 저장 방식 안 만듦).</td></tr>
+</table>
+<p class="note"><b>결론:</b> 「같은 꼴」은 맞다 — 단, <b>같은 표는 아니다.</b> 같은 표에 넣으면 VEX·심각도·지연 숫자가 오염되기 때문이고,
+그 이유는 <code>approvals.ts</code>가 스스로 세 번 겪고 주석으로 적어 둔 사고(「같은 이름으로 다른 것을 세는 곳 3군데」)와 같은 종류다.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§7. 구현 때 만질 자리</h2>
+<table style="max-width:1180px">
+<tr><th style="width:290px">파일</th><th style="width:230px">함수·자리</th><th>무엇을</th></tr>
+<tr><td><code>client/src/renderer/pages/chatparts.js</code></td><td><code>ensureCss()</code> · 새 <code>flag()</code> · <code>window.gijoChatParts</code> 내보내기 줄(829)</td><td><code>.wf-*</code> CSS 추가 · <code>P.flag(el, ctx, send)</code> 신설 · 내보내기에 <code>flag</code> 추가</td></tr>
+<tr><td><code>client/src/renderer/pages/console.js</code></td><td><code>attachFlag</code>(843) <b>삭제</b> · <code>openFlagCard</code>(499) <b>삭제</b> · CSS <code>.cs-flag</code>(193~196) <b>남김</b> · 호출부 1812 · <b>1894 · 2101 · 2320에도 추가</b></td><td>부품으로 이관 + <b>빠져 있던 3자리 배선</b></td></tr>
+<tr><td><code>client/src/renderer/pages/chatwidget.js</code></td><td>287 <code>P.quotes</code> 옆</td><td><code>P.flag</code> 호출 추가 — <b>분리창·위젯에 없던 버튼이 생긴다</b></td></tr>
+<tr><td><code>client/src/api/knowledge.ts</code></td><td><code>answerFeedbackApi</code>(112)</td><td><code>list</code>·<code>decide</code>·<code>setRoute</code> 추가</td></tr>
+<tr><td><code>client/src/preload.ts</code></td><td><code>sendAnswerFeedback</code>(455) 옆</td><td>결재판이 쓸 조회·처리 다리(위치 인자 관례)</td></tr>
+<tr><td><code>client/src/renderer/pages/approvals.html</code></td><td><code>.rv-filt</code> 위(96) · <code>#rvList</code>(116) · <code>#rvDetail</code>(120)</td><td>세그먼트 줄 · 종류별 목록·상세 렌더 분기</td></tr>
+<tr><td><code>server/src/engine/answerfeedback.ts</code></td><td><code>migrate()</code>(21) · <code>recordFeedback</code> · <code>listFeedback</code> · <code>registerAnswerFeedbackRoutes</code></td><td>칸 6개 추가(<code>route·banner·quotes·draft·draftModel·fixed</code>) · 상태 <code>fixed</code> 추가 · 조회/처리 라우트</td></tr>
+<tr><td><code>server/src/engine/learncandidates.ts</code></td><td><code>decideLearnCandidate</code>(269)의 <code>ws:</code> 분기와 같은 꼴</td><td><code>승인문답으로저장()</code> 내보내기 — <code>insertLogStmt</code>(origin=<code>"feedback"</code>) + <code>emitChatLogRated</code></td></tr>
+<tr><td><code>server/src/engine/screenguide.ts</code></td><td><code>"approvals.html"</code>(664) <code>panels</code> · <code>can</code> 목록</td><td>패널 문구 2개(§10) · 물어볼 말 2줄</td></tr>
+<tr><td><code>server/test/wiringcontract.test.ts</code></td><td>선택배선대장(22~)</td><td><b>안 만짐</b> — 화면 파일이 안 늘어난다(세그먼트는 기존 <code>approvals.html</code> 안)</td></tr>
+<tr><td><code>tools/feedback-cases.mjs</code> <span class="tag t-new">신설</span></td><td>—</td><td><code>gate-cases</code>를 읽어 <code>tools/evalgate/cases/</code> 초안을 뽑는다 — <b>없으면 ⓒ가 또 출구 없는 표가 된다</b></td></tr>
+</table>
+
+<div class="card lead good">
+<div class="card-h">다른 계약에 걸리나 — 소스로 확인한 「안 만짐/이유」</div>
+<table>
+<tr><th style="width:250px">계약</th><th style="width:90px">걸리나</th><th>이유</th></tr>
+<tr><td><code>wiringcontract.test</code> 선택배선대장</td><td><span class="tag t-new">안 걸림</span></td><td>새 <code>.html</code>이 안 생긴다. <code>approvals.html</code>은 이미 <b>"부품"</b>으로 등록돼 있다.</td></tr>
+<tr><td><code>wiringcontract.test</code>의 <code>"search" | "guard"</code> 글자 감시</td><td><span class="tag t-new">안 걸림</span></td><td>새 <code>llm:event kind</code>를 <b>안 만든다</b>. 초안은 평범한 <code>chat()</code>이라 기존 <code>kind:"chat"</code>으로 실린다.</td></tr>
+<tr><td><code>clientglobals.test</code>(<code>attachQuotes</code> 부활 금지)</td><td><span class="tag t-new">안 걸림</span></td><td>지우는 것은 <code>attachFlag</code>·<code>openFlagCard</code>다. <b>다만 그날 사고(옆 함수 <code>attachApproval</code>을 잘라 먹음)가 같은 파일에서 났으니, 삭제는 스크립트가 아니라 눈으로 한다.</b></td></tr>
+<tr><td>결재판 3열 그리드(<code>.cs-apgrid</code>) 밀도 계약</td><td><span class="tag t-new">안 만짐</span></td><td>대화창 <b>실행 승인</b>판은 손대지 않는다 — 이 시안은 그 판을 안 쓴다.</td></tr>
+<tr><td>「승인 뒤 칩」(<code>nextChips</code>)</td><td><span class="tag t-new">안 만짐</span></td><td>지적 올리기는 <b>쓰기 도구가 아니다</b>. 실행 승인 경로를 안 지나므로 칩도 안 붙는다.</td></tr>
+<tr><td>게시 관문(실화면 9227)</td><td><span class="tag t-warn">새 항목</span></td><td>대화창 꼬리·결재판 세그먼트 <b>둘 다 실화면 확인이 필요</b>하다. 특히 <b>도킹 콘솔 360px</b>에서 한 줄이 안 접히는지.</td></tr>
+<tr><td>등급 게이트 / 열람불가</td><td><span class="tag t-bad">확인 필요</span></td><td><b>원 답 본문이 결재판에 실린다.</b> 지금 <code>GET /api/answer-feedback</code>은 <code>authMiddleware</code>만 걸려 <b>누구나 남의 답 본문을 읽는다.</b> §11 남은 질문 1번.</td></tr>
+</table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§8. 짝 시험 제안 — 「그 값을 누가 넣는가」 위주</h2>
+<table style="max-width:1180px">
+<tr><th style="width:250px">시험</th><th>무엇을 잡나</th></tr>
+<tr><td><code>answerfeedback.route.test</code></td><td><code>route</code>의 <b>생산자와 소비자가 짝인지</b> — 대화창 갈래 3개가 넣는 값 집합 = 결재판 필터가 읽는 값 집합. 한쪽에 값이 늘면 실패한다.</td></tr>
+<tr><td><code>answerfeedback.draft.test</code></td><td><b>조각 0개면 초안이 <code>null</code></b>이고 응답에 「초안 없음」이 실린다. <b>지어낸 초안이 저장되면 실패.</b> (모킹으로 LLM을 가짜 성공시키지 않는다 — 모킹이 결함을 가린 전례)</td></tr>
+<tr><td><code>answerfeedback.approve.test</code></td><td>승인하면 ① <b>고친 답</b>(초안 아님)이 <code>chat_logs</code>에 <code>rating=1</code>로 들어가고 ② <b>원 답이 학습 후보에서 빠지고</b> ③ 항목이 <code>fixed</code>가 된다. 셋 중 하나만 되면 실패.</td></tr>
+<tr><td><code>answerfeedback.reject.test</code></td><td>반려해도 <b>행이 남는다</b>(파일 머리의 원칙 1). 「닫힘」이 「삭제」로 구현되면 실패.</td></tr>
+<tr><td><code>chatparts.flag.test</code> <span class="mini">(clientglobals 계열 소스 감시)</span></td><td><b>「이 답 이상해요」를 그리는 곳이 <code>chatparts.js</code> 한 곳</b>인지 — <code>console.js</code>·<code>chatwidget.js</code>에 사본이 생기면 실패. <b>세 번째면 소스 감시</b> 관례.</td></tr>
+<tr><td><code>chatparts.flag-callers.test</code></td><td><b>답을 그리는 자리 전부가 <code>P.flag</code>를 부르는지</b> — 지금 빠져 있는 4자리(1894·2101·2320·chatwidget 287)가 이 시험의 첫 적발 대상이다.</td></tr>
+<tr><td><code>answerfeedback.banner.test</code></td><td><code>banner</code>가 <b><code>noevidence</code> 판정기에서만</b> 온다 — 대화창이 배너 글자를 <b>다시 읽어</b> 판정하면 실패(배너가 5종→6종이 될 때 어긋나는 자리).</td></tr>
+<tr><td><code>approvals.counters.test</code></td><td><b>답 지적 건수가 「조치대상」·VEX 어디에도 안 섞인다</b> — 지적을 N건 넣어도 finding 카운터가 안 변한다.</td></tr>
+<tr><td><code>gatecases.consumer.test</code></td><td><code>tools/feedback-cases.mjs</code>가 <code>route='dev'</code> 항목을 실제로 뽑는다 — <b>소비자 없는 API를 또 만들지 않았다는 증거.</b></td></tr>
+<tr><td><code>screenguide.approvals.test</code></td><td>새 패널 문구가 <b>실제 버튼 이름과 같은 말</b>을 쓴다(guidance-check 계열 — 안내한 말이 화면에 없으면 실패).</td></tr>
+</table>
+<p class="mini">⚠ 서버 시험은 <b>WSL</b>에서 돌린다(<code>bash tools/wsl-test.sh</code>) — Windows에서 돌리면 딴 환경을 재게 된다.</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§9. 제품 원칙 자가점검</h2>
+<div class="card lead">
+<ul class="chk">
+<li><b>메뉴는 보기용 · 새 화면에 입력칸 금지</b> — 결재판은 원래 승인·수정 입력이 있는 창구다(담당자·기한·메모·반려 사유). 그 예외 안에 머문다. <b>새 화면을 안 만들었다.</b></li>
+<li><b>지시는 대화창에서만</b> — 결재판 버튼은 <b>「지시」가 아니라 「결재」</b>다(이미 있는 <code>data-set</code> 승인 버튼과 같은 성격). 새 <code>dispatch</code>를 화면에서 부르지 않는다.</li>
+<li><b>화면 설명은 screenguide + ⓘ</b> — §10에 문구를 냈다. 화면에는 정체성 한 줄과 ⚠만 둔다.</li>
+<li><b>프로 셸 우선</b> — 대화창 꼬리가 주 무대다. 결재판은 프로에서 <b>카드·도킹으로 열리는 기존 화면</b>이라 그대로 쓰인다.</li>
+<li><b>엑셀처럼 촘촘</b> — 뜬 카드 300px → 한 줄 24px. 결재판 목록은 기존 <code>.rv-row</code> 그대로.</li>
+<li><b>새 색 토큰 금지</b> — 이 문서의 색은 전부 <code>approvals.html :root</code>에서 복사. 종류 점 3개도 기존 <code>--amber/--blue/--purple</code>.</li>
+<li><b><code>window.confirm</code> 금지</b> — 안 쓴다. 취소는 인라인 「취소」 링크.</li>
+<li><b>가짜 UI 금지</b> — §5에 모든 칸의 생산자를 적었다. <b>생산자가 없는 칸은 하나도 없다.</b> 「초안 없음」은 빈 칸이 아니라 <b>명시된 상태</b>다.</li>
+<li class="q"><b>정직한 구현</b> — 「승인하면 똑똑해집니다」라고 <b>안 쓴다</b>. 승인 문답이 <b>RAG로는 아직 안 들어간다</b>는 것이 실측으로 알려져 있다(2026-09-03). 문구를 「검사 문항과 승인 문답으로 쌓입니다」까지만 적었다.</li>
+<li class="x"><b>남은 위반 후보</b> — 결재판에 <b>원 답 본문</b>이 실린다. 등급 게이트를 지나온 내용이 등급 없는 화면에 뜰 수 있다(§11-1).</li>
+</ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§10. screenguide 문구 제안</h2>
+<div class="card lead">
+<h3><code>"approvals.html"</code> → <code>panels</code> 에 추가</h3>
+<p class="mini">키: <b>「답 지적이란」</b></p>
+<div class="quote"><div class="qt">
+AI가 내놓은 답이 틀렸을 때 담당자가 그 자리에서 짚어 올린 항목입니다. 취약점 조치와는 <b>다른 목록</b>이라
+위쪽 「🔧 취약점 조치 / 💬 답 지적」에서 골라 보시고, <b>두 숫자는 서로 더해지지 않습니다</b>(섞으면 「얼마나 밀렸나」가 안 보입니다).<br><br>
+· <b>ⓐ 답 수정 승인</b> — 답이 사실과 다를 때입니다. 그 답이 <b>실제로 인용한 문서 조각</b>을 함께 보여 주고, 내부 AI가 그 조각으로 <b>수정 초안</b>을 하나 냅니다.
+초안은 제안일 뿐이니 <b>고쳐서 승인</b>하세요 — 저장되는 것은 고치신 문장입니다. 인용한 조각이 없던 답에는 <b>초안이 안 나옵니다</b>(없는 근거로 지어내지 않습니다).<br>
+· <b>ⓑ 문서 올리기 요청</b> — 사내 자료가 없어서 못 답한 경우입니다. 승인하면 <b>문서 올리는 자리</b>가 바로 열립니다.<br>
+· <b>ⓒ 개발팀 전달</b> — 답을 고쳐도 안 되는, 제품이 고칠 것입니다. 승인하면 <b>회귀 검사 문항 후보</b>로 넘어갑니다.<br><br>
+⚠ <b>반려해도 지적 기록은 지워지지 않습니다.</b> 무엇을 못 고쳤는지가 정보이기 때문입니다.<br>
+⚠ 승인하면 고치신 답이 <b>승인 문답</b>으로 쌓이고 <b>원래 틀린 답은 학습 후보에서 빠집니다.</b>
+</div></div>
+
+<h3><code>"approvals.html"</code> → <code>can</code> 에 추가</h3>
+<ul>
+<li><code>"답 지적 몇 건이야?"</code></li>
+<li><code>"이 지적 개발팀으로 보내줘"</code> (승인 후 반영)</li>
+</ul>
+
+<h3>지휘소(대화창) 쪽 — 접수 뒤 한 줄</h3>
+<p class="mini">지금 문구: 「접수했습니다. 사람이 검토 후 검사 문항으로 씁니다(자동 반영 아님).」 → 갈래에 따라 갈라 적는다.</p>
+<div class="quote"><div class="qt">
+· ⓐ <b>결재판에 올렸습니다.</b> 담당자가 확인해 답을 고치면 그때부터 반영됩니다 — <b>지금 바로 바뀌지는 않습니다.</b><br>
+· ⓑ <b>결재판에 올렸습니다.</b> 승인하면 문서 올리는 자리가 열립니다. 자료가 들어와야 답이 달라집니다.<br>
+· ⓒ(결재판에서 전환) <b>개발팀 목록에 실렸습니다.</b> 다음 검사 문항 후보가 됩니다.
+</div></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>§11. 포기한 것 · 라이트/표준 영향 · 남은 질문</h2>
+<div class="two">
+<div class="card bad" style="margin:0">
+<div class="card-h">포기한 것</div>
+<ul>
+<li><b>새 결재판 화면</b> — 만들면 승인 창구가 셋이 된다(대화창 실행 승인 · 조치·승인 판 · 새 판). 「어디서 승인하지?」가 생긴다.</li>
+<li><b>finding 표에 합치기</b> — 한 목록에서 다 보는 편함을 버렸다. 대신 VEX·지연·SBOM 숫자를 지켰다.</li>
+<li><b>「정답 적기」 칸</b>(대화창) — 담당자에게 답을 쓰라고 시키지 않는다. 결재판에서 <b>고치는</b> 형태로 옮겼다.</li>
+<li><b>「💬 말투」 갈래</b>(대화창) — 결재판 종류에 안 붙고 문항 감도 아니라 뺐다. 표의 값은 남긴다.</li>
+<li><b>자동 승인·자동 편입</b> — 신호가 아무리 강해도 사람을 안 건너뛴다(<code>answerfeedback.ts</code> 원칙 2와 증류 일괄승인 금지 관례).</li>
+<li><b>초안을 두 개 이상</b> — 고를 일이 늘면 결재가 느려진다. 하나만, 없으면 없다고 적는다.</li>
+</ul>
+</div>
+<div class="card" style="margin:0">
+<div class="card-h">라이트 / 표준 영향 (한 줄)</div>
+<p><b>라이트</b>: 도구 13개가 전부 읽기 전용이라 결재판이 지금도 안 뜬다 — <b>대화창 꼬리(P.flag)는 그대로 얹히고</b>, 결재판 세그먼트는 라이트에 화면 자체가 없어 <b>영향 0</b>.
+다만 지적이 갈 곳이 없으므로 라이트에서는 <b>버튼을 안 붙인다</b>(있는 척 금지) — <code>lite-chat</code>의 「부품은 살아 있으나 데이터가 없다」 처리와 같은 결.</p>
+<p><b>표준</b>: <code>approvals.html</code>이 그대로 있는 에디션이라 <b>세그먼트까지 그대로 반영</b>된다. 프로에서 먼저 만들고 표준에 그대로 실린다(신규는 프로 기준).</p>
+</div>
+</div>
+
+<div class="card lead warn">
+<div class="card-h">남은 질문 — 설계관·사장님 결정이 필요한 것</div>
+<ol style="margin-left:18px">
+<li><b>원 답 본문의 등급.</b> 지금 <code>GET /api/answer-feedback</code>은 <code>authMiddleware</code>만 걸려 <b>모든 로그인 사용자가 남의 질문·답 본문을 읽는다</b>(<code>answersamples.ts</code>가 본문을 아예 안 담기로 한 바로 그 이유). 결재판에 실으려면 <b>「올린 사람 + admin」으로 좁힐지</b> 결정이 필요하다.</li>
+<li><b>원 답을 학습 후보에서 어떻게 빼나.</b> 대화창은 그 답의 <code>chat_logs</code> id를 <b>모른다.</b> ㉮ 응답에 <code>logId</code>를 실어 내려주거나 ㉯ <code>fingerprint(question, answer)</code>로 찾는다(<code>learncandidates.ts:88</code>에 이미 있는 함수). ㉯가 코드 변경이 작지만 <b>같은 문답이 여럿이면 여럿을 뺀다</b>.</li>
+<li><b>「승인 문답」이 RAG로 안 들어간다</b>(2026-09-03 실측). 이 시안은 그 앞까지만 잇는다 — <b>기억 성장까지 이번 묶음에 넣을지</b>가 결정 사항.</li>
+<li><b>초안 만드는 시점.</b> 표시 즉시(담당자가 기다림) vs 결재판을 열 때(느림) vs 뒤에서(둘 다 아님). 이 시안은 <b>표시 즉시·비동기</b>(올리기는 바로 끝나고 초안은 나중에 붙는다)를 전제했다 — 결재판이 「초안 만드는 중…」을 그려야 한다.</li>
+<li><b>ⓑ 승인 = 문서함 카드 열기</b>의 실제 통로. <code>mydocs</code> 업로드 카드를 <b>결재판 화면에서</b> 열지, <b>대화창으로 넘겨</b> 열지.</li>
+<li><b>종류 세그먼트의 기본값.</b> 결재판을 열면 <b>취약점 조치</b>가 기본이어야 한다(지금 동작 유지). 답 지적이 0건이면 세그먼트를 <b>아예 안 그릴지</b>(세로 ±0) 회색으로 둘지.</li>
+<li><b>같은 답에 여러 사람이 지적</b>하면 항목이 여러 개 생긴다. 지문으로 묶을지, 그대로 둘지.</li>
+</ol>
+</div>
+
+<script>
+// 이 페이지는 **자기 높이만** 잰다 — 바깥 자원 0, 제품 코드 0.
+(function () {
+  function h(id) { var el = document.getElementById(id); if (!el) return null; var r = el.getBoundingClientRect(); return Math.round(r.height * 10) / 10; }
+  function put(id, v, suffix) { var el = document.getElementById(id); if (el) el.textContent = (v == null ? "–" : v + (suffix || "")); }
+  function diff(id, a, b) {
+    var el = document.getElementById(id); if (!el) return;
+    if (a == null || b == null) { el.textContent = "–"; return; }
+    var d = Math.round((b - a) * 10) / 10;
+    el.innerHTML = "<b style='color:" + (d <= 0 ? "var(--teal)" : "var(--amber)") + "'>" + (d > 0 ? "+" : "") + d + "px</b>";
+  }
+
+  function run() {
+    var oldCard = h("oldCard"), oldRow = h("oldRow");
+    var newLine = h("newLine"), newRow = h("newRow"), doneLine = h("doneLine");
+    var seg = h("segRow");
+    var rvRow = null; var r0 = document.querySelector("#rvRows .rv-row");
+    if (r0) rvRow = Math.round(r0.getBoundingClientRect().height * 10) / 10;
+    var btn = null; var b0 = document.getElementById("oldFlag");
+    if (b0) btn = Math.round(b0.getBoundingClientRect().height * 10) / 10;
+
+    // 화면 옆 실측 표시
+    put("mOldCard", oldCard); put("mOldRow", oldRow);
+    put("mNewLine", newLine); put("mNewRow", newRow); put("mDoneLine", doneLine);
+    put("mSeg", seg); put("mRvRow", rvRow);
+
+    // 밀도 표
+    put("dOldBtn", btn, "px"); put("dNewBtn", btn, "px");
+    // 지금 판 「펼침」 = 버튼 + 뜬 카드(대화를 덮는 면적) / 제안 판 = 한 줄
+    var oldOpen = (btn != null && oldCard != null) ? Math.round((btn + 6 + oldCard) * 10) / 10 : null;
+    put("dOldOpen", oldOpen, "px"); put("dNewOpen", newLine, "px"); diff("dDiffOpen", oldOpen, newLine);
+    put("dOldDone", btn, "px"); put("dNewDone", doneLine, "px"); diff("dDiffDone", btn, doneLine);
+    put("dOldRow", oldRow, "px"); put("dNewRow", newRow, "px"); diff("dDiffRow", oldRow, newRow);
+    put("dSeg", seg, "px"); diff("dSegDiff", 0, seg);
+    put("dRvRow", rvRow, "px"); put("dRvRow2", rvRow, "px");
+  }
+
+  if (document.readyState === "complete") run();
+  else window.addEventListener("load", run);
+  window.addEventListener("resize", run);
+})();
+</script>
+
+</body>
+</html>

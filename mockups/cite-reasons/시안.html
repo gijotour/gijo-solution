@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — ✂ 인용 제거를 「사유별」로 편다</title>
+<!--
+  시안: mockups/cite-reasons/시안.html  (2026-09-06)
+  앞 시안: mockups/cite-guard-supervision/시안.html (2026-09-05, 구현·게시됨)
+    그 시안의 ⑤에 이렇게 적혀 있다 — 「사유별 분해는 화면에 안 넣었다. 집계 테이블에 사유 칸이
+    없다(kind 하나뿐) — 넣으려면 스키마를 늘려야 해서 이번 「작게」의 밖이다.」
+    이 시안은 **그 문장이 미뤄 둔 일 하나**만 한다.
+  성격: 기록이자 구현 지침. 제품 코드는 한 줄도 안 건드렸다(시안공 권한 — mockups/ 아래만 쓴다).
+  ⚠ 「실물」 구역은 supervision.html의 CSS를 글자 그대로 옮겼고, 폭도 제품과 같은 1132px
+     (.main max-width 1180 − padding 24×2)로 고정했다. 좁은 칸에 나란히 놓고 재면 줄바꿈이 생겨
+     「늘었다」가 거짓이 된다.
+  ⚠ 코드 자리는 **함수 이름**으로만 가리킨다 — citeguard.ts·llm.ts는 지금도 다른 실행자가
+     고치는 중이라 줄 번호가 밀린다.
+-->
+<style>
+/* ── 제품 토큰(supervision.html :root 그대로) ───────────────────────────────── */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+/* ── 시안 문서 껍데기(제품 아님) ───────────────────────────────────────────── */
+.doc{max-width:1180px;margin:0 auto;padding:22px 24px 60px;line-height:1.7;}
+.doc h1{font-size:21px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+.doc .lead{font-size:12.75px;color:var(--muted);margin-top:6px;}
+.doc h2{font-size:15px;font-weight:800;color:#fff;margin:30px 0 8px;padding-top:16px;border-top:1px solid var(--border);}
+.doc h3{font-size:13px;font-weight:800;color:var(--blue-light);margin:16px 0 6px;}
+.doc p,.doc li{font-size:12.75px;color:var(--muted);}
+.doc li{margin:3px 0 3px 18px;}
+.doc b.k{color:var(--text);font-weight:700;}
+.doc code{font-family:"Consolas","Menlo",monospace;font-size:11.75px;color:#c9c3ff;background:rgba(139,124,240,.10);
+  border:1px solid rgba(139,124,240,.22);border-radius:5px;padding:0 4px;}
+.doc pre{font-family:"Consolas","Menlo",monospace;font-size:11.75px;line-height:1.65;color:#cfd8cf;background:#1a1a19;
+  border:1px solid var(--border);border-radius:9px;padding:12px 14px;overflow-x:auto;margin:8px 0;white-space:pre;}
+.doc pre .cm{color:#7f8f7f;} .doc pre .add{color:#8fd6a8;} .doc pre .del{color:#f5928a;}
+.cap{font-size:11.5px;color:var(--muted-2);margin:6px 0 10px;}
+.badge{display:inline-block;font-size:11px;font-weight:800;padding:1px 8px;border-radius:10px;margin-right:6px;}
+.badge.now{background:rgba(255,255,255,.08);color:var(--muted);}
+.badge.new{background:rgba(30,185,128,.14);color:var(--teal);}
+.badge.pick{background:rgba(59,130,246,.18);color:var(--blue-light);}
+.badge.no{background:rgba(226,72,61,.14);color:#f5928a;}
+table.n{border-collapse:collapse;width:100%;margin:8px 0 4px;}
+table.n th,table.n td{border:1px solid var(--border);padding:5px 9px;font-size:12px;text-align:left;vertical-align:top;}
+table.n th{background:rgba(255,255,255,.04);color:var(--text);font-weight:700;}
+table.n td{color:var(--muted);}
+table.n td b{color:var(--text);}
+table.n tr.win td{background:rgba(30,185,128,.06);}
+.num{font-family:"Consolas","Menlo",monospace;color:var(--text);}
+.warn{border-left:3px solid var(--amber);background:rgba(240,160,32,.07);padding:9px 12px;border-radius:0 8px 8px 0;margin:10px 0;}
+.warn b{color:var(--amber);}
+.good{border-left:3px solid var(--teal);background:rgba(30,185,128,.06);padding:9px 12px;border-radius:0 8px 8px 0;margin:10px 0;}
+.good b{color:var(--teal);}
+.stagewrap{overflow-x:auto;background:var(--bg);border:1px dashed var(--border-strong);border-radius:10px;padding:20px 24px;margin:8px 0 4px;}
+
+/* ── 실물 밀도 구역 — supervision.html의 CSS 그대로(line-height는 제품처럼 normal) ── */
+.stage{width:1132px;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13px;line-height:normal;color:var(--text);}
+.stage .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.stage .panel h2{font-size:14px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:10px;border:0;padding:0;}
+.stage .sup-line{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.75px;}
+.stage .sup-line:last-child{border-bottom:0;}
+.stage .sup-line .tag{flex:0 0 auto;font-size:11.75px;font-weight:800;padding:1px 8px;border-radius:10px;}
+.stage .tag.idle{background:rgba(255,255,255,.08);color:var(--muted);}
+.stage .tag.err{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}
+.stage .tag.ok{background:rgba(30,185,128,.14);color:var(--teal);}
+.stage .tag.cite{background:rgba(139,124,240,.18);color:var(--purple-ink, #b6a9ff);}
+.stage .dim{color:var(--muted-2);}
+.stage .note{font-size:11.75px;color:var(--muted-2);margin-top:10px;}
+
+/* ★ 신규 CSS는 이 세 줄이 전부다(supervision.html의 .tag.cite 아래에 붙인다) */
+.stage .cite-why{background:transparent;border:0;padding:0 0 0 9px;margin:0;font:inherit;font-size:11.75px;
+  font-weight:700;color:var(--purple-ink, #b6a9ff);cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
+.stage .cite-reasons{margin-top:3px;font-size:12px;color:var(--muted-2);}
+.stage .cite-reasons b{color:var(--text);font-weight:700;}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <h1>✂ 인용 제거 — 「왜 뗐는지」를 한 줄 펼쳐 보여 준다</h1>
+  <div class="lead">
+    지금 감독 화면의 ✂ 줄은 <b class="k">「답 3개에서 뗐습니다」</b>까지만 말한다. <b class="k">왜</b> 뗐는지는
+    <code>llm:event</code>의 <code>detail</code> <b class="k">문자열 안에만</b> 있고, 그 문자열은
+    인메모리 최근 200건이라 <b class="k">서버를 껐다 켜면 사라진다</b>. 그래서 담당자는
+    「모델이 없는 번호를 가리켰나(범위밖)」와 「내용을 지어냈나(겹침없음)」를 <b class="k">구분할 수 없다</b> —
+    둘은 조치가 완전히 다른 일이다.<br>
+    이 시안은 ✂ 줄에 <b class="k">토글 하나</b>를 달아 사유별 개수를 펴 보이고, 그 숫자를 담을
+    <b class="k">집계 칸을 어디에 둘지</b> 세 길을 견줘 하나를 고른다.
+    계획서 위치: <b class="k">전-7 「보여 주기」</b>의 연장(앞 시안과 같은 갈래) — 최종 확정은 사장님.
+  </div>
+
+  <!-- ═══════════════════ ① 지금 무엇이 없나 ═══════════════════ -->
+  <h2>① 지금 있는 것과 없는 것 — 읽어서 확인한 사실</h2>
+  <table class="n">
+    <tr><th style="width:24%">무엇</th><th style="width:26%">어디에 있나</th><th>수명·한계</th></tr>
+    <tr><td><b>뗀 답의 수</b>(답 N개)</td><td><code>llm_activity_daily(day, agent, kind=&quot;cite&quot;, calls)</code></td>
+        <td><b class="k">영속</b>. 7·30일 그대로 나온다. 지금 ✂ 줄이 쓰는 값.</td></tr>
+    <tr><td><b>뗀 건수와 사유</b></td><td><code>llm:event</code>의 <code>detail</code> <b class="k">문자열</b>
+        (<code>뗀인용요약()</code>이 「근거 없는 인용 3건 제거 — 겹침없음 2 · 범위밖 1」로 짓는다)</td>
+        <td><b style="color:var(--red)">인메모리 최근 200건 · 재시작하면 0</b>.
+            게다가 그 200칸은 <code>chat·embed·search·guard·load·swap</code>과 <b class="k">같은 링 버퍼</b>다 —
+            답 하나가 <b class="k">chat 시작 · 검색 · 가드 · chat 완료 · cite</b> 등 <b class="k">5건 이상</b>을 넣으므로
+            (<code>chat</code>은 <code>start</code>와 <code>done</code>이 따로 들어간다 — 확인함)
+            200칸은 <b class="k">답 40개분 남짓</b>이다.</td></tr>
+    <tr><td><b>사유의 이름표</b></td><td><code>citeguard.ts</code> <code>뗀사유종류</code> 6종 +
+        <code>metaleak.ts</code> <code>메타줄걷기()</code> 2종</td>
+        <td>타입으로 이미 <b class="k">닫혀 있다</b>(새 사전을 만들 필요가 없다).</td></tr>
+  </table>
+
+  <h3>사유 이름표 — 이것이 전부다(코드에서 그대로 옮김)</h3>
+  <table class="n">
+    <tr><th style="width:16%">사유</th><th style="width:12%">원천</th><th>사람 말로</th></tr>
+    <tr><td><b>블록없음</b></td><td>citeguard</td><td>참고 자료가 0건인데 인용 꼬리표를 달았다.</td></tr>
+    <tr><td><b>범위밖</b></td><td>citeguard</td><td>자료는 3개인데 [5]를 가리켰다 — 없는 번호.</td></tr>
+    <tr><td><b>겹침없음</b></td><td>citeguard</td><td>대조할 수 있는 토막인데 <b>어느 원천에도 없다</b> — 지어낸 원문.</td></tr>
+    <tr><td><b>자기인용</b></td><td>citeguard</td><td>제 앞 문장을 원문이라며 인용했다.</td></tr>
+    <tr><td><b>출처미확인</b></td><td>citeguard</td><td>출처 이름·제목을 어디서도 확인 못 했다(<b>가짜다</b>와 다르다).</td></tr>
+    <tr><td><b>통째교체</b></td><td>citeguard</td><td>다 떼니 글자가 안 남아 답 전체를 「자료 없음」 안내로 바꿨다.</td></tr>
+    <tr><td><b>내부 경로</b></td><td>metaleak</td><td><code>models/…gguf</code>·<code>store:…#sha12</code>가 든 줄을 뗐다.</td></tr>
+    <tr><td><b>내부 메타</b></td><td>metaleak</td><td>경로는 없지만 「교사 모델: …」 같은 라벨 줄을 뗐다.</td></tr>
+    <tr style="background:rgba(240,160,32,.06)"><td><b style="color:var(--amber)">못 뗌</b></td><td>metaleak</td>
+        <td><b>뗀 사유가 아니다.</b> 답이 통째로 메타뿐이라 빈 답을 내보내지 않으려고 <b>원문을 그대로 뒀다</b>
+            (<code>통째메타</code>). 뗀 것으로 세면 <b>없던 제거를 있다고 세는 거짓 계수</b>가 된다 — 따로 적는다.</td></tr>
+  </table>
+  <div class="warn"><b>여기서 첫 함정을 짚는다 — 사유를 「citeguard 6종」으로만 잡으면 화면이 거짓말한다.</b>
+    ✂ 이벤트는 <b class="k">인용 가드 또는 경로 가드 중 하나만 울어도</b> 나간다(<code>llm.ts</code>의 계수기 조건).
+    그래서 <b class="k">인용은 하나도 안 뗐고 내부 경로만 뗀 답</b>이 실제로 있다 — 6종만 세면 그 답은
+    <b class="k">「답 1개」인데 사유는 텅 비어</b> 보인다. 「집계가 고장 났나」로 읽힌다.
+    <b class="k">사유 사전은 8종 + 못 뗌 1종</b>이어야 한다.</div>
+
+  <!-- ═══════════════════ ② 화면 ═══════════════════ -->
+  <h2>② 화면 — ✂ 줄 하나에 토글 하나</h2>
+  <p>자리는 그대로 <code>supervision.html</code>의 <b class="k">감독 관점 — 규칙 계산</b> 판, ✂ 줄 <b class="k">한 줄</b>이다.
+     새 판·새 카드·새 KPI를 만들지 않는다.</p>
+
+  <h3><span class="badge now">지금(게시본 5.83.0)</span></h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-old">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div>
+        <div class="sup-line"><span class="tag idle">무호출</span><span>위협 인텔리전스 · 문서 사서 — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>
+        <div class="sup-line"><span class="tag err">오류 상위</span><span>분석가 2건(4%) · 보고서 1건(9%)</span></div>
+        <div class="sup-line" id="line-old"><span class="tag cite">✂ 인용 제거</span><span>답 3개에서 근거 없는 인용을 뗐습니다 — 분석가 2 · 총괄 1 <span class="dim">(뗀 건수는 팀 활동 기록에)</span></span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+  <div class="cap">끝의 <span class="dim">(뗀 건수는 팀 활동 기록에)</span>가 <b class="k">「가서 찾아보라」는 말</b>이다 —
+    그런데 가 보면 <b class="k">재시작 뒤엔 비어 있다.</b> 이 안내는 지금도 반쯤 거짓이다.</div>
+
+  <h3><span class="badge new">제안 · 접힌 기본 상태</span> — 세로 증가 <b class="num" id="hd-fold">–</b></h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-fold">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div>
+        <div class="sup-line"><span class="tag idle">무호출</span><span>위협 인텔리전스 · 문서 사서 — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>
+        <div class="sup-line"><span class="tag err">오류 상위</span><span>분석가 2건(4%) · 보고서 1건(9%)</span></div>
+        <div class="sup-line" id="line-fold"><span class="tag cite">✂ 인용 제거</span><span>답 3개에서 근거 없는 인용을 뗐습니다 — 분석가 2 · 총괄 1<button class="cite-why" aria-expanded="false">사유 6건 ▸</button></span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+  <div class="cap"><b class="k">「(뗀 건수는 팀 활동 기록에)」가 「사유 6건 ▸」로 바뀐다</b> — 글자 수가 비슷해 줄이 안 늘어난다.
+    안내가 <b class="k">다른 화면으로 보내는 말</b>에서 <b class="k">여기서 열리는 조작</b>으로 바뀌는 것이 이 시안의 알맹이다.</div>
+
+  <h3><span class="badge new">제안 · 펼친 상태</span> — 세로 증가 <b class="num" id="hd-open">–</b></h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-open">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div>
+        <div class="sup-line"><span class="tag idle">무호출</span><span>위협 인텔리전스 · 문서 사서 — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>
+        <div class="sup-line"><span class="tag err">오류 상위</span><span>분석가 2건(4%) · 보고서 1건(9%)</span></div>
+        <div class="sup-line" id="line-open"><span class="tag cite">✂ 인용 제거</span><span>답 3개에서 근거 없는 인용을 뗐습니다 — 분석가 2 · 총괄 1<button class="cite-why" aria-expanded="true">사유 6건 ▾</button><div class="cite-reasons" id="reasons-open"><b>겹침없음 3</b> · <b>범위밖 1</b> · <b>내부 메타 2</b> <span class="dim">— 뗀 「건수」입니다(위 답 개수와 다릅니다)</span></div></span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+  <div class="cap"><b class="k">「뗀 건수입니다(위 답 개수와 다릅니다)」를 화면이 스스로 말한다.</b>
+    답 3개 · 사유 합 6건은 <b class="k">서로 다른 잣대</b>라 더해지지도 나뉘지도 않는다 — 그 사실을 사람이 추측하게 두지 않는다.
+    사유는 <b class="k">개수 큰 순</b>으로, <b class="k">0인 사유는 아예 안 쓴다</b>(「겹침없음 0」 여덟 줄은 정보가 아니라 소음이다).</div>
+
+  <h3><span class="badge new">제안 · ⚠ 못 뗀 자리가 있으면 자동으로 펼친다</span></h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-hot">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div>
+        <div class="sup-line"><span class="tag ok">정상</span><span>이 기간 무호출·오류 특이사항이 없습니다.</span></div>
+        <div class="sup-line" id="line-hot"><span class="tag cite">✂ 인용 제거</span><span>답 4개에서 근거 없는 인용을 뗐습니다 — 분석가 3 · 미지정 1<button class="cite-why" aria-expanded="true">사유 5건 ▾</button><div class="cite-reasons"><b>겹침없음 2</b> · <b>출처미확인 2</b> · <b>범위밖 1</b> · <b style="color:var(--amber)">못 뗌 1</b> <span class="dim">— 답이 통째로 내부 메타라 원문을 그대로 뒀습니다</span></div></span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+  <div class="cap"><b class="k">이것이 접기 규칙을 그대로 따른 자리다.</b> <code>fold.js</code>의 계약 —
+    <i>「위험 신호(hot 배지가 0이 아님)가 있으면 접힌 구역도 다시 펼친다. 놓치면 안 되는 것을 접어서 가리는 일은 없어야 한다」</i>.
+    <b class="k">못 뗌</b>은 「가드가 손을 댔지만 못 막은 자리」라 정확히 그 hot 신호다.</div>
+
+  <h3><span class="badge new">제안 · 0건일 때</span> — 지금과 <b class="num">완전히 같다</b>(토글 없음)</h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-zero">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div>
+        <div class="sup-line"><span class="tag ok">정상</span><span>이 기간 무호출·오류 특이사항이 없습니다.</span></div>
+        <div class="sup-line" id="line-zero"><span class="tag cite">✂ 인용 제거</span><span>0개 — 이 기간에 뗀 인용이 없습니다</span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+  <div class="cap">0일 때 줄을 숨기지 않는 기존 규칙은 그대로다(「가드가 안 도는 것」과 「뗄 것이 없었던 것」을 가른다).
+    <b class="k">뗄 것이 없으면 사유도 없으므로 토글을 안 그린다</b> — 눌러도 빈 상자가 나오는 조작은 만들지 않는다.</div>
+
+  <div class="warn">
+    <b>⚠ 「접힘 기본」은 <code>fold.js</code>의 「펼침 기본」과 어긋나 보인다 — 일부러 그렇게 했고, 이유를 적는다.</b><br>
+    <code>fold.js</code> 머리말: <i>「기본은 펼침이다(2026-08-02 사용자 지시 — 접기가 아니라 펼치기로 하자,
+    못 보는 부분이 있는 것 같다). 접힌 화면은 있는 것을 없는 것처럼 보이게 만든다」</i>.
+    그 지시가 막으려던 것은 <b class="k">구역(panel) 접기</b>다 — 안에 무엇이 들었는지 모르는 채 닫혀 있는 상자.<br>
+    여기 접히는 것은 <b class="k">구역이 아니라 한 줄의 상세</b>이고, <b class="k">접힌 채로도 숫자 둘이 그대로 보인다</b>
+    (「답 3개」 + 「사유 6건」). 이는 같은 <code>fold.js</code>가 못박은 두 번째 계약
+    <i>「접기는 숨기기가 아니라 요약으로 줄이기다 — 접힌 제목 줄에 그 구역의 핵심 숫자 배지를 남긴다」</i>를
+    <b class="k">그대로 만족</b>한다. 없는 것처럼 보이는 자리가 없다.<br>
+    <b class="k">그래도 반대편을 적어 둔다</b>: <code>fold.js</code>를 안 쓰고 자체 토글을 만드는 것이므로
+    <b class="k">접기 부품이 두 벌</b>이 된다. <code>fold.js</code>를 쓰면 32px짜리 제목 줄이 하나 더 생겨
+    <b class="k">밀도가 오히려 나빠지고</b>(줄 하나 펴자고 헤더 하나를 세운다), 그 부품은 <code>display</code> 토글이라
+    <b class="k">한 줄 안쪽</b>을 못 다룬다. <b class="k">판단은 사장님</b> — 「그냥 늘 펼쳐 두자」도 성립하는 답이고,
+    그 경우 세로는 늘 <b class="num" id="alt-open">–</b> 늘어난다(아래 밀도 표).
+  </div>
+
+  <!-- ═══════════════════ ③ 집계 칸 세 길 ═══════════════════ -->
+  <h2>③ 집계 칸을 어디에 두나 — 세 길 비교</h2>
+  <p>사유별 숫자를 <b class="k">기간(7·30일)까지 견디게</b> 담으려면 어딘가에 <b class="k">영속으로</b> 쌓아야 한다.
+     길은 셋이다. 넷째(기존 표에 <code>reason</code> 칸을 더하고 기본키를 넓히기)는 아래 따로 기각한다.</p>
+
+  <table class="n">
+    <tr>
+      <th style="width:13%">길</th><th style="width:22%">어떻게</th>
+      <th style="width:31%">문제(코드를 읽어서 확인한 것)</th><th>비용</th>
+    </tr>
+    <tr>
+      <td><b>ⓐ 하위 kind</b><br><code>kind="cite:겹침없음"</code></td>
+      <td>같은 표에 사유마다 행을 하나 더 쌓는다. 기본키가 <code>(day, agent, kind)</code>라
+          <b>스키마를 안 건드려도 된다</b>.</td>
+      <td>
+        ① <b>한 칸에 두 뜻이 섞인다.</b> <code>calls</code>가 <code>cite</code> 행에선 <b>답의 수</b>,
+           <code>cite:겹침없음</code> 행에선 <b>건수</b>다. 누가 <code>SUM(calls)</code>로 「오늘 활동 총합」을 내면
+           <b>답 1개가 4로 세어진다</b>. 지금 그런 소비자가 없다는 것은 <b>내일도 없다는 뜻이 아니다</b>.<br>
+        ② <b><code>errors</code>·<code>latencyMsSum</code> 두 칸이 영원히 0</b>인 행이 표의 대부분을 차지한다.<br>
+        ③ <code>/api/aiteam/supervision</code>은 <code>activityDaily()</code>를 <b>거르지 않고 통째로</b> 내보낸다 —
+           30일 × 팀원 8 × 사유 8이면 <b>최대 1,920행</b>이 매 화면 로드마다 더 실린다.<br>
+        ④ 쓰는 자리가 문제다: <code>emitLlmActivity</code>가 사유마다 이벤트를 또 쏘면
+           <b>실동작 스트림에 한 답이 5줄</b>로 찍히고, 안 쏘고 표에만 넣으면
+           <b>「llm:event가 단일 원천」이 깨진다</b>(집계에 두 번째 작성자).
+      </td>
+      <td><b style="color:var(--teal)">가장 쌈</b><br>표 0개 · 시험 수정 0</td>
+    </tr>
+    <tr>
+      <td><b>ⓑ detail 집계</b><br>(인메모리)</td>
+      <td>이벤트에 사유 개수를 실어 보내고, 감독 API가 <b>인메모리 최근 200건</b>에서 합쳐 준다.
+          기존 <code>recentErrors</code>가 쓰는 방식과 같다.</td>
+      <td>
+        ① <b>창이 다르다.</b> 답 개수는 30일 영속인데 사유는 <b>부팅 후 최근 200건</b>이다.
+           한 줄에 나란히 놓이면 사람은 <b>같은 기간으로 읽는다</b> — 이 저장소가 반복해 겪은 「두 잣대」다.<br>
+        ② 그 200칸은 <code>chat·search·guard·embed</code>와 <b>공용</b>이다. 답 하나가 <b>5칸 이상</b>을 먹으므로
+           <b>답 40개면 오늘 아침 것이 이미 밀려났다</b>.<br>
+        ③ 재시작하면 0 — <b>「가드가 안 돌았다」와 구분이 안 된다</b>(장애 ≠ 부재 재발).<br>
+        ④ <b>detail 문자열을 정규식으로 파싱하는 변형은 절대 금지</b>다. 사람이 읽는 문장이 잣대가 되면
+           문구를 다듬는 순간 숫자가 죽는다. 구조화 필드를 새로 실어야 하는데, 그러면
+           <b>「스키마 안 늘림」이라는 이점이 반쪽</b>이 된다.
+      </td>
+      <td>표 0개<br>이벤트 필드 1개</td>
+    </tr>
+    <tr class="win">
+      <td><b class="k">ⓒ 새 표</b> <span class="badge pick">추천</span><br><code>cite_reason_daily</code></td>
+      <td><code>(day, agent, reason, count)</code> · 기본키 <code>(day, agent, reason)</code>.
+          <code>db.ts</code>에 <code>CREATE TABLE IF NOT EXISTS</code> 한 덩이 —
+          <code>llm_activity_daily</code>가 만들어진 방식 그대로.</td>
+      <td>
+        ① <b>표가 하나 는다</b> → <code>datacleanup.test.ts</code>의 전수 감시가 <b>빨개진다</b>(설계대로 — 아래 ⑤).<br>
+        ② 두 표가 <b>따로 쓰이면 어긋날 수 있다</b> → <b>같은 함수·같은 트랜잭션</b>에서 쓰게 묶어 막는다(아래 ④).<br>
+        ③ 과거 소급 없음 — 붙인 날부터 쌓인다(기존 「도입일 전은 0이 정직」 규칙과 같다).
+      </td>
+      <td>표 1개<br>시험 목록 1줄<br><b>마이그레이션 0</b></td>
+    </tr>
+  </table>
+
+  <div class="good"><b>ⓒ를 고른 한 문장.</b>
+    <b>「답의 수」와 「뗀 건수」는 서로 더할 수 없는 두 잣대</b>인데, ⓐ는 그 둘을 <b>한 칸(<code>calls</code>)</b>에 담고
+    ⓑ는 <b>한 줄에 두 기간</b>을 담는다. ⓒ만이 두 잣대를 <b>두 자리에 갈라 놓아</b> 섞일 길이 원리상 없다.
+    이 저장소가 반복해 데인 결함이 정확히 「같은 것을 여러 곳에 적어 어긋남」·「잣대 3중화」다.</div>
+
+  <h3><span class="badge no">기각</span> ⓓ 기존 표에 <code>reason</code> 칸을 더한다</h3>
+  <p><code>llm_activity_daily</code>에 <code>reason</code>을 더하려면 <b class="k">기본키를 <code>(day,agent,kind,reason)</code>로 넓혀야</b> 한다.
+     SQLite는 기본키 변경이 <b class="k">ALTER로 안 되고 표를 새로 만들어 옮기는 일</b>이라, 이 저장소의 다른 마이그레이션
+     (<code>ALTER TABLE … ADD COLUMN</code> 일색)과 결이 다르다. 게다가 <code>backup.ts</code>가
+     <b class="k">스냅샷의 마이그레이션 id를 지금 것과 대조</b>해 복원을 판단하므로, 표 재생성은
+     <b class="k">백업 복원 경로까지 끌고 들어간다</b>. 얻는 것(표 1개 절약) 대비 위험이 크다.
+     그리고 <code>reason</code>이 <code>NULL</code>인 기존 행 수만 행이 남아 <b class="k">「사유 없음」이라는 아홉 번째 가짜 사유</b>가 생긴다.</p>
+
+  <!-- ═══════════════════ ④ 어떻게 어긋나지 않게 하나 ═══════════════════ -->
+  <h2>④ 두 표가 어긋나지 않게 하는 장치 — 「새 계수기 금지」를 어떻게 지키나</h2>
+  <p>「원천은 하나」 원칙은 <b class="k">같은 것을 두 번 세지 말라</b>는 뜻이지 <b class="k">다른 것을 재지 말라</b>는 뜻이 아니다.
+     그래도 두 표가 시간차로 갈라지면 안 되므로, <b class="k">입구를 하나로 묶는다</b>.</p>
+  <ul>
+    <li><b class="k">생산자는 한 곳</b> — 사유 개수를 만드는 함수는 <code>citeguard.ts</code>에 <b class="k">새로 하나</b>(<code>사유별집계()</code>)만 둔다.
+        그리고 <b class="k">기존 <code>뗀인용요약()</code>이 그 함수를 불러서 문장을 짓게</b> 바꾼다 —
+        지금은 <code>뗀인용요약</code>이 자기 안에서 따로 세고 있어, 그대로 두면 <b class="k">문장의 숫자와 표의 숫자가 갈릴 수 있다</b>.</li>
+    <li><b class="k">운반은 이벤트 한 개</b> — <code>LlmActivityEvent</code>에 <code>citeReasons?: Record&lt;string, number&gt;</code> 한 칸을 더한다.
+        <b class="k">이벤트 개수는 안 늘린다</b>(답 하나에 ✂ 한 줄 — 스트림 화면이 안 변한다).</li>
+    <li><b class="k">쓰기는 한 함수</b> — <code>emitLlmActivity()</code> 안에서, 지금 <code>llm_activity_daily</code>를 올리는
+        그 <code>try</code> 블록에서 <b class="k">같이</b> 쓴다. 두 upsert를 <b class="k">한 트랜잭션</b>으로 묶어
+        「답은 세었는데 사유는 못 센」 반쪽 상태를 만들지 않는다.</li>
+    <li><b class="k">사전은 타입 하나</b> — <code>reason</code>에 넣는 글자는 <code>뗀사유종류</code>의 한글 값을 <b class="k">그대로</b> 쓴다.
+        영문 코드로 번역하면 <b class="k">두 번째 사전</b>이 생기고, 화면에 쓸 때 다시 한글로 되돌려야 한다(어긋날 자리를 새로 만드는 일).
+        <code>metaleak</code> 두 종은 <code>"내부 경로"</code>·<code>"내부 메타"</code>, 못 뗀 자리는 <code>"못 뗌"</code>으로 <b class="k">같은 사전에</b> 넣는다.</li>
+  </ul>
+  <div class="warn"><b>⚠ 「못 뗌」을 <code>count</code>에 같이 담는 것은 이 설계의 유일한 타협이다.</b>
+    엄밀히는 <b class="k">뗀 것이 아니라 못 뗀 것</b>이라, 합계를 「뗀 건수」라 부르면 그만큼 부풀려진다.
+    그래서 <b class="k">화면이 「못 뗌」을 다른 색(amber)으로 그리고</b>, 접힘 배지의 「사유 N건」에도
+    <b class="k">못 뗌은 안 더한다</b>. 짝 시험이 이 두 가지를 값으로 못박아야 한다(⑥-③).</div>
+
+  <!-- ═══════════════════ ⑤ 연쇄 ═══════════════════ -->
+  <h2>⑤ 이걸 넣으면 무엇이 함께 걸리나 <span style="font-size:11.5px;color:var(--muted-2);font-weight:400">— 착수 전에 알아야 안 깨진다</span></h2>
+  <table class="n">
+    <tr><th style="width:32%">걸리는 것</th><th style="width:14%">어떻게 걸리나</th><th>해야 할 일</th></tr>
+    <tr>
+      <td><code>server/test/datacleanup.test.ts</code><br>「DB에 있는 표 중 정리 대장이 모르는 업무 표가 없다」</td>
+      <td><b style="color:var(--red)">빨개진다</b><br>(<code>sqlite_master</code> 전수)</td>
+      <td><code>일부러제외</code>에 <code>cite_reason_daily</code>를 <b>이유와 함께</b> 넣는다.
+          바로 위 <code>llm_activity_daily</code>가 <b>「⏳ 판단 대기 — AI 팀 감독의 원천」</b>으로 올라 있으니
+          <b>같은 갈래·같은 문장</b>으로 잇는다. ⚠ 그 시험은 <b>이유가 8자 이하면 또 실패</b>한다(이름만 올리기 금지).</td>
+    </tr>
+    <tr>
+      <td><code>server/src/engine/datacleanup.ts</code> <code>TARGETS</code></td>
+      <td>안 걸린다(현재)</td>
+      <td><b>넣지 않는다.</b> <code>llm_activity_daily</code>가 <code>TARGETS</code>에 없는 것과 같은 이유 —
+          실사용 전환 리셋이 감독 지표를 지우면 <b>「도입일부터 축적」이라는 이 화면의 약속이 깨진다</b>.
+          <b>넣지 않기로 한 판단을 커밋에 적는다</b>(적지 않으면 다음 사람이 「빠뜨렸나」로 읽는다).</td>
+    </tr>
+    <tr>
+      <td><code>server/test/wiringcontract.test.ts</code></td>
+      <td>ⓐ를 골랐다면 확인 필요</td>
+      <td>그 시험은 <code>llmactivity.ts</code>에 <b>글자 <code>"search" | "guard"</code></b>가 있는지 본다.
+          ⓒ는 <code>kind</code> 유니언을 안 건드리므로 <b>영향 없음</b>(확인함).</td>
+    </tr>
+    <tr>
+      <td><code>screenguide.ts</code> <code>"supervision.html"</code> panels
+          <b>「인용 제거(✂)」</b></td>
+      <td><b style="color:var(--amber)">문구가 거짓이 된다</b></td>
+      <td>지금 그 문구는 <b>「사유(겹침없음·범위밖·자기인용·출처미확인)는 「팀 활동 — 실동작 기록」의 ✂ 줄에 있습니다」</b>라고 적혀 있다.
+          구현하면 <b>사유는 이 화면에 있다</b>. <b>같은 커밋에서 고친다</b> — 약속과 코드의 불일치는 검토관이 매번 잡는 부류다.
+          별칭 표(같은 파일 위쪽 <code>"supervision.html"</code> 별칭)에 <code>"사유"</code>·<code>"사유별"</code>도 잇는다
+          (사람은 화면에 보이는 글자 그대로 묻는다).</td>
+    </tr>
+    <tr>
+      <td><code>citeguard.ts</code> <code>뗀인용요약()</code> 위 주석</td>
+      <td><b style="color:var(--amber)">주석이 거짓이 된다</b></td>
+      <td>「건수 아닌 뗀 답의 수 = supervision.html ✂ 줄」이라 적힌 대목이 <b>반만 맞게</b> 된다(이제 건수도 그 화면에 있다). 같이 고친다.</td>
+    </tr>
+    <tr>
+      <td><code>agent.html</code> 실동작 스트림</td>
+      <td>안 걸린다</td>
+      <td><b>손대지 않는다.</b> 이벤트 개수·<code>detail</code> 문장이 그대로라 스트림은 한 글자도 안 변한다
+          (이것이 ⓒ의 조용한 이점이다 — 변화가 감독 화면 한 곳에서 끝난다).</td>
+    </tr>
+    <tr>
+      <td><code>grouppanels.js</code> 감독 판 · <code>datacard.ts</code> <code>supervisionStatusAnswer()</code></td>
+      <td>안 걸린다</td>
+      <td>둘 다 <code>kind === "chat"</code>만 본다(확인함). <b>3줄 고정 판 계약</b>도 안 건드린다 — 대화 홈 카드는 그대로.</td>
+    </tr>
+    <tr>
+      <td><code>backup.ts</code></td>
+      <td>안 걸린다</td>
+      <td><code>ESSENTIAL_TABLES</code>는 <code>users·schema_migrations·assets·audit_log</code> 넷뿐. 새 표는 통 백업에 그냥 실린다.</td>
+    </tr>
+  </table>
+
+  <!-- ═══════════════════ ⑥ 구현 자리 ═══════════════════ -->
+  <h2>⑥ 구현 때 만질 자리 <span style="font-size:11.5px;color:var(--muted-2);font-weight:400">— 함수 이름으로 가리킨다(줄 번호는 지금도 밀리는 중)</span></h2>
+  <table class="n">
+    <tr><th style="width:30%">파일 · 함수</th><th style="width:20%">무엇</th><th>어떻게</th></tr>
+    <tr><td><code>server/src/db.ts</code> — <code>llm_activity_daily</code> 정의 <b>바로 아래</b></td><td>표 신설</td>
+        <td><code>CREATE TABLE IF NOT EXISTS cite_reason_daily (day TEXT, agent TEXT, reason TEXT, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, agent, reason))</code>.
+            <b>마이그레이션 등록 불필요</b> — 새 표는 <code>CREATE … IF NOT EXISTS</code>가 곧 멱등이다(<code>migrate()</code>는 기존 표를 고칠 때 쓴다).</td></tr>
+    <tr><td><code>citeguard.ts</code> — <b>신설</b> <code>사유별집계()</code></td><td>단일 생산자</td>
+        <td><code>(removed, 보류) =&gt; Record&lt;string, number&gt;</code>. <b>그리고 <code>뗀인용요약()</code>이 이걸 부르도록 고친다</b>
+            (지금은 자기 안에서 따로 센다 — 두 벌이면 반드시 갈라진다).</td></tr>
+    <tr><td><code>llmactivity.ts</code> — <code>LlmActivityEvent</code></td><td>칸 하나</td>
+        <td><code>citeReasons?: Record&lt;string, number&gt;</code>. <b><code>kind</code> 유니언은 안 건드린다</b>(wiringcontract 무영향).</td></tr>
+    <tr><td><code>llmactivity.ts</code> — <code>emitLlmActivity()</code></td><td>쓰기 한 자리</td>
+        <td>지금 <code>dailyUpsert</code>를 부르는 <code>try</code> 안에서, <code>citeReasons</code>가 있으면 새 upsert를 <b>같은 트랜잭션</b>으로 함께 돌린다.
+            <b>WS 방송은 지금 그대로</b>(이벤트 수 안 늘림).</td></tr>
+    <tr><td><code>llmactivity.ts</code> — <b>신설</b> <code>citeReasonsDaily(days)</code></td><td>읽기</td>
+        <td><code>activityDaily</code>와 <b>같은 날짜 계산</b>(<code>todayLocal</code> 기준 로컬 달력)을 써야 한다 —
+            UTC로 재면 0~9시에 하루가 밀려 <b>답 개수와 사유가 다른 날을 가리킨다</b>.</td></tr>
+    <tr><td><code>llmactivity.ts</code> — <code>registerLlmActivityRoutes()</code>의 <code>/api/aiteam/supervision</code></td><td>응답 칸 하나</td>
+        <td><code>citeReasons: [{agent, reason, count}]</code>를 더한다. <b>새 API를 만들지 않는다</b> — 감독 화면은 지금도 이 한 창구만 부른다.</td></tr>
+    <tr><td><code>llm.ts</code> — 계수기(<code>emitLlmActivity({kind:"cite"…})</code> 부르는 자리)</td><td>사유 합치기</td>
+        <td><code>사유별집계(인용가드…)</code>에 <code>경로가드</code>의 <code>내부 경로</code>/<code>내부 메타</code>/<code>못 뗌</code>을 더해 <code>citeReasons</code>로 넘긴다.
+            <b>「경로」와 「메타」를 가르는 기존 판정을 그대로 재사용</b>한다(<code>경로.length &gt; 0</code>) — 새로 판정하지 않는다.</td></tr>
+    <tr><td><code>cloudllm.ts</code> — 클라우드 답의 ✂ emit</td><td>빠뜨리면 구멍</td>
+        <td>여기도 <code>citeReasons</code>를 넘긴다. <b>안 넘기면 클라우드 답만 사유가 비어</b>
+            「외부 두뇌는 가드가 안 도나」로 읽힌다. 이 자리는 <code>agent: "-"</code>라 화면에 <b>「미지정」</b>으로 모인다(기존 규약).</td></tr>
+    <tr><td><code>supervision.html</code> — <code>load()</code> 안 ✂ 줄 만드는 대목</td><td>화면</td>
+        <td>사유 합산(기간 전체) → 큰 순 정렬 → <b>0인 사유는 버림</b> → 토글 버튼과 <code>.cite-reasons</code> 한 줄.
+            <b>「정상」 판정은 지금처럼 무호출·오류만 본다</b>(✂ 줄은 늘 서므로 <code>lines.length</code>로 재면 안 된다 — 앞 시안이 이미 못박은 자리).</td></tr>
+    <tr><td><code>supervision.html</code> — <code>&lt;style&gt;</code>의 <code>.tag.cite</code> 아래</td><td>CSS 3줄</td>
+        <td>이 시안 <code>&lt;style&gt;</code>의 <code>.cite-why</code>·<code>.cite-reasons</code> 세 줄을 그대로 옮긴다. 새 색 토큰 없음(<code>--purple-ink</code> 재사용).</td></tr>
+    <tr><td><b>안 만짐</b>: <code>agent.html</code> · <code>grouppanels.js</code> · <code>datacard.ts</code> · <code>railroster.js</code> · <code>fold.js</code></td><td>—</td>
+        <td>각각 스트림 무변화 · 3줄 고정 계약 · <code>kind==="chat"</code>만 봄 · 게시 관문 12개 계약 · 구역 부품(한 줄엔 안 맞음).
+            <b>손대지 않는 이유를 커밋에 적는다</b>.</td></tr>
+  </table>
+
+  <h3>펼침 상태 기억 — 그 PC에만</h3>
+  <p><code>localStorage</code> 키 <code>gijo:cite-reasons-open</code> 하나. <b class="k"><code>fold.js</code>의
+     <code>gijo:fold:</code> 이름 공간은 쓰지 않는다</b> — 그 부품이 관리하는 구역이 아닌데 같은 이름 공간에 끼면
+     나중에 <code>fold.js</code>가 화면을 훑을 때 <b class="k">있지도 않은 구역</b>을 찾는다.
+     읽기·쓰기는 <code>try/catch</code>로 감싼다(사생활 모드·저장 차단에서 던진다).</p>
+
+  <!-- ═══════════════════ ⑦ 밀도 ═══════════════════ -->
+  <h2>⑦ 밀도 숫자 <span style="font-size:11.5px;color:var(--muted-2);font-weight:400">— 이 페이지가 브라우저에서 스스로 잰 값(추정 아님)</span></h2>
+  <table class="n" id="dens">
+    <tr><th style="width:40%">잰 것</th><th style="width:15%">지금</th><th style="width:15%">제안</th><th style="width:30%">증감</th></tr>
+    <tr><td>✂ 줄 높이 — <b>접힌 기본 상태</b></td><td class="num" id="d-old">–</td><td class="num" id="d-fold">–</td><td class="num" id="d-fold-diff">–</td></tr>
+    <tr><td>✂ 줄 높이 — <b>펼친 상태</b></td><td class="num" id="d-old2">–</td><td class="num" id="d-open">–</td><td class="num" id="d-open-diff">–</td></tr>
+    <tr><td>감독 관점 판 세로 총합 — <b>접힘</b></td><td class="num" id="d-pold">–</td><td class="num" id="d-pfold">–</td><td class="num" id="d-pfold-diff">–</td></tr>
+    <tr><td>감독 관점 판 세로 총합 — <b>펼침</b></td><td class="num" id="d-pold2">–</td><td class="num" id="d-popen">–</td><td class="num" id="d-popen-diff">–</td></tr>
+    <tr><td>✂ 줄 높이 — <b>0건일 때</b></td><td class="num" id="d-zero-old">–</td><td class="num" id="d-zero">–</td><td class="num" id="d-zero-diff">–</td></tr>
+    <tr><td>사유 한 줄(<code>.cite-reasons</code>) 자체 높이</td><td class="num">—</td><td class="num" id="d-reasons">–</td><td>신규</td></tr>
+    <tr><td>실동작 스트림(agent.html)</td><td class="num">—</td><td class="num">—</td><td><b>0px</b> — 이벤트 수·<code>detail</code> 문장이 안 변한다(ⓒ를 고른 덕)</td></tr>
+    <tr><td>대화 홈 감독 판(grouppanels 3줄 고정)</td><td class="num">—</td><td class="num">—</td><td><b>0px</b> — <code>kind==="chat"</code>만 읽는다</td></tr>
+    <tr><td><b>화면 전체 증가분</b>(감독 화면 1회 렌더)</td><td class="num">—</td><td class="num">—</td><td class="num" id="d-total">–</td></tr>
+  </table>
+  <div class="cap">잰 방법: 제품과 같은 폭 1132px(<code>.main</code> max-width 1180 − padding 24×2)에서
+    <code>getBoundingClientRect().height</code>. 좁은 칸에 나란히 놓고 재면 줄바꿈이 생겨 숫자가 부풀거나 줄어들어
+    세로로 쌓아 쟀다.<br>
+    <b class="k">실측값(2026-09-06 · 폭 1132px):</b> ✂ 줄 <b class="k">31.0px → 31.0px(접힘, +0)</b> ·
+    <b class="k">31.0 → 50.0px(펼침, +19)</b> · 감독 관점 판 <b class="k">211 → 211px(접힘, +0)</b> ·
+    <b class="k">211 → 230px(펼침, +19)</b> · 사유 줄 자체 <b class="k">16.0px</b>(+ 위 여백 3px = 19px) ·
+    0건 줄 <b class="k">31.0px</b>(지금과 같음).<br>
+    <b class="k">가로도 남는다</b>: ✂ 줄의 글 폭 실측 <b class="k">411px</b> / 쓸 수 있는 폭 약 <b class="k">1,006px</b> —
+    <b class="k">2.5배 여유</b>라 팀원 이름이 길어져도 줄바꿈이 안 난다.
+    글자 수는 오히려 <b class="k">53자 → 43자로 줄었다</b>(안내 문구를 토글로 바꿨기 때문).<br>
+    <b class="k">읽는 법</b>: 접힘이 <b class="k">+0px</b>인 것이 이 안의 핵심이다 — 글자만 바뀌고 줄 수가 같다.
+    <b class="k">0이 아니게 되면</b> 토글 버튼이 줄 높이를 밀어 올린 것이니 <code>.cite-why</code>의
+    <code>font-size</code>·<code>padding</code>을 줄여 0으로 되돌린다 — <b class="k">이 표가 그 조정의 잣대다</b>.<br>
+    <b class="k">「사유 6건」 배지를 넣을 자리는 공짜가 아니다</b>: 지금 그 자리에 있던
+    <span class="dim">(뗀 건수는 팀 활동 기록에)</span> 16글자를 <b class="k">빼고</b> 넣는 것이라 가로도 거의 그대로다.</div>
+
+  <!-- ═══════════════════ ⑧ 짝 시험 ═══════════════════ -->
+  <h2>⑧ 짝 시험 제안 <span style="font-size:11.5px;color:var(--muted-2);font-weight:400">— 「그 값을 누가 넣는가」를 코드로 못박는다</span></h2>
+  <table class="n">
+    <tr><th style="width:6%">#</th><th style="width:30%">무엇을 지키나</th><th>어떻게 잡나</th></tr>
+    <tr><td>①</td><td><b>문장과 표가 갈리지 않는다</b></td>
+        <td><code>사유별집계()</code>의 합 = <code>removed.length</code>이고, <code>뗀인용요약()</code>이 만든 문장에서 뽑은 숫자와
+            <b>글자로 일치</b>한다. <b>가장 중요한 시험</b> — 두 벌 세기를 막는 유일한 자물쇠다.</td></tr>
+    <tr><td>②</td><td><b>두 잣대가 안 섞인다</b></td>
+        <td><code>emitLlmActivity({kind:"cite", citeReasons:{겹침없음:2, 범위밖:1}})</code> 한 번 뒤 —
+            <code>llm_activity_daily(kind="cite").calls</code>는 <b>1</b>(답 1개), <code>cite_reason_daily</code> 합은 <b>3</b>(건수).
+            <b>1과 3이 서로 안 물드는 것</b>을 값으로 확인한다.</td></tr>
+    <tr><td>③</td><td><b>「못 뗌」을 뗀 걸로 안 센다</b></td>
+        <td><code>citeReasons:{못 뗌:1}</code>만 있는 이벤트 → 접힘 배지의 「사유 N건」이 <b>0</b>이고(줄이 안 뜬다),
+            표에는 <b>「못 뗌 1」이 남는다</b>. 「없던 제거를 있다고 세는」 거짓 계수의 방지선.</td></tr>
+    <tr><td>④</td><td><b>내부 경로만 뗀 답도 사유가 있다</b></td>
+        <td>인용 <code>removed</code>는 0이고 <code>메타줄걷기</code>만 운 답 → 답 1개 · 사유 「내부 경로 N」.
+            <b>사유가 텅 빈 답이 없다</b>(①의 함정을 값으로 닫는다).</td></tr>
+    <tr><td>⑤</td><td><b>클라우드 경로가 빠지지 않는다</b></td>
+        <td>소스 감시 — <code>cloudllm.ts</code>의 <code>kind: "cite"</code> emit에 <code>citeReasons</code>가 <b>같이 있는지</b>
+            글자로 본다(호출부가 둘인데 한쪽만 고치는 것이 이 저장소의 「반쪽 수리」다).</td></tr>
+    <tr><td>⑥</td><td><b>사전이 두 벌이 되지 않는다</b></td>
+        <td>소스 감시 — <code>뗀인용요약</code> 본문 안에 <code>사유별집계(</code> 호출이 <b>있는지</b>.
+            없으면 누군가 다시 자기 안에서 세기 시작한 것이다.</td></tr>
+    <tr><td>⑦</td><td><b>날짜가 두 달력을 안 쓴다</b></td>
+        <td><code>citeReasonsDaily</code>와 <code>activityDaily</code>가 <b>같은 <code>todayLocal</code></b>을 쓰는지 소스로.
+            (UTC를 쓰면 0~9시에 답 개수와 사유가 <b>다른 날</b>을 가리킨다 — 이 화면이 이미 한 번 데인 자리.)</td></tr>
+    <tr><td>⑧</td><td><b>정리 대장이 새 표를 안다</b></td>
+        <td>기존 <code>datacleanup.test</code> 전수 감시가 자동으로 잡는다. <b>등록하면 초록, 안 하면 빨강</b> — 손댈 것 없다.</td></tr>
+    <tr><td>⑨</td><td><b>화면이 「건수」와 「답 수」를 구분해 말한다</b></td>
+        <td>소스 감시 — <code>supervision.html</code>에 <code>뗀 「건수」</code> 취지의 문구와 <code>aria-expanded</code>가 함께 있는지.
+            (세 번째 재발이면 감시가 규칙 — 이 화면은 이미 「건수/답수」로 한 번 못박은 이력이 있다.)</td></tr>
+  </table>
+  <div class="warn"><b>⚠ 실화면 관문에서는 반드시 「펴서」 잰다.</b> 접힘이 기본이라
+    자동 점검이 접힌 채로 보면 사유 줄을 <b>영원히 못 본다</b> — 「접기는 접은 채로, 검증 땐 펴서 잰다」가
+    이 저장소의 규칙이다. 관문 스크립트가 토글을 <b>먼저 누르고</b> 확인하도록 적어 둔다.</div>
+
+  <!-- ═══════════════════ ⑨ ⓘ 문구 ═══════════════════ -->
+  <h2>⑨ screenguide에 고칠 ⓘ 문구 — <code>"supervision.html"</code>의 <code>panels</code></h2>
+  <p>기존 <b class="k">「인용 제거(✂)」</b> 항목은 <b class="k">지금 문장 그대로 두면 거짓</b>이 된다(사유가 다른 화면에 있다고 안내한다). 아래로 바꾼다.</p>
+  <pre>"인용 제거(✂)": "AI가 「[1] \"…\"」처럼 근거를 대고 말했는데 <b>그 근거가 실제로 없으면</b> 답을 내보내기 전에 그 인용을 뗍니다.
+  앞의 숫자는 그렇게 <b>손댄 답의 개수</b>이고, 「사유 N건 ▸」을 누르면 <b>왜 뗐는지가 건수로</b> 펼쳐집니다.
+  <b>답 개수와 건수는 다른 잣대</b>입니다 — 한 답에서 세 군데를 뗄 수 있어 서로 더하거나 나눌 수 없습니다.
+  사유는 이런 뜻입니다 — <b>겹침없음</b>: 인용문이 어느 자료에도 없습니다(지어낸 원문). <b>범위밖</b>: 자료는 3개인데 [5]를 가리켰습니다.
+  <b>블록없음</b>: 참고 자료가 0건인데 인용 꼬리표를 달았습니다. <b>자기인용</b>: 제 앞 문장을 원문이라며 인용했습니다.
+  <b>출처미확인</b>: 출처 이름을 어디서도 확인하지 못했습니다(가짜라는 뜻은 아닙니다). <b>통째교체</b>: 다 떼니 남는 글이 없어 답 전체를 「자료 없음」 안내로 바꿨습니다.
+  <b>내부 경로·내부 메타</b>: 모델 파일 경로나 내부 라벨이 답에 섞여 그 줄을 뗐습니다.
+  <b style='color:amber'>못 뗌</b>: 답이 통째로 내부 메타라 빈 답이 되는 것을 막으려고 <b>원문을 그대로 뒀습니다</b> — 이 값이 보이면 사람이 한 번 보셔야 합니다.
+  <b>0이면 뗄 것이 없었다는 뜻</b>이고, 0이어도 줄을 숨기지 않는 이유는 「가드가 안 도는 것」과 「뗄 것이 없었던 것」이 화면에서 같아 보이면 안 되기 때문입니다.
+  ⚠ 사유별 숫자는 이 기능을 붙인 날부터 쌓이므로 그 전 기간은 사유가 비어 있는 것이 맞습니다(답 개수는 2026-09-05부터 있습니다)."</pre>
+  <div class="cap">화면에는 <b class="k">「✂ 인용 제거 / 답 3개… / 겹침없음 3 · 범위밖 1」</b>만 둔다 — 풀이는 전부 ⓘ가 연다.
+    별칭 표에 <code>"사유"</code>·<code>"사유별"</code>·<code>"겹침없음"</code>·<code>"범위밖"</code>을 <b class="k">「인용 제거(✂)」로 잇는다</b>
+    (사람은 화면에서 읽은 글자 그대로 묻는다 — 그 표의 존재 이유다).<br>
+    <span style="color:var(--muted-2)">📖 용어 풀이 — <b class="k">인용 검증 가드</b>: AI 답에 붙은 「[1] “…”」 같은 근거 표시가
+    진짜 있는 자료를 가리키는지 대조해, 아니면 그 인용만 조용히 떼는 <b class="k">출구 검사기</b>.
+    <b class="k">경로 가드</b>: 답에 섞여 나가는 모델 파일 경로·내부 라벨 줄을 마지막에 한 번 더 걷어내는 검사기.</span></div>
+
+  <!-- ═══════════════════ ⑩ 포기한 것 ═══════════════════ -->
+  <h2>⑩ 무엇을 포기했나</h2>
+  <ul>
+    <li><b class="k">추이(그래프)를 안 만든다.</b> 「겹침없음이 지난주보다 늘었나」는 이 판에서 못 본다.
+        미니 막대는 팀원 카드에 이미 있지만 그건 <code>chat</code> 축이라, 사유 축 막대를 새로 그리면
+        <b class="k">같은 화면에 두 종류의 막대</b>가 생겨 무엇을 재는지 흐려진다. 표가 쌓이면 나중에 붙일 수 있다(데이터는 남는다).</li>
+    <li><b class="k">팀원별 × 사유별 교차표를 안 만든다.</b> 표에는 <code>agent</code>가 있지만 화면은 <b class="k">기간 합계</b>만 편다.
+        8사유 × 8팀원 = 64칸을 이 판에 넣는 것은 밀도 원칙과 정면 충돌이다. 대신 <b class="k">대화창에서 물을 수 있게</b> ⓘ를 붙인다.</li>
+    <li><b class="k">비율(%)을 안 쓴다.</b> 앞 시안과 같은 이유 — 분모가 될 「호출」은 <b class="k">등록된 팀원만</b> 세는데
+        ✂는 <code>agent</code>가 <code>"-"</code>(미지정·클라우드)일 수 있어 <b class="k">세 번째 잣대</b>가 생긴다.</li>
+    <li><b class="k">뗀 인용의 원문은 여전히 안 싣는다.</b> 사내 문서 본문이 감독 화면·WS로 새면 안 된다 —
+        이 시안은 <b class="k">개수만</b> 늘렸다. (<code>quote</code>·<code>reason</code> 문장은 지금도 서버 안에만 있다.)</li>
+    <li><b class="k">과거 소급 없음.</b> 사유 표는 붙인 날부터 쌓인다. 이전 기간은 「답 N개」만 있고 사유는 비어 있다 —
+        그것을 <b class="k">화면이 「사유 기록은 …부터 있습니다」로 말하게</b> 한다(빈칸을 침묵으로 두지 않는다).</li>
+    <li><b class="k">라이트 에디션은 이번에 안 본다.</b> 프로가 기준이므로 프로 셸에서 먼저 서고,
+        같은 파일이라 표준에도 함께 반영된다. 라이트는 별도 확인 대상.</li>
+  </ul>
+
+  <!-- ═══════════════════ ⑪ 자가점검 ═══════════════════ -->
+  <h2>⑪ 제품 원칙 자가점검</h2>
+  <table class="n">
+    <tr><th style="width:26%">원칙</th><th style="width:8%">지킴</th><th>어떻게</th></tr>
+    <tr><td>화면은 <b>보기용</b> — 입력칸 금지</td><td><b style="color:var(--teal)">O</b></td>
+        <td>새 조작은 <b>펼침 토글 하나</b>뿐. 입력칸·검색칸·필터를 안 만들었다(지시는 대화창).</td></tr>
+    <tr><td>설명은 <b>ⓘ/screenguide</b>로</td><td><b style="color:var(--teal)">O</b></td>
+        <td>화면 글자는 「사유 6건 ▸」과 「겹침없음 3 · 범위밖 1」과 한 줄 단서뿐. 여덟 사유의 뜻풀이는 전부 ⑨의 panels로.</td></tr>
+    <tr><td><b>정직</b> — 없으면 없다고 코드가 먼저 말한다</td><td><b style="color:var(--teal)">O</b></td>
+        <td>0건이면 토글을 안 그린다 · 「못 뗌」을 뗀 걸로 안 센다 · 「건수≠답 수」를 화면이 스스로 말한다 ·
+            사유 기록 시작일을 ⓘ가 밝힌다 · 클라우드 경로를 빠뜨리면 시험이 잡는다.</td></tr>
+    <tr><td><b>단일 출처</b></td><td><b style="color:var(--teal)">O</b></td>
+        <td>사유를 세는 함수 <b>하나</b>(<code>사유별집계</code>) · 쓰는 함수 <b>하나</b>(<code>emitLlmActivity</code>) ·
+            읽는 창구 <b>하나</b>(<code>/api/aiteam/supervision</code>) · 사전 <b>하나</b>(<code>뗀사유종류</code> 한글 값 그대로).</td></tr>
+    <tr><td><b>밀도 우선</b>(엑셀처럼 촘촘)</td><td><b style="color:var(--teal)">O</b></td>
+        <td>새 판·카드·KPI <b>0개</b>. 접힘 기본 <span class="num" id="p-fold-diff2">–</span>, 펼쳐도 <span class="num" id="p-open-diff2">–</span>.</td></tr>
+    <tr><td>모든 사용자 대상 텍스트 <b>한글</b></td><td><b style="color:var(--teal)">O</b></td>
+        <td>화면·DB 값·이벤트 칸 이름표까지 사유는 전부 한글(<code>겹침없음</code>·<code>범위밖</code>·<code>내부 경로</code>).
+            영문 코드로 번역하지 않는 것이 오히려 <b>사전을 하나로</b> 지킨다.</td></tr>
+    <tr><td><b>프로가 기준</b></td><td><b style="color:var(--teal)">O</b></td>
+        <td>감독 화면은 프로 셸이 카드·도킹으로 여는 자산 그대로 — 프로에서 먼저 보이고 표준은 같은 파일이라 함께 온다.</td></tr>
+    <tr><td><b>접기 규칙</b></td><td><b style="color:var(--amber)">△</b></td>
+        <td><b>의도적 예외</b>다(②의 ⚠ 상자). 구역이 아니라 한 줄의 상세라 <code>fold.js</code>를 안 쓰고,
+            접힌 채로도 숫자 둘이 보이며, 위험 신호(못 뗌)면 자동으로 펼친다. <b>「늘 펼쳐 두자」도 성립하는 답</b> — 결정은 사장님.</td></tr>
+  </table>
+
+  <div class="cap" style="margin-top:22px">
+    이 시안은 <b class="k">제품 코드를 한 줄도 바꾸지 않았다</b>(mockups/ 아래 단일 파일, 외부 자원 0, 스크립트는 자기 높이 재기뿐).
+    승인되면 <b class="k">설계관 → 구현 → 병렬 검토관 → 수리 → 게이트 → 실화면 관문 → 게시</b> 순서를 탄다.
+  </div>
+</div>
+
+<script>
+// 이 페이지가 스스로 잰다 — 「늘었다/줄었다」를 눈대중으로 적지 않기 위해(실측 원칙).
+(function () {
+  function H(id) { var e = document.getElementById(id); return e ? Math.round(e.getBoundingClientRect().height * 10) / 10 : null; }
+  function put(id, v, sfx) { var e = document.getElementById(id); if (e) e.textContent = (v == null ? "—" : v + (sfx || "")); }
+  function diff(a, b) { return (a == null || b == null) ? null : Math.round((b - a) * 10) / 10; }
+  function sign(v, sfx) { return v == null ? "—" : (v > 0 ? "+" : "") + v + (sfx || "px"); }
+
+  function measure() {
+    var old = H("line-old"), fold = H("line-fold"), open = H("line-open");
+    var zeroOld = H("line-old"), zero = H("line-zero"), reasons = H("reasons-open");
+    var pold = H("p-old"), pfold = H("p-fold"), popen = H("p-open");
+
+    put("d-old", old, "px"); put("d-fold", fold, "px");
+    put("d-old2", old, "px"); put("d-open", open, "px");
+    put("d-pold", pold, "px"); put("d-pfold", pfold, "px");
+    put("d-pold2", pold, "px"); put("d-popen", popen, "px");
+    put("d-zero-old", zeroOld, "px"); put("d-zero", zero, "px");
+    put("d-reasons", reasons, "px");
+
+    var dl = diff(old, fold), dlo = diff(old, open);
+    var dp = diff(pold, pfold), dpo = diff(pold, popen);
+    put("d-fold-diff", sign(dl)); put("d-open-diff", sign(dlo));
+    put("d-pfold-diff", sign(dp)); put("d-popen-diff", sign(dpo));
+    // 0건 줄은 지금과 제안이 같은 마크업이라 0이어야 한다 — 아니면 CSS가 샌 것이다.
+    put("d-zero-diff", sign(diff(zeroOld, zero)));
+
+    put("hd-fold", sign(dp)); put("hd-open", sign(dpo)); put("alt-open", sign(dpo));
+    put("p-fold-diff2", sign(dp)); put("p-open-diff2", sign(dpo));
+    put("d-total", dp == null ? "—" : sign(dp) + " (접힘) / " + sign(dpo) + " (펼침) · 다른 화면 0px");
+  }
+  // 토글은 시연용 — 실제 동작은 제품 구현에서. 여기선 「눌리는 느낌」만 준다.
+  Array.prototype.forEach.call(document.querySelectorAll(".cite-why"), function (b) {
+    b.addEventListener("click", function () {
+      var box = b.parentNode.querySelector(".cite-reasons");
+      if (!box) return;
+      var on = b.getAttribute("aria-expanded") === "true";
+      b.setAttribute("aria-expanded", on ? "false" : "true");
+      box.style.display = on ? "none" : "";
+      b.textContent = b.textContent.replace(on ? "▾" : "▸", on ? "▸" : "▾");
+      measure();
+    });
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); else measure();
+  measure();
+})();
+</script>
+</body>
+</html>

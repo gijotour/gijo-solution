@@ -1,13 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+const { gijoAsKnowledgeDocs, quickQuestions } = require('./gijo_as_knowledge_pack.js');
 
 const targetHtmlPath = path.join(__dirname, 'GIJO_Security_ERP_Suite.html');
 const copyV3Path = path.join(__dirname, 'GIJO_AS_스마트아키텍처_v3.html');
 const electronIndexPath = path.join(__dirname, 'gijo-security-erp-app', 'index.html');
 
-const template = fs.readFileSync(path.join(__dirname, 'GIJO_Security_ERP_Suite.html'), 'utf8');
+const docsJson = JSON.stringify(gijoAsKnowledgeDocs);
+const quickQuestionsJson = JSON.stringify(quickQuestions);
 
-// Write cleaner script that doesn't suffer from nested template string escaping
 const htmlContent = `<!DOCTYPE html>
 <html lang="ko" data-theme="dark">
 <head>
@@ -214,7 +215,7 @@ const htmlContent = `<!DOCTYPE html>
     /* GIJO WIKI VIEW */
     .wiki-container {
       display: grid;
-      grid-template-columns: 320px 1fr 420px;
+      grid-template-columns: 320px 1fr 440px;
       gap: 1.25rem;
       height: calc(100vh - 110px);
     }
@@ -229,7 +230,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     .sidebar-header {
-      padding: 1rem;
+      padding: 0.85rem 1rem;
       border-bottom: 1px solid var(--border-dark);
       display: flex;
       align-items: center;
@@ -247,7 +248,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     .doc-search-box {
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 0.85rem;
       border-bottom: 1px solid var(--border-dark);
     }
 
@@ -319,12 +320,16 @@ const htmlContent = `<!DOCTYPE html>
       color: #cbd5e1;
       border: none;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     .badge-cat.sec { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
     .badge-cat.manual { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
     .badge-cat.arch { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
     .badge-cat.runbook { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+    .badge-cat.vuln { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+    .badge-cat.ai { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    .badge-cat.qa { background: rgba(6, 182, 212, 0.2); color: #67e8f9; }
 
     .wiki-main-content {
       background: var(--surface-dark);
@@ -396,8 +401,9 @@ const htmlContent = `<!DOCTYPE html>
 
     .wiki-view-render { line-height: 1.7; }
     .wiki-view-render h1, .wiki-view-render h2, .wiki-view-render h3 { color: #f8fafc; margin: 1.2rem 0 0.6rem 0; font-weight: 700; }
-    .wiki-view-render h1 { font-size: 1.5rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.4rem; }
-    .wiki-view-render h2 { font-size: 1.25rem; color: #c084fc; }
+    .wiki-view-render h1 { font-size: 1.45rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.4rem; color:#60a5fa; }
+    .wiki-view-render h2 { font-size: 1.2rem; color: #c084fc; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.3rem; }
+    .wiki-view-render h3 { font-size: 1.05rem; color: #38bdf8; }
     .wiki-view-render p { margin-bottom: 0.85rem; color: #cbd5e1; }
     .wiki-view-render ul, .wiki-view-render ol { margin-left: 1.5rem; margin-bottom: 1rem; color: #cbd5e1; }
     .wiki-view-render code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; color: #38bdf8; }
@@ -443,24 +449,37 @@ const htmlContent = `<!DOCTYPE html>
       gap: 0.3rem;
     }
 
-    .llm-config-panel {
-      padding: 0.75rem 1rem;
-      background: rgba(15, 23, 42, 0.6);
+    .quick-questions-strip {
+      padding: 0.6rem 0.85rem;
+      background: rgba(15, 23, 42, 0.8);
       border-bottom: 1px solid var(--border-dark);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
     }
 
-    .llm-config-panel select, .llm-config-panel input {
-      background: #090d16;
-      border: 1px solid var(--border-dark);
-      border-radius: 6px;
-      color: #cbd5e1;
-      padding: 0.35rem 0.5rem;
-      font-size: 0.75rem;
-      outline: none;
+    .quick-chip-container {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      padding-bottom: 0.2rem;
+    }
+
+    .quick-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #93c5fd;
+      font-size: 0.72rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 16px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .quick-chip:hover {
+      background: #2563eb;
+      color: #fff;
+      border-color: #3b82f6;
     }
 
     .rag-chat-messages {
@@ -473,11 +492,11 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     .chat-bubble {
-      max-width: 92%;
-      padding: 0.75rem 0.95rem;
+      max-width: 94%;
+      padding: 0.8rem 1rem;
       border-radius: 10px;
       font-size: 0.85rem;
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
     .chat-bubble.user {
@@ -498,15 +517,20 @@ const htmlContent = `<!DOCTYPE html>
     .citation-tag {
       display: inline-flex;
       align-items: center;
-      gap: 0.25rem;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
+      gap: 0.3rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
       background: rgba(168, 85, 247, 0.2);
       border: 1px solid rgba(168, 85, 247, 0.4);
       color: #d8b4fe;
-      font-size: 0.7rem;
-      margin-top: 0.4rem;
+      font-size: 0.72rem;
+      margin-top: 0.5rem;
       cursor: pointer;
+      transition: all 0.2s;
+    }
+    .citation-tag:hover {
+      background: rgba(168, 85, 247, 0.4);
+      color: #fff;
     }
 
     .rag-input-box {
@@ -598,9 +622,7 @@ const htmlContent = `<!DOCTYPE html>
       transform-origin: center center;
     }
 
-    @keyframes dashFlow {
-      to { stroke-dashoffset: -40; }
-    }
+    @keyframes dashFlow { to { stroke-dashoffset: -40; } }
     .edgePath path { stroke: #38bdf8 !important; stroke-width: 2.5px !important; }
     .edgePath.animated path { stroke-dasharray: 6, 6; animation: dashFlow 1s linear infinite; }
 
@@ -631,7 +653,6 @@ const htmlContent = `<!DOCTYPE html>
       box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
     }
 
-    /* Modal */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
       z-index: 2000; display: none; align-items: center; justify-content: center;
@@ -659,14 +680,14 @@ const htmlContent = `<!DOCTYPE html>
           <div class="brand-title">
             GIJO WIKI <span style="font-size:0.75rem; padding:0.15rem 0.5rem; background:linear-gradient(135deg,#2563eb,#8b5cf6); border-radius:20px; color:#fff;">v5.0 Pro</span>
           </div>
-          <div class="brand-subtitle">보안 솔루션 통합 ERP & 스마트 아키텍처 스튜디오 & 로컬 LLM 위키</div>
+          <div class="brand-subtitle">보안 솔루션 통합 ERP & 스마트 아키텍처 스튜디오 & GIJO AS 학습 지식 RAG</div>
         </div>
       </div>
 
       <!-- Navigation Views -->
       <nav class="nav-tabs-group">
         <button id="tabBtn-wiki" class="nav-tab-btn wiki-tab active" onclick="switchView('wiki')">
-          <i data-lucide="book-open"></i> 📚 GIJO WIKI (내문서·로컬LLM)
+          <i data-lucide="book-open"></i> 📚 GIJO WIKI (사내지식·RAG)
         </button>
         <button id="tabBtn-studio" class="nav-tab-btn" onclick="switchView('studio')">
           <i data-lucide="cpu"></i> 🏗️ 스마트 아키텍처 Pro 스튜디오
@@ -682,13 +703,12 @@ const htmlContent = `<!DOCTYPE html>
         </button>
       </nav>
 
-      <!-- Quick Action Buttons -->
       <div class="header-actions">
         <button class="btn-action" onclick="openLlmSettingsModal()">
           <i data-lucide="settings"></i> LLM 설정
         </button>
         <button class="btn-action btn-primary-action" onclick="exportFullProjectBackup()">
-          <i data-lucide="download"></i> 프로젝트 내보내기
+          <i data-lucide="download"></i> 프로젝트 백업
         </button>
       </div>
     </div>
@@ -704,27 +724,28 @@ const htmlContent = `<!DOCTYPE html>
         <!-- Left: My Docs Vault -->
         <aside class="wiki-sidebar">
           <div class="sidebar-header">
-            <span class="sidebar-title"><i data-lucide="folder-git-2"></i> 사내 지식고 (My Docs Vault)</span>
+            <span class="sidebar-title"><i data-lucide="folder-git-2"></i> 사내 지식고 (<span id="totalDocCount">0</span>건)</span>
             <button class="btn-action" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="createNewWikiDoc()">
               <i data-lucide="plus"></i> 새 문서
             </button>
           </div>
           
           <div class="doc-search-box">
-            <input type="text" id="wikiSearchInput" class="doc-search-input" placeholder="문서 제목, 태그, 내용 검색..." oninput="filterWikiDocs()">
+            <input type="text" id="wikiSearchInput" class="doc-search-input" placeholder="GIJO AS 지식 검색 (WAF, CVE, AIBOM...)" oninput="filterWikiDocs()">
           </div>
 
           <div style="padding: 0.4rem 0.8rem; display: flex; gap: 0.3rem; overflow-x: auto; background: rgba(15,23,42,0.4); border-bottom: 1px solid var(--border-dark);">
-            <button class="badge-cat" onclick="filterByCat('ALL')">전체 (<span id="count-all">0</span>)</button>
+            <button class="badge-cat" onclick="filterByCat('ALL')">전체</button>
             <button class="badge-cat sec" onclick="filterByCat('보안규정')">보안규정</button>
-            <button class="badge-cat manual" onclick="filterByCat('솔루션매뉴얼')">솔루션매뉴얼</button>
+            <button class="badge-cat vuln" onclick="filterByCat('취약점관리')">취약점</button>
+            <button class="badge-cat ai" onclick="filterByCat('AI보안')">AI보안</button>
             <button class="badge-cat arch" onclick="filterByCat('아키텍처설계')">아키텍처</button>
-            <button class="badge-cat runbook" onclick="filterByCat('장애런북')">장애런북</button>
+            <button class="badge-cat manual" onclick="filterByCat('솔루션매뉴얼')">매뉴얼</button>
+            <button class="badge-cat qa" onclick="filterByCat('QA문답집')">QA문답</button>
+            <button class="badge-cat runbook" onclick="filterByCat('장애런북')">런북</button>
           </div>
 
-          <ul id="wikiDocList" class="doc-list">
-            <!-- Rendered by JS -->
-          </ul>
+          <ul id="wikiDocList" class="doc-list"></ul>
 
           <div style="padding: 0.6rem; border-top: 1px solid var(--border-dark); display: flex; gap: 0.4rem;">
             <button class="btn-action" style="flex:1; justify-content:center; font-size:0.75rem;" onclick="importDocsFile()">
@@ -740,7 +761,7 @@ const htmlContent = `<!DOCTYPE html>
         <article class="wiki-main-content">
           <div class="wiki-toolbar">
             <div class="wiki-breadcrumbs">
-              <span id="wikiBreadcrumbCat">보안규정</span> &gt; <b id="wikiBreadcrumbTitle">ISMS-P 인증 체계 수립 가이드</b>
+              <span id="wikiBreadcrumbCat">보안규정</span> &gt; <b id="wikiBreadcrumbTitle">문서 제목</b>
             </div>
             <div class="wiki-actions-bar">
               <button id="btnToggleEdit" class="btn-action" onclick="toggleEditMode()">
@@ -756,23 +777,23 @@ const htmlContent = `<!DOCTYPE html>
           </div>
 
           <div class="wiki-body">
-            <!-- View Mode -->
             <div id="wikiReadView" class="wiki-view-render"></div>
 
-            <!-- Edit Mode -->
             <div id="wikiEditView" class="doc-editor-view" style="display: none;">
               <input type="text" id="editDocTitle" class="doc-title-input" placeholder="문서 제목을 입력하세요">
               <div style="display:flex; gap:0.5rem;">
-                <select id="editDocCategory" class="llm-config-panel select" style="width:160px; background:#0f172a; border:1px solid var(--border-dark); border-radius:6px; color:#fff; padding:0.4rem;">
+                <select id="editDocCategory" style="width:160px; background:#0f172a; border:1px solid var(--border-dark); border-radius:6px; color:#fff; padding:0.4rem;">
                   <option value="보안규정">보안규정</option>
-                  <option value="솔루션매뉴얼">솔루션매뉴얼</option>
+                  <option value="취약점관리">취약점관리</option>
+                  <option value="AI보안">AI보안</option>
                   <option value="아키텍처설계">아키텍처설계</option>
+                  <option value="솔루션매뉴얼">솔루션매뉴얼</option>
+                  <option value="QA문답집">QA문답집</option>
                   <option value="장애런북">장애런북</option>
-                  <option value="인수인계">인수인계</option>
                 </select>
-                <input type="text" id="editDocTags" class="doc-title-input" style="flex:1; font-size:0.9rem;" placeholder="태그 (쉼표로 구분: WAF, 망분리, ISMS-P)">
+                <input type="text" id="editDocTags" class="doc-title-input" style="flex:1; font-size:0.9rem;" placeholder="태그 (쉼표 구분: WAF, 망분리, ISMS-P)">
               </div>
-              <textarea id="editDocContent" class="doc-content-textarea" placeholder="마크다운(Markdown) 문서 내용을 입력하세요..."></textarea>
+              <textarea id="editDocContent" class="doc-content-textarea" placeholder="마크다운 문서 내용을 입력하세요..."></textarea>
               <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
                 <button class="btn-action" onclick="cancelDocEdit()">취소</button>
                 <button class="btn-action btn-primary-action" onclick="saveDocEdit()">저장 완료</button>
@@ -785,42 +806,31 @@ const htmlContent = `<!DOCTYPE html>
         <aside class="wiki-rag-pane">
           <div class="rag-header">
             <div class="rag-header-title">
-              <i data-lucide="bot"></i> GIJO 온프레미스 RAG
+              <i data-lucide="bot"></i> GIJO AS 학습 RAG 어시스턴트
             </div>
             <div id="llmStatusBadge" class="llm-status-pill">
               <span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span> GB10 Engine
             </div>
           </div>
 
-          <div class="llm-config-panel">
-            <div>
-              <label style="display:block; color:var(--text-muted); margin-bottom:2px;">LLM 모델</label>
-              <select id="ragModelSelect" style="width:100%;">
-                <option value="qwen2.5-coder:latest">Qwen2.5-Coder (온프레미스)</option>
-                <option value="qwen3.8-flash:177b">GB10 177B Engine</option>
-                <option value="llama3.1:latest">Llama 3.1 8B</option>
-                <option value="local-rule-rag">내장 에어갭 오프라인 RAG</option>
-              </select>
+          <!-- Quick Questions Chips -->
+          <div class="quick-questions-strip">
+            <div style="font-size:0.7rem; color:var(--text-muted); display:flex; align-items:center; gap:0.3rem;">
+              <i data-lucide="sparkles" style="width:12px; height:12px; color:#c084fc;"></i> <b>GIJO AS 추천 질문 (클릭 시 질의)</b>
             </div>
-            <div>
-              <label style="display:block; color:var(--text-muted); margin-bottom:2px;">검색 범위 (Docs)</label>
-              <select id="ragScopeSelect" style="width:100%;">
-                <option value="all">사내 지식고 전체</option>
-                <option value="current">현재 열린 문서만</option>
-              </select>
-            </div>
+            <div id="quickChipContainer" class="quick-chip-container"></div>
           </div>
 
           <div id="ragChatMessages" class="rag-chat-messages">
             <div class="chat-bubble ai">
-              👋 안녕하세요! <b>GIJO WIKI</b> 지식 비서입니다.<br>
-              사내 등록된 보안 규정, 솔루션 매뉴얼, 아키텍처 설계를 기반으로 정확한 원문 출처(Citation)와 함께 답변을 생성합니다.<br>
-              <span style="color:#94a3b8; font-size:0.75rem;">💡 질문 예시: "망분리 환경에서 WAF 이중화 구성 방안은?", "ISMS-P 접근통제 기준 문서 요약해줘"</span>
+              👋 안녕하세요! <b>GIJO AS 학습 지식 베이스</b>가 모두 연동되었습니다.<br>
+              사내 등록된 <b>보안제품 관리 지침, CVE 취약점 대응, AIBOM 가이드, ISMS-P 망분리 규정, 고객 QA 30문 30답</b>에 대해 정확한 <b>원문 출처(Citation)</b>와 함께 답변합니다.<br>
+              <span style="color:#94a3b8; font-size:0.75rem;">💡 상단의 추천 질문 칩을 누르거나 직접 질문해 보세요!</span>
             </div>
           </div>
 
           <div class="rag-input-box">
-            <input type="text" id="ragQueryInput" class="rag-input" placeholder="사내 문서 및 아키텍처 질의 입력..." onkeydown="if(event.key==='Enter') executeRagQuery()">
+            <input type="text" id="ragQueryInput" class="rag-input" placeholder="GIJO AS 지식 질의 입력 (예: AIBOM 가이드, WAF 이중화...)" onkeydown="if(event.key==='Enter') executeRagQuery()">
             <button class="btn-action btn-primary-action" style="padding:0 0.85rem;" onclick="executeRagQuery()">
               <i data-lucide="send"></i>
             </button>
@@ -1037,46 +1047,14 @@ const htmlContent = `<!DOCTYPE html>
       flowchart: { curve: 'basis', htmlLabels: true }
     });
 
-    let currentActiveDocId = 1;
+    const defaultWikiDocs = ${docsJson};
+    const quickQuestions = ${quickQuestionsJson};
+
+    let currentActiveDocId = defaultWikiDocs[0].id;
     let isEditingMode = false;
     let canvasZoom = 1.0;
     let isTrafficFlowing = true;
     let currentFilterCat = 'ALL';
-
-    const defaultWikiDocs = [
-      {
-        id: 1,
-        title: "금융권 ISMS-P 인증기준 및 망분리 구현 지침",
-        category: "보안규정",
-        tags: ["ISMS-P", "망분리", "금융보안원", "접근통제"],
-        updatedAt: "2026-09-16",
-        content: "# 금융권 ISMS-P 인증기준 및 망분리 구현 지침\\n\\n## 1. 개요 및 목적\\n본 지침은 금융보안원 및 KISA ISMS-P 인증 기준(2.4 망분리 및 접근통제)을 준수하기 위한 사내 표준 아키텍처 및 통제 규정을 정의합니다.\\n\\n## 2. 핵심 보안 요구사항\\n1. **물리적/논리적 망분리**: 인터넷망과 사내 업무망, 데이터베이스(DB) 보안망의 트래픽을 엄격히 차단합니다.\\n2. **차세대 방화벽(NGFW) 이중화**: 주/보조 방화벽 간 Active-Standby 동기화를 유지하며 단일 장애점(SPOF)을 제거합니다.\\n3. **웹 방화벽(WAF) 필수 배치**: DMZ 웹 서버 전면에 WAF를 인라인으로 배치하여 OWASP Top 10 및 SQL Injection 공격을 1차 차단합니다.\\n4. **EDR 및 사내 에이전트 통제**: 모든 내부망 엔드포인트 단말에 EDR 및 DLP 에이전트 설치를 의무화합니다.\\n\\n## 3. 침해사고 대응 런북 연계\\n- 외부 이상 트래픽 감지 시 WAF 정책 즉시 차단 및 SIEM 알람 발행.\\n- 내부 단말 악성코드 감염 시 EDR 네트워크 격리 기능 발동."
-      },
-      {
-        id: 2,
-        title: "WAF & NGFW 하드웨어 이중화(HA) 표준 매뉴얼",
-        category: "솔루션매뉴얼",
-        tags: ["WAF", "NGFW", "HA이중화", "VRRP"],
-        updatedAt: "2026-09-15",
-        content: "# WAF & NGFW 하드웨어 이중화(HA) 표준 매뉴얼\\n\\n## 1. 장비 구성 사양\\n- **주 장비 (Active)**: Primary Appliance (포트 eth0/eth1 트래픽 인라인 인입)\\n- **보조 장비 (Standby)**: Secondary Appliance (동기화 링크 eth2 전용 케이블 직결)\\n\\n## 2. 상태 점검 및 페일오버(Failover) 절차\\n1. VRRP 헬스체크 주기는 1초로 설정 (3회 연속 응답 실패 시 3초 이내 자동 절체).\\n2. 세션 동기화(State Sync) 확인: Active 장비의 실시간 연결 테이블이 Standby 장비에 실시간 복제되는지 모니터링합니다.\\n3. 정기 점검 주기: 매월 3째주 토요일 새벽 02:00 수동 페일오버 모의훈련 실시."
-      },
-      {
-        id: 3,
-        title: "온프레미스 생성형 AI 보안존 아키텍처 설계서",
-        category: "아키텍처설계",
-        tags: ["생성형AI", "GB10", "AirGap", "DLP", "KMS"],
-        updatedAt: "2026-09-14",
-        content: "# 온프레미스 생성형 AI 보안존 아키텍처 설계서\\n\\n## 1. 아키텍처 개요\\n사내 민감정보 및 고객 데이터의 외부 유출을 원천 방지하기 위해 에어갭(Air-Gap) 기반 온프레미스 GB10 (177B) 전용 GPU 클러스터를 구축합니다.\\n\\n## 2. 다계층 방어선 (Defense in Depth)\\n- **1계층 (경계 보안)**: AI 전용 WAF 및 API Gateway를 통한 토큰 기반 인증 및 Rate Limiting.\\n- **2계층 (데이터 필터링)**: 프롬프트 인입 시 사내 DLP 엔진을 통해 주민등록번호/계좌번호 마스킹 처리.\\n- **3계층 (저장 암호화)**: 지식고 벡터 DB 및 모델 가중치 파일은 HSM/KMS 연동 AES-256 암호화 적용."
-      },
-      {
-        id: 4,
-        title: "DDoS 및 랜섬웨어 침해사고 긴급대응 런북",
-        category: "장애런북",
-        tags: ["DDoS", "랜섬웨어", "긴급대응", "SOAR"],
-        updatedAt: "2026-09-12",
-        content: "# DDoS 및 랜섬웨어 침해사고 긴급대응 런북\\n\\n## 1. 초기 인지 및 전파 (10분 이내)\\n- SIEM 알람 발생 또는 서비스 지연 감지 즉시 보안관제팀 및 인프라팀 비상 연락망 가동.\\n- 트래픽 임계치 초과 여부 확인 (평시 대비 300% 이상 인입 시 DDoS 의심).\\n\\n## 2. 긴급 조치 단계\\n1. **DDoS 대피소 전환**: DNS 레코드 CNAME을 안티DDoS 스크러빙 센터로 우회.\\n2. **EDR 단말 일괄 격리**: 랜섬웨어 확산 징후 발견 시 감염 대역 단말 네트워크 격리.\\n3. **포렌식 증거 수집**: 침해 서버 메모리 덤프 및 방화벽 세션 로그 즉시 영구보존 스토리지로 복제."
-      }
-    ];
 
     const solutionCatalog = [
       { id: "SEC-01", name: "AhnLab TrusGuard NGFW", vendor: "안랩", category: "방화벽", price: 35000000, opexRate: 0.12, ismsMapping: "2.4 망분리/접근통제" },
@@ -1171,7 +1149,7 @@ const htmlContent = `<!DOCTYPE html>
     };
 
     function loadStoredDocs() {
-      const stored = localStorage.getItem('gijo_wiki_docs');
+      const stored = localStorage.getItem('gijo_wiki_docs_v5');
       if (stored) {
         try { return JSON.parse(stored); } catch(e) { }
       }
@@ -1179,7 +1157,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     function saveDocsToStorage(docs) {
-      localStorage.setItem('gijo_wiki_docs', JSON.stringify(docs));
+      localStorage.setItem('gijo_wiki_docs_v5', JSON.stringify(docs));
     }
 
     let currentDocs = loadStoredDocs();
@@ -1206,6 +1184,21 @@ const htmlContent = `<!DOCTYPE html>
       lucide.createIcons();
     }
 
+    function renderQuickChips() {
+      const chipBox = document.getElementById('quickChipContainer');
+      chipBox.innerHTML = '';
+      quickQuestions.forEach(q => {
+        const chip = document.createElement('button');
+        chip.className = 'quick-chip';
+        chip.innerText = q;
+        chip.onclick = () => {
+          document.getElementById('ragQueryInput').value = q;
+          executeRagQuery();
+        };
+        chipBox.appendChild(chip);
+      });
+    }
+
     function renderWikiDocList() {
       const listEl = document.getElementById('wikiDocList');
       const searchVal = document.getElementById('wikiSearchInput')?.value.toLowerCase() || '';
@@ -1219,7 +1212,7 @@ const htmlContent = `<!DOCTYPE html>
         return matchesCat && matchesSearch;
       });
 
-      document.getElementById('count-all').innerText = currentDocs.length;
+      document.getElementById('totalDocCount').innerText = currentDocs.length;
 
       filtered.forEach(doc => {
         const li = document.createElement('li');
@@ -1230,6 +1223,9 @@ const htmlContent = `<!DOCTYPE html>
         if (doc.category === '솔루션매뉴얼') catClass = 'manual';
         if (doc.category === '아키텍처설계') catClass = 'arch';
         if (doc.category === '장애런북') catClass = 'runbook';
+        if (doc.category === '취약점관리') catClass = 'vuln';
+        if (doc.category === 'AI보안') catClass = 'ai';
+        if (doc.category === 'QA문답집') catClass = 'qa';
 
         li.innerHTML = '<div class="doc-item-title"><span>' + doc.title + '</span></div>' +
                        '<div class="doc-item-meta"><span class="badge-cat ' + catClass + '">' + doc.category + '</span>' +
@@ -1255,7 +1251,7 @@ const htmlContent = `<!DOCTYPE html>
 
       const renderedHtml = parseMarkdownToHtml(doc.content);
       document.getElementById('wikiReadView').innerHTML = 
-        '<div style="margin-bottom: 1rem;"><div style="display:flex; gap:0.4rem; margin-bottom:0.5rem;">' +
+        '<div style="margin-bottom: 1rem;"><div style="display:flex; gap:0.4rem; margin-bottom:0.5rem; flex-wrap:wrap;">' +
         doc.tags.map(t => '<span class="badge-cat">#' + t + '</span>').join('') +
         '</div></div>' + renderedHtml;
 
@@ -1371,10 +1367,19 @@ const htmlContent = `<!DOCTYPE html>
       currentDocs.forEach(doc => {
         let score = 0;
         searchTerms.forEach(term => {
-          if (doc.title.toLowerCase().includes(term)) score += 5;
-          if (doc.tags.some(t => t.toLowerCase().includes(term))) score += 4;
+          if (doc.title.toLowerCase().includes(term)) score += 6;
+          if (doc.tags.some(t => t.toLowerCase().includes(term))) score += 5;
           if (doc.content.toLowerCase().includes(term)) score += 2;
         });
+
+        // Special GIJO AS ontology boost
+        if (query.includes('AIBOM') && (doc.tags.includes('AIBOM') || doc.title.includes('AIBOM'))) score += 10;
+        if (query.includes('WAF') && (doc.tags.includes('WAF') || doc.title.includes('WAF'))) score += 10;
+        if (query.includes('에어갭') && (doc.tags.includes('에어갭') || doc.content.includes('에어갭'))) score += 10;
+        if (query.includes('CVE') && (doc.tags.includes('CVE') || doc.title.includes('CVE'))) score += 10;
+        if (query.includes('ISMS-P') && (doc.tags.includes('ISMS-P') || doc.title.includes('ISMS-P'))) score += 10;
+        if (query.includes('DDoS') && (doc.tags.includes('DDoS') || doc.title.includes('DDoS'))) score += 10;
+
         if (score > 0) {
           matchedDocs.push({ doc, score });
         }
@@ -1388,12 +1393,12 @@ const htmlContent = `<!DOCTYPE html>
 
         if (matchedDocs.length > 0) {
           const topDoc = matchedDocs[0].doc;
-          let summary = topDoc.content.slice(0, 200).replace(/#/g, '');
-          aiBubble.innerHTML = '<div><b>[로컬 지식 분석 결과]</b><br>' +
+          let summary = topDoc.content.slice(0, 240).replace(/#/g, '');
+          aiBubble.innerHTML = '<div><b>[GIJO AS 학습 지식 분석 결과]</b><br>' +
             '질의하신 \\'<b>' + query + '</b>\\'에 대한 사내 규정 및 아키텍처 지침입니다:<br><br>' +
             summary + '...<br></div>' +
             '<div class="citation-tag" onclick="selectWikiDoc(' + topDoc.id + ')">' +
-            '<i data-lucide="file-text" style="width:12px; height:12px;"></i> 출처: [' + topDoc.category + '] ' + topDoc.title +
+            '<i data-lucide="file-text" style="width:12px; height:12px;"></i> 근거 문서: [' + topDoc.category + '] ' + topDoc.title +
             '</div>';
         } else {
           aiBubble.innerHTML = '<div>해당 질문에 직접 일치하는 사내 문서 조각을 찾지 못했으나, 일반 보안 원칙에 따르면 <b>경계 방화벽 통제</b> 및 <b>ISMS-P 최소 권한 부여</b> 기준을 준수해야 합니다.</div>';
@@ -1409,10 +1414,12 @@ const htmlContent = `<!DOCTYPE html>
       const doc = currentDocs.find(d => d.id === currentActiveDocId);
       if (!doc) return;
 
-      if (doc.tags.includes('AI') || doc.title.includes('AI')) {
+      if (doc.tags.includes('AI') || doc.title.includes('AI') || doc.tags.includes('AIBOM')) {
         loadStudioPreset('ai');
       } else if (doc.tags.includes('공공') || doc.title.includes('공공')) {
         loadStudioPreset('public');
+      } else if (doc.tags.includes('제로트러스트') || doc.tags.includes('ZTNA')) {
+        loadStudioPreset('zerotrust');
       } else {
         loadStudioPreset('finance');
       }
@@ -1558,7 +1565,7 @@ const htmlContent = `<!DOCTYPE html>
         { code: "2.5.2", title: "암호화 적용 및 키 관리", status: "PASS", desc: "데이터베이스 AES-256 저장 암호화 및 KMS 연동" },
         { code: "2.8.1", title: "악성코드 통제 (EDR)", status: "PASS", desc: "내부 전 단말 EDR 실시간 탐지 에이전트 정책 수립" },
         { code: "2.10.1", title: "로그 기록 및 통합 관리 (SIEM)", status: "PASS", desc: "주요 장비 Syslog 및 감사로그 1년 이상 보존 설정" },
-        { code: "2.12.1", title: "신기술(생성형 AI) 보안 통제", status: "WARN", desc: "사내 온프레미스 AI 프롬프트 DLP 검증 강화 권고" }
+        { code: "2.12.1", title: "신기술(생성형 AI) 보안 통제", status: "PASS", desc: "AIBOM 3단계 검토 및 사내 온프레미스 에어갭 GB10 엔진 가동" }
       ];
 
       items.forEach(it => {
@@ -1605,7 +1612,7 @@ const htmlContent = `<!DOCTYPE html>
               currentDocs = imported;
               saveDocsToStorage(currentDocs);
               renderWikiDocList();
-              alert('✅ ' + imported.length + '개의 위키 문서가 성공적으로 로드되었습니다.');
+              alert('✅ ' + imported.length + '개의 위키 문서가 로드되었습니다.');
             }
           } catch(err) {
             alert('JSON 파일 형식이 올바르지 않습니다.');
@@ -1650,6 +1657,7 @@ const htmlContent = `<!DOCTYPE html>
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      renderQuickChips();
       renderWikiDocList();
       loadStudioPreset('finance');
       lucide.createIcons();
@@ -1664,4 +1672,4 @@ if (fs.existsSync(path.dirname(electronIndexPath))) {
   fs.writeFileSync(electronIndexPath, htmlContent, 'utf8');
 }
 
-console.log('✅ GIJO WIKI files generated successfully!');
+console.log('✅ GIJO AS Knowledge fully injected into GIJO WIKI across all targets!');

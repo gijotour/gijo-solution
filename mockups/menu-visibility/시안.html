@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 메뉴에서 안 보이는 화면 4건 (ⓐⓑⓒⓓ)</title>
+<!--
+  시안: 메뉴 가시성 4건 — mockups/menu-visibility/시안.html
+  자체완결(외부 자원 0). 스크립트는 **자기 목업의 높이만** 잰다.
+  제품 코드 0줄 수정. 색 토큰은 aihub.html·discover.html·nav.js에 있는 값 그대로(새 토큰 0).
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;
+        --muted-2:#a49d95;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;
+        --amber:#f0a020;--panel-2:#1f1e1d;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+       font-size:13px;line-height:1.55;padding:18px 22px 60px;}
+  h1{font-size:17px;font-weight:800;margin-bottom:3px;}
+  .sub{font-size:12.25px;color:var(--muted);margin-bottom:14px;}
+  h2{font-size:14px;font-weight:800;margin:22px 0 7px;padding-top:12px;border-top:1px solid var(--border);}
+  h3{font-size:12.75px;font-weight:800;margin:12px 0 5px;color:var(--blue-light);}
+  p{margin:5px 0;color:var(--muted);font-size:12.25px;}
+  b,strong{color:var(--text);font-weight:800;}
+  code{font-family:Consolas,"D2Coding",monospace;font-size:11.75px;background:var(--panel-2);
+       border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--blue-light);}
+  table{border-collapse:collapse;width:100%;margin:7px 0;font-size:11.75px;}
+  th,td{border:1px solid var(--border);padding:4px 8px;text-align:left;vertical-align:top;line-height:1.45;}
+  th{background:var(--panel-2);color:var(--muted);font-weight:700;white-space:nowrap;}
+  td.n{white-space:nowrap;}
+  .verdict{display:inline-block;font-size:11.25px;font-weight:900;border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:2px;}
+  .v-keep{background:rgba(30,185,128,.16);color:var(--teal);border:1px solid rgba(30,185,128,.4);}
+  .v-do{background:rgba(59,130,246,.16);color:var(--blue-light);border:1px solid rgba(59,130,246,.45);}
+  .v-del{background:rgba(226,72,61,.14);color:var(--red);border:1px solid rgba(226,72,61,.4);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin:9px 0;}
+  .warn{border-left:3px solid var(--amber);background:rgba(240,160,32,.07);padding:8px 11px;margin:8px 0;
+        border-radius:0 8px 8px 0;font-size:12px;color:var(--muted);}
+  .warn b{color:var(--amber);}
+  .ok{border-left:3px solid var(--teal);background:rgba(30,185,128,.06);padding:8px 11px;margin:8px 0;
+      border-radius:0 8px 8px 0;font-size:12px;color:var(--muted);}
+  .ok b{color:var(--teal);}
+  ul{margin:5px 0 5px 17px;font-size:12.25px;color:var(--muted);}
+  li{margin:2px 0;}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:900px){.cols{grid-template-columns:1fr;}}
+
+  /* ── 사이드바 목업(nav.js CSS 값 그대로 옮김 — .gn-item height:30px / font 12.5 / gap 9 / padding 0 10) ── */
+  .navmock{width:212px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:7px 6px;}
+  .gn-glabel{font-size:11.75px;font-weight:800;color:var(--muted-2);padding:5px 10px 3px;}
+  .gn-item{display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:6px;
+           font-size:12.5px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;}
+  .gn-kids .gn-item{padding-left:16px;}
+  .gn-item .gn-label{flex:1;overflow:hidden;text-overflow:ellipsis;}
+  .gn-item.new{color:var(--text);background:rgba(59,130,246,.13);box-shadow:inset 0 0 0 1px rgba(59,130,246,.4);}
+  .gn-upbadge{flex:0 0 auto;background:var(--amber,#f0a020);color:#3a2a00;font-size:11.25px;font-weight:900;
+              border-radius:20px;padding:1px 6px;}
+  .gn-ic{flex:0 0 auto;width:15px;height:15px;opacity:.7;font-size:11px;text-align:center;line-height:15px;}
+
+  /* ── 허브 한눈에 띠 목업(aihub.html CSS 값 그대로) ── */
+  .stagebox{border:1px dashed rgba(255,255,255,.16);border-radius:10px;padding:9px;}
+  .gh-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+  .gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:0;
+           min-height:132px;display:flex;flex-direction:column;overflow:hidden;}
+  .gh-head{font-size:12.75px;font-weight:800;color:var(--text);padding:7px 12px;
+           border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:6px;align-items:center;}
+  .gh-body{padding:7px 12px;}
+  .gh-row{display:flex;flex-direction:column;gap:1px;font-size:12px;color:var(--muted);padding:3px 0;}
+  .gh-row b{color:var(--text);font-size:14px;font-weight:800;}
+  .gh-badge{font-weight:800;font-size:11.5px;color:var(--amber);}
+  .gh-card.exists{box-shadow:inset 0 0 0 1px rgba(30,185,128,.45);}
+  .measure{font-size:11.5px;color:var(--muted-2);margin-top:5px;font-family:Consolas,monospace;}
+  .measure b{color:var(--teal);}
+</style>
+</head>
+<body>
+
+<h1>시안 — 「메뉴에서 안 보이는 화면」 4건</h1>
+<div class="sub">
+  mockups/menu-visibility/시안.html · 2026-09-07 · 추천 1개 원칙 · 제품 코드 0줄 수정 ·
+  근거는 전부 이 저장소 소스에서 직접 읽은 줄이다(파일:줄 병기).
+</div>
+
+<div class="warn">
+  <b>⚠ 먼저 보고할 것 — 의뢰 문항 ⓐ·ⓑ의 전제가 틀렸다.</b><br>
+  ⓐ「supervision을 AI 허브 무대에 추가」와 ⓑ「incidentcases를 허브에 추가」는 <b>이미 2026-08-20·2026-09-03에 끝난 일</b>이다.
+  둘 다 지금 <code>grouppanels.js</code> aiops 판 목록에 들어 있고, 「어디 있나」 안내까지 붙어 있다.
+  <b>맹종하지 않고 먼저 의견을 낸다</b>(CLAUDE.md 작업 규칙) — ⓐ·ⓑ는 <b>무변경</b>을 추천하고,
+  대신 그 조사에서 나온 <b>낡은 기록 2건</b>과 <b>띠 줄바꿈 1건</b>을 보고한다.
+</div>
+
+<table>
+  <tr><th style="width:34px">건</th><th style="width:150px">의뢰 문항</th><th>실제 코드 상태</th><th style="width:96px">추천</th></tr>
+  <tr>
+    <td class="n">ⓐ</td><td>supervision.html을 aihub 무대에 추가</td>
+    <td><b>이미 있다.</b> <code>grouppanels.js:791</code> <code>{ id:"safety", title:"🛡 팀 감독·안전", page:"supervision.html" }</code> ·
+        <code>nav.js:266</code> 옛 주소 <code>supervision.html → aihub.html?panel=safety</code> ·
+        <code>screenguide.ts:1712</code> 「AI 메뉴 → 🛡 팀 감독·안전 판에 있습니다」</td>
+    <td><span class="verdict v-keep">무변경</span></td>
+  </tr>
+  <tr>
+    <td class="n">ⓑ</td><td>incidentcases.html을 discover 무대에 추가</td>
+    <td><b>aihub에 이미 있다</b>(<code>grouppanels.js:826</code>, 6판 중 5번째). <code>screenguide.ts:1114</code> 주석은 <b>사실</b>이다.
+        discover에 <b>또</b> 넣지 않는다(아래 §ⓑ).</td>
+    <td><span class="verdict v-keep">무변경</span></td>
+  </tr>
+  <tr>
+    <td class="n">ⓒ</td><td>approvals.html을 사이드바 직접 항목으로 승격</td>
+    <td>지금은 <code>fix.html?panel=approvals</code> 판 카드로만 열린다(<code>nav.js:272</code> 갈아타기).
+        <b>진짜 결손은 「어디 있나」가 아니라 「몇 건이 나를 기다리나」</b> — 붙일 자리가 없어 배지가 없다.</td>
+    <td><span class="verdict v-do">1줄 추가</span></td>
+  </tr>
+  <tr>
+    <td class="n">ⓓ</td><td>merge.html 삭제</td>
+    <td>2026-08-08 메뉴에서 내려간 고아. 소스 참조 <b>16곳</b> + 서버 엔진·API·시험까지 살아 있다.
+        API 소비자는 merge.html <b>하나뿐</b>이다.</td>
+    <td><span class="verdict v-del">전부 삭제</span></td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>ⓐ AI 팀 감독 — <span class="verdict v-keep">무변경</span> (이미 되어 있다)</h2>
+
+<div class="cols">
+  <div>
+    <p>의뢰문의 「agent·memory·learnloop·redteam 옆」이라는 표현은 <b>낡은 주석에서 온 것</b>이다 —
+      <code>server/test/wiringcontract.test.ts:52</code>가 aihub 무대를 그 넷으로 적고 있는데,
+      <b>실제 판은 6개</b>이고 <code>redteam</code>은 판이 아니다(<code>nav.js:264</code>에서
+      <code>redteam.html → aihub.html?panel=safety</code>로 <b>safety에 흡수</b>됐다).</p>
+    <div class="ok"><b>✅ 지금 aiops 판 6종</b>(<code>grouppanels.js:676~862</code>) —
+      🤖 AI 팀(agent) · 📚 지식(memory) · 🎓 학습(learnloop) · <b>🛡 팀 감독·안전(supervision)</b> ·
+      <b>📚 침해사고 히스토리(incidentcases)</b> · 🗒 작업 기록(audit)</div>
+    <div class="warn"><b>발견 1 — 낡은 기록(수리 대상, 이 사슬 밖).</b>
+      <code>wiringcontract.test.ts:48</code>「discover 무대는 analysis·threat·<b>inventory</b>」도 낡았다:
+      inventory는 2026-08-18 승인 시안으로 <b>⓪ 자산 고르기로 이사</b>했고 discover 판은 <b>2개</b>다
+      (<code>grouppanels.js:104~197</code>, <code>discover.html</code> 본문 주석도 그렇게 적고 있다).
+      둘 다 <b>「제외」 사유 문자열</b>이라 시험이 강제하지 않는다 — 그래서 조용히 썩었다.</div>
+  </div>
+  <div>
+    <div class="stagebox">
+      <div style="font-size:11.5px;color:var(--muted-2);margin-bottom:7px;">AI 허브 한눈에 띠 — <b style="color:var(--teal)">초록 테두리 = 이미 있는 판</b></div>
+      <div class="gh-strip" id="stripAi">
+        <div class="gh-card"><div class="gh-head"><span>🤖 AI 팀</span></div><div class="gh-body"><div class="gh-row"><span>팀원</span><b>6명</b></div></div></div>
+        <div class="gh-card"><div class="gh-head"><span>📚 지식</span></div><div class="gh-body"><div class="gh-row"><span>올린 문서</span><b>115</b></div></div></div>
+        <div class="gh-card"><div class="gh-head"><span>🎓 학습</span></div><div class="gh-body"><div class="gh-row"><span>승인</span><b>40</b></div></div></div>
+        <div class="gh-card exists"><div class="gh-head"><span>🛡 팀 감독·안전</span></div><div class="gh-body"><div class="gh-row"><span>팀·감독(오늘)</span><b>6명</b></div></div></div>
+        <div class="gh-card exists"><div class="gh-head"><span>📚 침해사고 히스토리</span></div><div class="gh-body"><div class="gh-row"><span>등록된 사례</span><b>—건</b></div></div></div>
+        <div class="gh-card"><div class="gh-head"><span>🗒 작업 기록</span></div><div class="gh-body"><div class="gh-row"><span>오늘</span><b>—</b></div></div></div>
+      </div>
+      <div class="measure" id="mAi">재는 중…</div>
+    </div>
+  </div>
+</div>
+
+<div class="warn"><b>발견 2 — 띠가 기본 창에서 2줄이 된다(실물 확인 필요).</b>
+  <code>.gh-strip</code>은 <code>repeat(auto-fit,minmax(200px,1fr))</code>·<code>gap:10px</code>이라
+  <b>6칸이 한 줄에 서려면 6×200+5×10 = 1250px</b>가 든다. 무대 폭은 <code>1440 − 사이드바 212 − main padding 36 = 1192px</code>
+  (<code>aihub.html</code> <code>.app{grid-template-columns:212px 1fr}</code> · <code>.main{padding:14px 18px 0}</code>)라
+  <b>1250에 58px 모자라 5+1로 접힌다</b> → 띠 높이 <b>132 → 274px</b>(132×2+10), 무대가 142px 줄어든다.
+  <b>이 숫자는 목업 계산이다 — 제품 창에서 다시 잰다.</b> 판을 더 늘리자는 제안(ⓑ)을 왜 거절하는지의 근거이기도 하다.</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>ⓑ 침해사고 히스토리 — <span class="verdict v-keep">무변경</span> (「이미 있으니 안내만」도 이미 있다)</h2>
+
+<p><b>screenguide.ts:1114 주석은 사실이다.</b> 코드로 확정했다:</p>
+<table>
+  <tr><th style="width:210px">확인처</th><th>실제 내용</th></tr>
+  <tr><td class="n"><code>grouppanels.js:826</code></td><td><code>{ id:"incidentcases", title:"📚 침해사고 히스토리", page:"incidentcases.html", agents:["해설"] }</code> — aiops 5번째 판</td></tr>
+  <tr><td class="n"><code>aihub.html</code> 본문 주석</td><td>「📚 침해사고 히스토리 판이 <b>5번째로 들어와</b> 넷 고정이면 다섯째 카드가 혼자 둘째 줄에 선다」 — 그래서 <code>repeat(4,1fr)</code>을 걷었다</td></tr>
+  <tr><td class="n"><code>agents.ts:113</code></td><td>「📚 침해사고 히스토리는 메뉴 항목이 아니라 <b>카드로 여는 화면</b>이다」 — normaltic의 맡은 메뉴 칩을 비운 까닭</td></tr>
+  <tr><td class="n"><code>screenguide.ts:1715</code></td><td>「AI 메뉴 → 📚 침해사고 히스토리 판에 있습니다(… <b>따로 메뉴 항목은 없습니다</b>)」 — 안내 이미 있음</td></tr>
+  <tr><td class="n">여는 통로 4개</td><td><code>agent.html:359</code> 해설 팀원 카드 「📚 히스토리」 · <code>vulnscan.html:700</code>·<code>console.js:829</code> 「📚 비슷한 사례」 칩(<code>?cve=</code>) · aihub 판 카드 · <code>screenguide.ts:1546~1549</code> 화면별칭 4개</td></tr>
+</table>
+
+<h3>왜 discover에 <b>또</b> 넣지 않나 — 3가지</h3>
+<ul>
+  <li><b>같은 것을 두 곳에 적으면 어긋난다.</b> 판을 두 허브에 두면 같은 <code>GET /api/incident-cases</code>를 두 번 세게 되고,
+      상한(500)·<code>total</code> 규칙(<code>grouppanels.js:846~852</code>)이 한쪽만 고쳐지는 날 두 화면이 다른 숫자를 말한다.
+      이 저장소가 반복해 겪은 부류다.</li>
+  <li><b>축이 다르다.</b> discover(① 발견·수집)는 <b>우리 환경에서 지금 뭐가 나왔나</b>의 축이고,
+      히스토리는 <b>남에게 있었던 일</b>이다. 「사례 등록」은 해설 팀원(AI 팀)의 일이라 aiops가 제자리다.</li>
+  <li><b>띠가 이미 꽉 찼다</b>(위 발견 2). discover는 판 2개라 여유가 있어 보이지만, 넣는 순간
+      <code>wiringcontract.test.ts:48</code>의 무대 목록·<code>screenguide.ts:1715</code>의 「따로 메뉴 항목은 없습니다」·
+      <code>agents.ts:113</code> 주석 <b>셋을 동시에</b> 고쳐야 한다. 얻는 것 없이 계약만 늘어난다.</li>
+</ul>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>ⓒ 결재판(조치·승인) — <span class="verdict v-do">추천안: 사이드바 1줄 + 배지</span></h2>
+
+<div class="cols">
+  <div>
+    <h3>① 왜 이 안인가</h3>
+    <p><b>「어디 있나」는 이미 답이 있다</b>(<code>screenguide.ts:1724</code>「③ 조치 → ✅ 조치·승인 판에 있습니다」).
+      그래서 <b>승격의 값어치는 「길」이 아니라 「배지」</b>다.</p>
+    <p><code>nav.js:679</code>가 이미 그 논리를 적어 뒀다 — 기한 초과 배지를 대시보드로 옮기며
+      「<b>붙일 자리가 사라지면 늦은 건수를 알릴 곳이 없어져 조용히 묻힌다</b>」.
+      결재판이 정확히 그 상태다: <b>쓰기 지시는 항상 결재판을 거치는데</b>(<code>grouppanels.js:815</code>),
+      몇 건이 대기 중인지는 <b>③ 조치를 열어 봐야만</b> 안다.</p>
+    <div class="ok"><b>새 기구가 0이다.</b> 배지 3종(<code>gn-sessbadge</code>·<code>gn-workbadge</code>·<code>gn-docbadge</code>)이
+      이미 <code>nav.js:584</code> 한 CSS를 공유하고, 갱신 함수도 같은 꼴이다(<code>nav.js:1520~1563</code>).
+      네 번째를 같은 틀로 얹는다 — <b>새 색 토큰 0 · 새 부품 0</b>.</div>
+    <div class="ok"><b>주소도 새 규약이 아니다.</b> ④ 보안제품 관리 그룹이 이미
+      <code>verify.html?panel=hardening</code>·<code>fix.html?panel=maintenance</code> <b>두 개</b>를
+      「판을 가리키는 사이드바 항목」으로 쓰고 있다(<code>nav.js:191~192</code>). 같은 꼴을 쓴다.</div>
+    <div class="warn"><b>⚠ 반드시 <code>fix.html?panel=approvals</code>로 적는다.</b>
+      <code>approvals.html</code>이라고 적으면 갈아타기 표(<code>nav.js:272</code>)가 <b>오류 없이</b> 같은 곳으로 돌리지만,
+      「메뉴 항목의 주소」와 「갈아타기 출발지」가 같은 문자열이 되어 <b>표를 지우는 날 메뉴가 조용히 깨진다</b>.
+      <code>inventory.html?full=1</code> 주석(<code>nav.js:183~187</code>)이 겪은 그 함정이다.</div>
+
+    <h3>② 무엇을 포기했나</h3>
+    <ul>
+      <li><b>TOP 고정줄 승격을 포기.</b> 거기 두면 대시보드의 <code>gn-workbadge</code>(기한 초과)와
+        <b>비슷한 뜻의 빨간 숫자 2개</b>가 나란히 서서 담당자가 무엇을 먼저 볼지 잃는다.</li>
+      <li><b>「열린 건수」를 포기하고 「미배정 건수」를 골랐다.</b> 아래 ③ 참조.</li>
+      <li><b>판 카드 제거를 포기.</b> ③ 조치 허브의 ✅ 조치·승인 판은 그대로 둔다 —
+        「카드가 곧 메뉴」 계약(카드 11종·dock 5곳)을 깨지 않는다. 사이드바 줄은 <b>지름길</b>이지 대체가 아니다.</li>
+    </ul>
+  </div>
+  <div>
+    <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11.5px;color:var(--muted-2);margin-bottom:5px;">지금 (7줄)</div>
+        <div class="navmock" id="navBefore">
+          <div class="gn-glabel">③ 🩹 취약점 업무</div>
+          <div class="gn-kids">
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">⓪ 자산 고르기</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">① 발견·수집</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">② 우선순위</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">③ 조치</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">④ 검증</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">⑤ 보고</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">보안 로그 파일 분석</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11.5px;color:var(--muted-2);margin-bottom:5px;">추천안 (8줄)</div>
+        <div class="navmock" id="navAfter">
+          <div class="gn-glabel">③ 🩹 취약점 업무</div>
+          <div class="gn-kids">
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">⓪ 자산 고르기</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">① 발견·수집</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">② 우선순위</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">③ 조치</span></div>
+            <div class="gn-item new"><span class="gn-ic">✅</span><span class="gn-label">조치·승인 (결재판)</span><span class="gn-upbadge">7</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">④ 검증</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">⑤ 보고</span></div>
+            <div class="gn-item"><span class="gn-ic">◎</span><span class="gn-label">보안 로그 파일 분석</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="measure" id="mNav">재는 중…</div>
+    <p style="margin-top:8px"><b>자리</b> — 「③ 조치」 <b>바로 아래</b>. 절차 번호를 안 붙인다(⓪①②③④⑤는 단계 축이고 이건 그 안의 판이다).
+      라벨은 판 제목 <b>「조치·승인」</b>과 글자를 맞추고 <code>(결재판)</code>만 덧붙인다 —
+      단계 이름 글자 불일치가 챗봇 오안내를 낳은 2026-08-05 실사고(<code>nav.js:174~176</code>)의 교훈.</p>
+  </div>
+</div>
+
+<h3>③ 배지에 무슨 숫자를 넣나 — <b>「미배정 N」</b> (새 잣대를 만들지 않는다)</h3>
+<table>
+  <tr><th style="width:120px">후보</th><th style="width:200px">원천</th><th>판단</th></tr>
+  <tr><td class="n">미배정 N</td><td><code>grouppanels.js:339</code> <code>미배정인가()</code> 헬퍼 → <code>badge:{text:"미배정 "+n}</code></td>
+      <td><b>✅ 채택.</b> ③ 조치 허브의 ✅ 판 배지와 <b>같은 헬퍼·같은 수</b>다 — 사이드바와 카드가 어긋날 여지가 0.
+          「나를 기다리는 것」이라는 뜻도 맞다.</td></tr>
+  <tr><td class="n">pending N</td><td><code>approvals.ts:314</code> ApprovalSummary.pending</td>
+      <td>❌ 늘 크다(검토 대기는 상시 수십~수백). <code>nav.js:676~678</code>「남은 건수는 늘 많아서 보고도 안 움직인다」.</td></tr>
+  <tr><td class="n">overdue N</td><td><code>approvals.ts:332</code> overdue</td>
+      <td>❌ <b>대시보드 <code>gn-workbadge</code>가 이미 세고 있다</b>(<code>nav.js:1540</code> <code>myWork().counts.overdue</code>) — 3중화가 된다.</td></tr>
+</table>
+<div class="ok"><b>기존 3종과 같은 규약을 그대로 따른다</b>(<code>nav.js:1524~1531</code>): <b>0이면 감춘다</b>(<code>display:none</code>) ·
+  <b>99 넘으면 <code>99+</code></b> · <b><code>aria-label</code>로 말도 남긴다</b>(「담당자가 정해지지 않은 조치 N건」) ·
+  <b>실패하면 조용히 넘어간다</b>(배지가 없다고 메뉴가 망가지진 않는다). 색은 <code>--amber</code> 기본값 그대로 —
+  빨강(<code>--red</code>)은 대시보드 「늦음」이 이미 쓰고 있어 뜻이 갈린다.</div>
+
+<h3>④ 「사라지는 조작」 자가점검</h3>
+<div class="ok"><b>사라지지 않는다.</b> 이 줄은 <b>보기용 지름길</b>이고 입력칸이 0이다.
+  승인·반려·담당 배정은 종전대로 <b>대화창 지시 → 결재판</b>에서만 일어난다(메뉴는 보기용 · 지시는 대화창).
+  판 카드도 그대로 있어 「카드가 곧 메뉴」 계약이 유지된다 — <b>없어지는 길이 하나도 없다.</b></div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>ⓓ merge.html — <span class="verdict v-del">추천안: 화면·엔진·API·시험 전부 삭제</span></h2>
+
+<h3>왜 「API는 남기고 화면만」이 아닌가 — 소비자가 0이 되기 때문</h3>
+<p>API는 <code>GET /api/merge/preflight</code>·<code>POST /api/merge/plan</code> 둘뿐이고(<code>merge.ts:164·168</code>),
+  그 소비자는 <code>preload.ts:372~373</code> → <code>llm-engine.ts:265 mergeApi</code> → <b><code>merge.html</code> 하나</b>다.
+  에이전트 도구(<code>agenttools/registry.ts</code>·<code>handlers.ts</code>)·대화창·다른 화면 어디에도 호출이 없다(전수 grep 0건).
+  <b>화면만 지우면 아무도 안 부르는 인증 딸린 창구 2개가 서버에 남는다</b> — 보안 경계에 쓸모없는 문이 늘어난다.</p>
+<div class="warn"><b>⚠ <code>modeldex.ts</code>는 지우지 않는다.</b> <code>merge.ts:17</code>이 <code>SECURITY_LLM_DEX</code>를 <b>가져다 쓸 뿐</b>이고,
+  modeldex 자신은 <code>/api/modeldex</code>(<code>assets.ts:317</code>)·<code>agentroster.test.ts</code>·<code>modeldex.test.ts</code>의 것이다.
+  <b>다만</b> modeldex의 <code>synthesisGroups</code>(합성 그룹)는 merge가 사라지면 <b>뜻만 남고 쓰임이 옅어진다</b> —
+  <code>/api/modeldex</code>의 <code>groups</code> 응답이 아직 쓰는지 별도 확인이 필요하다(미결 ②).</div>
+
+<h3>참조 전수 — 소스 16곳 (빌드 산출물 <code>*/dist/*</code>·<code>release*/</code> 제외)</h3>
+<table>
+  <tr><th style="width:34px">#</th><th style="width:300px">자리</th><th style="width:80px">처분</th><th>내용·주의</th></tr>
+  <tr><td class="n">1</td><td><code>client/src/renderer/pages/merge.html</code></td><td class="n">삭제</td><td>255줄 / 18,509B</td></tr>
+  <tr><td class="n">2</td><td><code>server/src/engine/merge.ts</code></td><td class="n">삭제</td><td><code>planMerge</code>·<code>buildMergeConfig</code>·<code>mergedModelId</code>·<code>mergePreflight</code>·<code>registerMergeRoutes</code></td></tr>
+  <tr><td class="n">3</td><td><code>server/src/app.ts:23</code> + 호출부</td><td class="n">삭제</td><td><code>import { registerMergeRoutes } from "./engine/merge"</code> — <b>import와 호출 두 줄</b>을 함께</td></tr>
+  <tr><td class="n">4</td><td><code>client/src/api/llm-engine.ts:247·265</code></td><td class="n">삭제</td><td><code>interface MergePlan</code> · <code>export const mergeApi</code></td></tr>
+  <tr><td class="n">5</td><td><code>client/src/preload.ts:372~373</code></td><td class="n">삭제</td><td><code>planMerge</code>·<code>mergePreflight</code> — <code>clientglobals.test</code>가 preload 표면을 보는지 확인</td></tr>
+  <tr><td class="n">6</td><td><code>server/test/merge.test.ts</code></td><td class="n">삭제</td><td>시험 5개(전체 파일)</td></tr>
+  <tr><td class="n">7</td><td><code>server/src/engine/screencontext.ts:75</code></td><td class="n">삭제</td><td><code>"merge.html": { label:"LLM 합성", domain:"모델 병합" }</code></td></tr>
+  <tr><td class="n">8</td><td><code>server/src/engine/screenguide.ts:1139~1155</code></td><td class="n">삭제</td><td><code>GUIDES["merge.html"]</code> — <b>저장소 유일의 <code>retired:true</code></b>(9번 참조)</td></tr>
+  <tr><td class="n">9</td><td><code>server/src/engine/screenguide.ts:1675</code></td><td class="n"><b>남긴다</b></td><td>「…merge.html 실측」 <b>주석</b>. <code>화면위치안내()</code>의 <code>g.retired</code> 분기가 <b>왜</b> 생겼는지의 유일한 기록이다.
+      <b>⚠ 분기 자체를 지우지 말 것</b> — 8번이 사라지면 <code>retired:true</code>가 0건이 되어 「죽은 코드」로 보이지만,
+      다음에 화면을 내릴 때 <b>같은 사고를 되풀이한다</b>(「메뉴에서 내려갔다」와 「사이드바에서 찾으세요」가 한 답에 같이 나온 그 사고).</td></tr>
+  <tr><td class="n">10</td><td><code>server/test/wiringcontract.test.ts:65</code></td><td class="n">삭제</td><td><code>"merge.html": ["제외","관리자 도구(모델 합성)"]</code> — 화면 대장에서 뺀다</td></tr>
+  <tr><td class="n">11</td><td><code>tools/publish-gate-ui.mjs:1445</code></td><td class="n">삭제</td><td><code>"merge.html": "LLM 합성(관리 전용·메뉴 밖)"</code> — 얕은 렌더 <b>제외 사유표</b>. 안 지우면 없는 화면을 제외하는 항목이 남는다</td></tr>
+  <tr><td class="n">12</td><td><code>tools/gen-screenshots.mjs:277</code></td><td class="n">삭제</td><td>「18-LLM합성(merge.html)은 뺐다(2026-08-19)」 제외 주석·항목</td></tr>
+  <tr><td class="n">13</td><td><code>client/src/renderer/pages/nav.js:1375</code></td><td class="n">수정</td><td>주석의 화면 열거에 <code>merge</code>가 들어 있다 — 이름만 뺀다</td></tr>
+  <tr><td class="n">14</td><td><code>GIJO_AS_LLM_합성_안내.md</code> (1,181B)</td><td class="n">사장님</td><td><b>고객용 안내 문서</b>. 지울지 「내렸음」으로 남길지는 문서 정책이라 <b>내가 정하지 않는다</b>(미결 ③).
+      <code>docs-manifest.json</code> 등재 여부·RAG 반입 여부를 먼저 확인해야 한다 — 반입돼 있으면 지워도 <b>지식에는 남아</b> 챗봇이 계속 안내한다</td></tr>
+  <tr><td class="n">15</td><td><code>tools/review-2026-09-01/결과/*.json</code> (5곳)</td><td class="n"><b>손대지 않음</b></td><td>과거 검토 <b>기록물</b>이다. 사실을 사후에 고치면 기록이 아니게 된다</td></tr>
+  <tr><td class="n">16</td><td><code>client/src/renderer/pages/lite-screens.json</code></td><td class="n">해당 없음</td><td>grep <b>0건</b> — 라이트에는 원래 없다</td></tr>
+</table>
+
+<div class="warn"><b>⚠ 삭제 순서가 중요하다.</b> 화면(1)만 먼저 지우면 <code>publish-gate-ui.mjs</code>(11)의
+  「전 화면 얕은 렌더 — 제외 N개는 사유 명시」가 <b>없는 파일을 제외하는 상태</b>가 되어 관문이 어떻게 반응할지 모른다.
+  <b>7·10·11·12(대장·제외표)를 같은 커밋에서 함께</b> 지운다.</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>③ 밀도 숫자</h2>
+<div class="warn"><b>⚠ 아래 px는 전부 「목업에서 잰 값」이다 — 설치본을 열 수 없으므로 제품 화면에서 다시 잰다.</b>
+  다만 <b>목업의 CSS는 제품 소스에서 그대로 옮겨 왔다</b>(아래 근거 열) — 값이 어긋나면 그건 목업이 아니라
+  제품 쪽에 다른 규칙(부모 폰트·zoom 등)이 걸려 있다는 뜻이니 그 자체가 소득이다.</div>
+<table>
+  <tr><th style="width:190px">무엇</th><th style="width:230px">소스 CSS 근거</th><th style="width:170px">목업 실측</th><th>증감</th></tr>
+  <tr><td>사이드바 한 줄</td>
+      <td><code>nav.js:568</code> <code>.gn-item{height:30px;padding:0 10px;font-size:12.5px;gap:9px}</code><br><code>nav.js:546</code> <code>.gn-kids .gn-item{padding-left:16px}</code></td>
+      <td id="dRow">—</td><td>기준값 (변경 0)</td></tr>
+  <tr><td>③ 취약점 업무 그룹</td><td>항목 7개 × 30px (+ 그룹 머리)</td>
+      <td id="dGroup">—</td><td id="dGroupDelta">—</td></tr>
+  <tr><td>배지</td><td><code>nav.js:584</code> <code>.gn-upbadge{font-size:11.25px;padding:1px 6px;border-radius:20px}</code></td>
+      <td id="dBadge">—</td><td>줄 높이 30px <b>안</b>에 들어간다 → <b>세로 증가 0</b></td></tr>
+  <tr><td>허브 띠 한 칸</td>
+      <td><code>aihub.html</code> <code>.gh-card{min-height:132px}</code> · <code>.gh-strip{gap:10px; auto-fit minmax(200px,1fr)}</code></td>
+      <td id="dCard">—</td><td>변경 0 (ⓐⓑ 무변경)</td></tr>
+  <tr><td>AI 허브 띠 (판 6개)</td><td>6칸 한 줄 = 6×200+5×10 = <b>1250px</b> 필요</td>
+      <td id="dStrip">—</td><td>무대 1192px 추정 → <b>2줄(274px)</b> · 발견 2</td></tr>
+</table>
+
+<h2>④ 제품 원칙 자가점검</h2>
+<table>
+  <tr><th style="width:210px">원칙</th><th style="width:60px">판정</th><th>근거</th></tr>
+  <tr><td>메뉴는 보기용(입력칸 금지)</td><td class="n">✅</td><td>ⓒ가 더하는 것은 <b>줄 1개 + 숫자 1개</b>. 입력칸 0.</td></tr>
+  <tr><td>지시는 대화창</td><td class="n">✅</td><td>승인·반려·배정은 종전대로 대화창 → 결재판. 사이드바에서 하는 일은 <b>여는 것뿐</b>.</td></tr>
+  <tr><td>카드가 곧 메뉴 (카드 11종·dock 5곳)</td><td class="n">✅</td><td>판 카드를 <b>하나도 안 뺀다</b>. ⓒ는 지름길을 <b>더하기</b>만 하고, 선례가 이미 2개(<code>nav.js:191~192</code>).</td></tr>
+  <tr><td>화면 설명은 screenguide + ⓘ</td><td class="n">✅</td><td>ⓒ 구현 시 <code>screenguide.ts:1724</code> 「③ 조치 → ✅ 조치·승인 판에 있습니다」에
+      <b>「③ 취약점 업무 › 조치·승인으로도 바로 열 수 있습니다」 한 구절만</b> 덧댄다. 화면에 설명을 깔지 않는다.</td></tr>
+  <tr><td>엑셀처럼 촘촘</td><td class="n">✅</td><td>새 여백·새 폰트 크기 0. 기존 <code>.gn-item</code> 30px 줄을 그대로 쓴다.</td></tr>
+  <tr><td>새 색 토큰 금지</td><td class="n">✅</td><td>배지는 <code>--amber</code> 기본값(<code>nav.js:584</code>) 그대로. <b>인라인 색 지정도 안 한다</b>
+      (대시보드 배지가 <code>--red</code>를 인라인으로 덮어쓰는 것과 달리, 이건 기본값이 맞다).</td></tr>
+  <tr><td>라이트 = 프로 부분집합</td><td class="n">✅</td><td><code>lite-screens.json</code>에 approvals·merge·supervision·incidentcases <b>전부 0건</b> — 라이트 영향 없음(§⑦).</td></tr>
+</table>
+
+<h2>⑤ 구현 때 만질 자리 (승인 뒤 설계관 → 구현)</h2>
+<table>
+  <tr><th style="width:34px">건</th><th style="width:280px">파일 · 함수/자리</th><th>무엇</th></tr>
+  <tr><td class="n">ⓒ</td><td><code>client/src/renderer/pages/nav.js</code> — <code>GROUPS</code> <code>id:"vulnwork"</code> items (:168~178)</td>
+      <td><code>{ page:"fix.html?panel=approvals", label:"조치·승인 (결재판)" }</code>을 <code>③ 조치</code> 다음에 삽입</td></tr>
+  <tr><td class="n">ⓒ</td><td><code>nav.js</code> — 배지 부착부 (:668~712 <code>넣기()</code> 안)</td>
+      <td><code>if (it.page === "fix.html?panel=approvals")</code> → <code>span.gn-upbadge gn-apvbadge</code> 추가(<code>display:none</code> 시작)</td></tr>
+  <tr><td class="n">ⓒ</td><td><code>nav.js</code> — <code>refreshApvBadge()</code> 신설 (:1520~1563 세 함수 옆)</td>
+      <td><code>window.gijo.listApprovals()</code> → <code>미배정인가()</code>와 <b>같은 판정</b>으로 셈 · 0이면 감춤 · 99+ · aria-label · catch 무시.
+          <b>⚠ 판정을 새로 쓰지 말고 <code>grouppanels.js</code>의 헬퍼를 공용으로 올릴지 설계관에 묻는다</b></td></tr>
+  <tr><td class="n">ⓒ</td><td><code>nav.js</code> — 새로고침 호출부(기존 3개 부르는 자리)</td><td>네 번째 호출 추가</td></tr>
+  <tr><td class="n">ⓒ</td><td><code>server/src/engine/screenguide.ts:1724</code> 흡수자리</td><td>「…판에 있습니다」에 사이드바 지름길 한 구절 덧댐 (셸 중립 문구 — 「사이드바」 낱말은 <code>proguidewording</code>이 잡는다)</td></tr>
+  <tr><td class="n">ⓓ</td><td>위 §ⓓ 표 1~13 (14·15·16은 손대지 않거나 사장님 결정)</td><td>한 커밋으로 묶는다</td></tr>
+  <tr><td class="n">발견1</td><td><code>server/test/wiringcontract.test.ts:48·52</code></td><td>「제외」 사유 문자열의 낡은 무대 목록 정정(discover 2판 · aihub 6판) — <b>별도 작은 커밋</b></td></tr>
+</table>
+
+<h2>⑥ 짝 시험 제안</h2>
+<table>
+  <tr><th style="width:34px">건</th><th style="width:250px">시험</th><th>무엇을 막나</th></tr>
+  <tr><td class="n">ⓒ</td><td><code>clientglobals.test</code> 확장 — <code>nav.js</code>에 <code>fix.html?panel=approvals</code> 문자열이 있고 배지 부착 <code>if</code>의 문자열과 <b>한 글자까지 같다</b></td>
+      <td>주소만 바꾸고 배지 부착점을 안 고쳐 <b>어디에도 안 붙는 죽은 배지</b>가 되는 것(<code>nav.js:669</code>가 실제로 겪은 사고)</td></tr>
+  <tr><td class="n">ⓒ</td><td>배지 <b>생산자↔소비자 짝</b> 시험 — <code>listApprovals</code>가 preload에 있고 <code>refreshApvBadge</code>가 그것만 쓴다</td>
+      <td>「소비자만 있고 생산자 없는 값」(이 저장소 반복 결함)</td></tr>
+  <tr><td class="n">ⓒ</td><td><code>screenguidefix.test</code> 계열 — 안내 문구에 <b>「사이드바」 낱말이 없다</b></td><td>프로 셸에 없는 물건을 안내하는 거짓말</td></tr>
+  <tr><td class="n">ⓓ</td><td><b>merge 잔재 0건</b> 소스 감시 — <code>client/src</code>·<code>server/src</code>·<code>server/test</code>·<code>tools</code>에 <code>merge.html</code>·<code>/api/merge</code> grep 0
+      (예외: <code>screenguide.ts</code> 교훈 주석 1줄만 허용, 사유 명시)</td>
+      <td><b>반쪽 삭제</b> — 이 저장소가 반복해 겪은 「고쳤다가 거짓」 부류. 세 번째면 소스 감시 원칙</td></tr>
+  <tr><td class="n">ⓓ</td><td><code>publish-gate-ui.mjs</code> 제외표 ↔ 실제 파일 존재 대조</td><td>없는 화면을 제외하는 유령 항목</td></tr>
+  <tr><td class="n">발견1</td><td>허브 무대 목록 주석 ↔ <code>grouppanels.js</code> 실제 판 <b>기계 대조</b>(사유 문자열도 검사 대상으로)</td>
+      <td>「제외」 사유가 강제되지 않아 <b>조용히 썩는 것</b> — 이번에 2건이 그렇게 썩어 있었다</td></tr>
+</table>
+
+<h2>⑦ 라이트 / 표준 영향</h2>
+<table>
+  <tr><th style="width:70px">에디션</th><th style="width:60px">영향</th><th>근거</th></tr>
+  <tr><td class="n">라이트</td><td class="n"><b>없음</b></td>
+      <td><code>lite-screens.json</code>에 <code>approvals</code>·<code>merge</code>·<code>supervision</code>·<code>incidentcases</code> <b>전부 grep 0건</b>.
+          라이트 메뉴는 <code>lite-app.html</code>·<code>lite-screens.json</code>이 따로 정하고 <code>nav.js</code> <code>GROUPS</code>를 안 쓴다.
+          <b>⚠ 단, <code>nav.js</code>는 공용 파일</b>이므로 구현 뒤 라이트 화면 9종에서 메뉴가 그대로인지 <b>눈으로 한 번</b> 본다(뿌리가 공용이면 win이 고친다).</td></tr>
+  <tr><td class="n">표준</td><td class="n"><b>그대로 반영</b></td>
+      <td>표준·프로가 같은 <code>nav.js</code>를 쓴다. ⓒ는 프로에서 <b>dock 목록에도</b> 같은 항목이 필요한지 설계관에 확인(미결 ④).</td></tr>
+  <tr><td class="n">프로</td><td class="n"><b>기준</b></td>
+      <td>프로가 개발 기준(2026-08-19). ⓒ의 값어치(배지)는 프로에서도 그대로 — 다만 프로 셸은 카드가 메뉴라
+          <b>사이드바 줄이 프로에서 어떤 꼴로 나타나는지</b>가 승인 전 확인 대상이다(미결 ④).</td></tr>
+</table>
+
+<script>
+// 자기 목업의 높이만 잰다(제품을 열지 않는다 — 아래 숫자는 「이 파일 안에서 잰 값」이다).
+(function () {
+  "use strict";
+  function h(el) { return el ? Math.round(el.getBoundingClientRect().height) : 0; }
+  function w(el) { return el ? Math.round(el.getBoundingClientRect().width) : 0; }
+  function set(id, txt) { var e = document.getElementById(id); if (e) e.textContent = txt; }
+
+  var row  = document.querySelector("#navBefore .gn-item");
+  var before = document.getElementById("navBefore");
+  var after  = document.getElementById("navAfter");
+  var badge = document.querySelector("#navAfter .gn-upbadge");
+  var card  = document.querySelector("#stripAi .gh-card");
+  var strip = document.getElementById("stripAi");
+
+  var rowH = h(row), bH = h(before), aH = h(after);
+  set("dRow", rowH + "px (한 줄)");
+  set("dGroup", "지금 " + bH + "px → 추천안 " + aH + "px");
+  set("dGroupDelta", "+" + (aH - bH) + "px (" + (bH ? (Math.round((aH - bH) / bH * 1000) / 10) : 0) + "%) · 줄 7→8");
+  set("dBadge", w(badge) + "×" + h(badge) + "px");
+  set("dCard", h(card) + "px (한 칸) · 가로 " + w(card) + "px");
+
+  var lines = 0, top = null;
+  Array.prototype.forEach.call(strip.children, function (c) {
+    var t = Math.round(c.getBoundingClientRect().top);
+    if (top === null || Math.abs(t - top) > 4) { lines++; top = t; }
+  });
+  set("dStrip", "이 문서 폭(" + w(strip) + "px)에서 " + lines + "줄 · 띠 높이 " + h(strip) + "px");
+
+  var nav = document.getElementById("mNav");
+  if (nav) nav.textContent = "목업 실측 — 한 줄 " + rowH + "px · 그룹 " + bH + " → " + aH + "px (+" + (aH - bH) + "px) · 배지는 줄 안에 들어가 세로 증가 0";
+  var ai = document.getElementById("mAi");
+  if (ai) ai.textContent = "목업 실측 — 칸 " + h(card) + "px · 이 폭(" + w(strip) + "px)에서 " + lines + "줄 · 띠 " + h(strip) + "px  ※ 제품 무대 폭에서 다시 잰다";
+})();
+</script>
+
+</body>
+</html>

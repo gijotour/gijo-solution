@@ -1,0 +1,472 @@
+<!--
+  GIJO AS — 왼쪽 패널(사이드바 메뉴) 재편 시안 (추천 1개)
+  =====================================================
+  대상: client/src/renderer/pages/nav.js:65~267 (TOP·GROUPS·TAB_REDIRECT)
+  사장님 방침(2026-08-21): 「연계성 있는 메뉴 구성 · 불필요 메뉴 삭제 · 왼쪽 패널 이용방안」
+
+  ── 사전 조사(설계 전 조사 원칙) ──────────────────────────────────────────
+  1) 사이드바 라벨 모호성(polysemy) — 같은 낱말이 다른 맥락에서 다른 뜻이면 새 사용자는
+     10초 안에 못 찾는다는 것이 통례("새 입사자에게 메뉴로 화면을 찾게 하고 10초를 못 넘기면
+     이름이 틀린 것"). 우리 사이드바의 "제품"이 정확히 이 함정 — 3곳에서 다른 뜻.
+     참고: Abby Covert IA for Navigation(abbycovert.com), IGC "Information Architecture for
+     Business Software"(intelligentgraphicandcode.com), Smashing Magazine "Efficiently
+     Simplifying Navigation Pt.1"(2013, 여전히 인용되는 라벨링 규범).
+  2) Hick's Law — 평평한 목록 30개는 그룹 6~11개보다 고르는 시간이 늘어난다. 우리는 이미
+     그룹으로 접었다 폈다 하는 구조(2026-07-28)라 이 원칙은 이미 반영돼 있음 — 이번 시안은
+     "그룹 수를 늘리지 않는 것"을 제약으로 삼는 근거로 씀(아래 §7 참고).
+  3) 사이드바 배지(뱃지) 관행 — 숫자가 우선순위 판단에 쓰일 때만 숫자 배지, 0이면 숨김,
+     두 자리 넘으면 "99+"로 자름. 이미 우리 제품에 선례가 있음(gn-sessbadge·gn-workbadge,
+     nav.js:1439~1468) — 이번 시안의 "반입 배지"는 **새 패턴이 아니라 같은 패턴의 재사용**.
+     참고: PatternFly Notification Badge 가이드라인, Setproduct "Badge UI design" 뱃지 원칙.
+  4) 제품 내부 근거 — GIJO_AS_취약점관리_지침.md 1절(업무 절차 5단계=메뉴 자리), Tenable
+     Exposure Response(생애주기형 내비게이션) — nav.js:99~101에 이미 인용, 이번 시안은 그
+     구조를 유지만 하고 건드리지 않음.
+
+  ── 코드 대조로 확인한 사실(추측 아님, 직접 읽고 확인) ───────────────────
+  · TOP.forEach가 hidden 항목도 gijoScreenList(🔍 찾기 색인)엔 넣지만 렌더는 건너뛴다
+    (nav.js:701, 845~851) → "제품 안내(옛 문서함)"은 이미 시각적으로 존재하지 않는다.
+  · 카드 계약: app.html open()이 쿼리 없는 page를 열 때 screenCard(page,label)을 먼저 부른다
+    (app.html:572~589). 카드는 **파일명**으로 찾는다(server/src/engine/datacard.ts:334~351
+    화면파일카드, 335~363 카드예외) — **라벨(이름)이 아니다.** 그래서 이름만 바꾸는 것은
+    카드 계약에 영향이 없다. intro.html은 이미 카드예외(361행, "제품 소개(읽기 전용)")라
+    그룹을 옮겨도 예외 표를 고칠 일이 없다.
+  · 5단계 감시: server/test/workflow.test.ts가 nav.js에서 `id: "s1-find"` ~ `id: "s5-report"`
+    사이의 텍스트를 정규식으로 긁어 STAGE_SCREENS(workflow.ts:30~38)와 정확히 같아야 통과
+    시킨다. 이 창 **안**에 화면을 새로 끼우면(예: 발견·수집 그룹에 보안로그분석을 얹기) 그
+    화면이 STAGE_SCREENS[1]에도 없으므로 **시험이 깨진다.** 이번 시안은 그 창 안을 건드리지
+    않는다(§6에서 별도 설명).
+  · 화면이름카드(datacard.ts:269~288, 대화창에 "보안제품"이라고만 쳐도 카드가 뜨는 별칭표)는
+    라벨과 독립된 문자열 키다. "보안제품"→products 매핑은 유지되므로 사이드바 라벨을
+    "우리 보안제품"으로 바꿔도 그 별칭은 안 깨진다. "제품 소개자료"는애초 이 표에 없다(깰
+    것이 없다).
+
+  작성: gijo-mockup · 2026-08-21 · 이 파일은 결정을 받기 위한 정적 그림입니다.
+  실제 접기/펼치기·배지 숫자는 예시이며 **동작하지 않습니다**(정직한 구현 원칙 — 아래
+  각 인터랙션 옆에 "데모용" 표시를 둡니다).
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 왼쪽 패널 재편 시안</title>
+<style>
+  :root{
+    --bg:#262624; --panel:#30302e; --panel-2:#1f1e1d;
+    --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.16);
+    --text:#e9e7e2; --text-strong:#fff; --muted:#b3ada4; --muted-2:#a49d95;
+    --blue:#3b82f6; --blue-light:#5fa1ff; --teal:#1eb980; --red:#e2483d;
+    --red-ink:#f5928a; --amber:#f0a020; --purple:#8b7cf0;
+    --green-ink:#7cd9a8; --diff-add:rgba(30,185,128,.14); --diff-move:rgba(59,130,246,.14);
+    --diff-rm:rgba(226,72,61,.12);
+  }
+  html.theme-light{
+    /* 값 그대로 복사 — client/src/renderer/pages/pro-white.css:13~29 (WCAG 계산분 명시된 것) */
+    --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+    --border:rgba(43,38,33,.12); --border-strong:rgba(43,38,33,.22);
+    --text:#2b2621; --text-strong:#1f1b14; --muted:#6b6259; --muted-2:#726960;
+    --blue:#1d4f91; --blue-light:#1d4f91; --teal:#086b43; --red:#b3241a;
+    --red-ink:#b3241a; --amber:#8f4d02; --purple:#5b21b6;
+    --green-ink:#086b43; --diff-add:#e3f6ec; --diff-move:#eaf1fb; --diff-rm:#fdeceb;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13px;line-height:1.55;}
+  .wrap{max-width:1360px;margin:0 auto;padding:22px 26px 60px;}
+  .topbar{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:18px;position:sticky;top:10px;z-index:30;box-shadow:0 6px 20px rgba(0,0,0,.25);}
+  html.theme-light .topbar{box-shadow:0 6px 20px rgba(43,38,33,.08);}
+  .topbar h1{font-size:16px;margin:0;color:var(--text-strong);font-weight:800;}
+  .topbar .sub{font-size:12px;color:var(--muted);}
+  .badge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;background:rgba(59,130,246,.16);color:var(--blue-light);border:1px solid rgba(59,130,246,.35);}
+  .spacer{flex:1;}
+  .themebtn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .themebtn:hover{border-color:var(--blue);color:var(--blue-light);}
+  .demo-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;background:rgba(255,255,255,.05);border:1px dashed var(--border-strong);border-radius:5px;padding:1px 6px;margin-left:6px;}
+
+  section{margin:34px 0;}
+  h2{font-size:15px;color:var(--text-strong);margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  h2 .num{width:22px;height:22px;border-radius:6px;background:rgba(59,130,246,.18);color:var(--blue-light);font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  h3{font-size:13px;color:var(--text-strong);margin:18px 0 8px;}
+  .lead{color:var(--muted);font-size:12.5px;margin:6px 0 16px;max-width:900px;}
+  .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+
+  .tldr{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .tldr .item b{color:var(--text-strong);display:block;font-size:12.5px;margin-bottom:3px;}
+  .tldr .item span{color:var(--muted);font-size:12px;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.25px;}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{color:var(--muted-2);font-size:11.25px;font-weight:800;letter-spacing:.3px;}
+  td b{color:var(--text-strong);}
+  tr:last-child td{border-bottom:none;}
+  .pick{background:var(--diff-add);}
+  .pick td:first-child{box-shadow:inset 3px 0 0 var(--teal);}
+  .reject td{color:var(--muted);}
+  .tagpick{font-size:10.5px;font-weight:800;color:var(--green-ink);background:var(--diff-add);border-radius:5px;padding:1px 6px;}
+  .tagreject{font-size:10.5px;font-weight:800;color:var(--muted-2);background:rgba(255,255,255,.06);border-radius:5px;padding:1px 6px;}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 16px;font-size:11.75px;color:var(--muted);}
+  .legend .sw{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:13px;height:13px;border-radius:3px;display:inline-block;}
+  .lg-add{background:var(--diff-add);border:1px solid var(--teal);}
+  .lg-move{background:var(--diff-move);border:1px solid var(--blue);}
+  .lg-rm{background:var(--diff-rm);border:1px solid var(--red);}
+  .lg-same{background:transparent;border:1px solid var(--border-strong);}
+
+  /* ── 사이드바 재현 (nav.js:437~560 스타일을 그대로 옮김) ── */
+  .navdemo{width:260px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:12.5px;}
+  .nd-head{padding:9px 10px;border-bottom:1px solid var(--border);font-size:11px;font-weight:800;color:var(--muted-2);letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between;}
+  .nd-search{margin:8px 8px 2px;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;padding:5px 9px;font-size:11.5px;color:var(--muted-2);}
+  .nd-top{padding:6px;border-bottom:1px solid var(--border);}
+  .nd-fav{padding:2px 6px;}
+  .nd-body{padding:2px 6px 10px;}
+
+  .gn-g{display:flex;align-items:center;gap:6px;height:24px;font-size:11px;font-weight:700;color:var(--muted-2);letter-spacing:.5px;margin:9px 4px 1px;padding:0 5px;border-radius:5px;}
+  .gn-g .car{font-size:10px;width:9px;opacity:.5;flex:0 0 auto;}
+  .gn-g.open .car{transform:rotate(90deg);display:inline-block;}
+  .gn-g .gicon{width:12px;height:12px;flex:0 0 auto;opacity:.6;border:1px solid currentColor;border-radius:3px;}
+  .gn-num{flex:0 0 auto;width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;border:1px solid var(--border-strong);border-radius:3px;opacity:.85;}
+  .gn-gname{flex:0 0 auto;white-space:nowrap;}
+  .gn-line{flex:1;height:1px;background:var(--border);min-width:6px;}
+  .gn-cnt{flex:0 0 auto;font-size:10.5px;font-weight:700;opacity:.65;}
+  .gn-g.rep{cursor:pointer;}
+  .gn-g.rep:hover{background:rgba(255,255,255,.04);}
+
+  .gn-item{display:flex;align-items:center;gap:8px;height:29px;padding:0 9px 0 20px;border-radius:6px;font-weight:500;color:var(--muted);position:relative;white-space:nowrap;overflow:hidden;}
+  .gn-item .ic{width:13px;height:13px;flex:0 0 auto;border:1.4px solid currentColor;border-radius:3px;opacity:.55;}
+  .gn-item .lab{flex:1;overflow:hidden;text-overflow:ellipsis;}
+  .gn-item:hover{background:rgba(255,255,255,.04);color:var(--text-strong);}
+  .gn-item.active{background:rgba(255,255,255,.05);color:var(--text-strong);font-weight:600;}
+  .gn-item.active::before{content:'';position:absolute;left:0;top:5px;bottom:5px;width:2px;border-radius:2px;background:var(--blue-light);}
+  .gn-item.top-item{padding-left:9px;}
+  .gn-item .star{opacity:.3;font-size:11px;flex:0 0 auto;}
+  .gn-item .upb{flex:0 0 auto;background:var(--amber);color:#3a2a00;font-size:10px;font-weight:900;border-radius:20px;padding:1px 6px;}
+  html.theme-light .gn-item .upb{color:#fff;}
+
+  .diff-rename{background:var(--diff-add);box-shadow:inset 3px 0 0 var(--teal);border-radius:0 6px 6px 0;}
+  .diff-move-in{background:var(--diff-move);box-shadow:inset 3px 0 0 var(--blue);border-radius:0 6px 6px 0;}
+  .diff-rm{background:var(--diff-rm);box-shadow:inset 3px 0 0 var(--red);border-radius:0 6px 6px 0;text-decoration:line-through;opacity:.7;}
+  .diff-note{font-size:10.25px;color:var(--muted-2);padding:1px 9px 4px 20px;}
+  .diff-note b{color:var(--green-ink);}
+
+  .callout{border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.02);}
+  .callout.warn{border-color:rgba(240,160,32,.4);}
+  .callout.ok{border-color:rgba(30,185,128,.4);}
+  .callout b{color:var(--text-strong);}
+
+  .num-table td.n{font-weight:800;color:var(--text-strong);text-align:right;}
+  .num-table td.delta-up{color:var(--amber);font-weight:800;text-align:right;}
+  .num-table td.delta-flat{color:var(--muted-2);font-weight:700;text-align:right;}
+
+  .checklist{list-style:none;margin:0;padding:0;}
+  .checklist li{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.25px;}
+  .checklist li:last-child{border-bottom:none;}
+  .checklist .ok{color:var(--teal);flex:0 0 auto;font-weight:900;}
+  .checklist b{color:var(--text-strong);}
+
+  .foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);}
+  .foot a{color:var(--blue-light);}
+  code{background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px;font-size:11.5px;}
+  html.theme-light code{background:rgba(43,38,33,.06);}
+
+  .mockband{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;}
+  .zoom{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;}
+  .zoom .caption{font-size:11px;color:var(--muted-2);margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <h1>왼쪽 패널(사이드바 메뉴) 재편</h1>
+    <span class="badge">추천 시안 1개</span>
+    <span class="sub">대상: nav.js TOP·GROUPS · 2026-08-21</span>
+    <div class="spacer"></div>
+    <button class="themebtn" onclick="document.documentElement.classList.toggle('theme-light')">다크 ⇄ 프로 흰 전환<span class="demo-tag">데모</span></button>
+  </div>
+
+  <!-- ── 요약 ─────────────────────────────────────────────────────── -->
+  <section>
+    <div class="tldr">
+      <div class="item"><b>① "제품" 이름 3중 충돌</b><span>「보안제품」(우리 것) · 「보안제품 비교·소개」(외부 카탈로그, 옛 이름 제품 소개자료) 두 개로 재명명하고 같은 그룹에 모은다. 「제품 안내」는 이미 숨김이라 손댈 것이 없다.</span></div>
+      <div class="item"><b>② 삭제 0건 — 재배치 위주</b><span>껍데기 화면이 없어(정찰 결론) 지울 게 없다. 대신 이름 2건 교정 + 항목 1건 그룹 이동 + 배지 1건 신설.</span></div>
+      <div class="item"><b>③ 새 화면·새 그룹 0건</b><span>반입 가시성은 "내 문서" 기존 항목에 배지만 얹는다. 그룹 수는 11→11로 그대로.</span></div>
+    </div>
+  </section>
+
+  <!-- ── 1. 문제 재확인 ───────────────────────────────────────────── -->
+  <section>
+    <h2><span class="num">1</span>정찰이 찾은 문제 — 다시 확인</h2>
+    <p class="lead">아래 4건은 이번 재편이 다루는 대상이다. 삭제할 껍데기 화면은 0건 — 문제는 "무엇이 없다"가 아니라 "이름·자리가 헷갈린다"였다.</p>
+    <div class="grid2">
+      <div class="box">
+        <h3>1) "제품" 3중 충돌</h3>
+        <table>
+          <tr><th>화면</th><th>실제 내용</th><th>지금 이름</th></tr>
+          <tr><td><code>mydocs.html?tab=guide</code></td><td>GIJO AS 자체 매뉴얼</td><td>제품 안내 <span class="tagreject">숨김</span></td></tr>
+          <tr><td><code>intro.html</code></td><td>외부 보안제품 소개·비교(카탈로그)</td><td>제품 소개자료</td></tr>
+          <tr><td><code>products.html</code></td><td>우리가 운영 중인 보안제품 등록부</td><td>보안제품</td></tr>
+        </table>
+      </div>
+      <div class="box">
+        <h3>2) 반입 결과 가시성 분열</h3>
+        <p class="lead" style="margin:2px 0 6px;">파일·URL·유튜브 반입은 대화창 ＋ (메뉴에 없는 게 맞음). 결과를 보는 자리가 둘로 나뉜다:</p>
+        <table>
+          <tr><th>자리</th><th>성격</th></tr>
+          <tr><td>내 문서 → 🩹 반입 탭</td><td>업로드 이력(영수증) — 조작 없음</td></tr>
+          <tr><td>AI → 지식</td><td>RAG 지식창고 실관리(삭제·재색인 등)</td></tr>
+        </table>
+        <p class="lead" style="margin:8px 0 0;">사이드바만 보고는 "내가 올린 게 어디 쌓이나"를 못 찾는다.</p>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:14px;">
+      <div class="box">
+        <h3>3) 삭제/통합 후보 2건 — 검토 결과</h3>
+        <table>
+          <tr><td><b>(a)</b> 제품 안내(옛 문서함, hidden)</td><td>nav.js:701이 <code>!it.hidden</code>일 때만 렌더 → <b>이미 안 보임</b>. 지울 것이 없다(🔍 찾기 별칭 용도로 존치).</td></tr>
+          <tr><td><b>(b)</b> 보안로그파일분석 = ①발견·수집과 같은 카드종류("ops")</td><td>진짜 흡수(허브 판 병합)는 <code>grouppanels.js</code>+<code>STAGE_SCREENS</code> 변경이 필요한 <b>별도 구현 과제</b>(§6). 이번 시안은 위치만 그대로 두고, "왜 관련 있는지"는 화면 열 때 뜨는 카드/screenguide 문구가 말하도록 제품 원칙(챗봇 설명)에 맡긴다.</td></tr>
+        </table>
+      </div>
+      <div class="box">
+        <h3>4) 매뉴얼↔명령창 관계</h3>
+        <p class="lead" style="margin:2px 0 0;">보안제품 등록부(products.html)와 ③조치의 명령창(terminal.html)은 다른 그룹이라 사이드바만으론 관계가 안 보인다. 이 관계는 <b>챗봇이 잇는 게 원칙</b>(제품 규칙)이라 사이드바 구조를 바꿔 표현하지 않는다 — 참고 사항으로만 기록.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 2. Before / After ────────────────────────────────────────── -->
+  <section>
+    <h2><span class="num">2</span>재편 전 / 후 — 사이드바 나란히</h2>
+    <p class="lead">nav.js:437~560의 실제 CSS 값(색·크기)을 그대로 옮겨 재현했다. 접기/펼치기 화살표·검색칸은 <b>정적 그림</b>이며 눌러도 동작하지 않는다.</p>
+    <div class="legend">
+      <span class="sw"><i class="lg-same"></i>유지</span>
+      <span class="sw"><i class="lg-add"></i>이름 변경</span>
+      <span class="sw"><i class="lg-move"></i>다른 그룹에서 이동해 옴</span>
+      <span class="sw"><i class="lg-rm"></i>이 자리에서 빠짐(다른 그룹으로 이동 — 삭제 아님)</span>
+    </div>
+
+    <div class="mockband">
+      <!-- BEFORE -->
+      <div class="zoom">
+        <div class="navdemo">
+          <div class="nd-head">현재<span style="opacity:.6;font-weight:600;">22줄 · 11그룹</span></div>
+          <div class="nd-search">🔍 화면 찾기…</div>
+          <div class="nd-top">
+            <div class="gn-item top-item active"><span class="ic"></span><span class="lab">대시보드</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">팀 사무실 (창)</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">내 문서</span><span class="star">☆</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">문서 작성 (창) · 무료</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">작업 내역</span></div>
+          </div>
+          <div class="nd-fav">
+            <div class="gn-g"><span class="car">▸</span><span class="gn-gname">⭐ 즐겨찾기</span><span class="gn-line"></span><span class="gn-cnt">0</span></div>
+          </div>
+          <div class="nd-body">
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-gname">⓪ 자산</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">1</span><span class="gn-gname">발견·수집</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">2</span><span class="gn-gname">우선순위</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">3</span><span class="gn-gname">조치</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">4</span><span class="gn-gname">검증</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">5</span><span class="gn-gname">보고</span><span class="gn-line"></span></div>
+
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-gname">등록부</span><span class="gn-line"></span></div>
+            <!-- ↑ "등록부" 대표 항목이 곧 "보안제품" 화면 자체 -->
+
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-gname">AI</span><span class="gn-line"></span></div>
+
+            <div class="gn-g open"><span class="car">▸</span><span class="gicon"></span><span class="gn-gname">추가 기능</span><span class="gn-line"></span><span class="gn-cnt">4</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">보안 로그 파일 분석</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">법령·판례</span></div>
+            <div class="gn-item diff-rm"><span class="ic"></span><span class="lab">제품 소개자료</span></div>
+            <div class="diff-note">→ <b>보안제품</b> 그룹으로 이동</div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">업무 넘기기</span></div>
+
+            <div class="gn-g open"><span class="car">▸</span><span class="gicon"></span><span class="gn-gname">설정</span><span class="gn-line"></span><span class="gn-cnt">2</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">설정</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">기록</span></div>
+          </div>
+        </div>
+        <div class="caption">현재 — TOP 5줄(숨김 1건 제외) + 즐겨찾기 헤더 1줄 + 그룹 16줄 = 22줄, 그룹 11개</div>
+      </div>
+
+      <!-- AFTER -->
+      <div class="zoom">
+        <div class="navdemo">
+          <div class="nd-head">제안<span style="opacity:.6;font-weight:600;">23줄(+1) · 11그룹(±0)</span></div>
+          <div class="nd-search">🔍 화면 찾기…</div>
+          <div class="nd-top">
+            <div class="gn-item top-item active"><span class="ic"></span><span class="lab">대시보드</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">팀 사무실 (창)</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">내 문서</span><span class="star">☆</span><span class="upb" title="예시 값 — 오늘 새로 반입된 문서 수">3</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">문서 작성 (창) · 무료</span></div>
+            <div class="gn-item top-item"><span class="ic"></span><span class="lab">작업 내역</span></div>
+          </div>
+          <div class="nd-fav">
+            <div class="gn-g"><span class="car">▸</span><span class="gn-gname">⭐ 즐겨찾기</span><span class="gn-line"></span><span class="gn-cnt">0</span></div>
+          </div>
+          <div class="nd-body">
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-gname">⓪ 자산</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">1</span><span class="gn-gname">발견·수집</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">2</span><span class="gn-gname">우선순위</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">3</span><span class="gn-gname">조치</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">4</span><span class="gn-gname">검증</span><span class="gn-line"></span></div>
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-num">5</span><span class="gn-gname">보고</span><span class="gn-line"></span></div>
+
+            <div class="gn-g open diff-rename"><span class="car">▸</span><span class="gicon"></span><span class="gn-gname">보안제품</span><span class="gn-line"></span><span class="gn-cnt">2</span></div>
+            <div class="diff-note">옛 이름 <s>등록부</s> — 1항목 대표 모드에서 일반 그룹으로(항목이 2개가 됨)</div>
+            <div class="gn-item diff-rename"><span class="ic"></span><span class="lab">우리 보안제품</span></div>
+            <div class="diff-note">옛 이름 <s>보안제품</s></div>
+            <div class="gn-item diff-move-in"><span class="ic"></span><span class="lab">보안제품 비교·소개</span></div>
+            <div class="diff-note">추가 기능 → 이동 · 옛 이름 <s>제품 소개자료</s></div>
+
+            <div class="gn-g rep"><span class="car" style="visibility:hidden"></span><span class="gicon"></span><span class="gn-gname">AI</span><span class="gn-line"></span></div>
+
+            <div class="gn-g open"><span class="car">▸</span><span class="gicon"></span><span class="gn-gname">추가 기능</span><span class="gn-line"></span><span class="gn-cnt">3</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">보안 로그 파일 분석</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">법령·판례</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">업무 넘기기</span></div>
+
+            <div class="gn-g open"><span class="car">▸</span><span class="gicon"></span><span class="gn-gname">설정</span><span class="gn-line"></span><span class="gn-cnt">2</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">설정</span></div>
+            <div class="gn-item"><span class="ic"></span><span class="lab">기록</span></div>
+          </div>
+        </div>
+        <div class="caption">제안 — 등록부 그룹이 대표(1행)에서 일반(헤더+2행)으로 바뀌며 +2줄, 추가 기능은 -1줄 → 그룹 합계 16→17줄(+1). TOP은 배지만 추가(줄 수 불변).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 3. 제품 3중 충돌 해소안 ──────────────────────────────────── -->
+  <section>
+    <h2><span class="num">3</span>「제품」 3중 충돌 해소안</h2>
+    <p class="lead">이름을 정확히 하는 것이 핵심이다. 세 화면 모두 지우지 않는다 — 실제로 세 화면 다 각자 역할이 있다(정찰 결론). 대안 세 갈래를 검토했다.</p>
+    <table>
+      <tr><th style="width:22%">대안</th><th>내용</th><th style="width:12%">판정</th></tr>
+      <tr class="pick">
+        <td><b>A. 재명명 + 등록부 그룹에 통합</b> (채택)</td>
+        <td>products.html → "우리 보안제품", intro.html → "보안제품 비교·소개"로 이름을 바꾸고 같은 그룹("보안제품")에 둔다. "우리 것" vs "비교용 외부 자료"라는 대비가 이름만으로 드러난다.</td>
+        <td><span class="tagpick">채택</span></td>
+      </tr>
+      <tr class="reject">
+        <td>B. 세 화면을 한 화면으로 합친다</td>
+        <td>등록부(우리 제품)와 카탈로그(외부 비교)는 데이터 대장이 다르다(products vs productintro, intro.html:10 주석). 합치면 "우리가 쓰는 것"과 "검토 중인 것"이 뒤섞여 담당자가 오인해 결재판·자산 연동에 잘못된 제품을 건다 — 위험이 이름 헷갈림보다 크다.</td>
+        <td><span class="tagreject">기각</span></td>
+      </tr>
+      <tr class="reject">
+        <td>C. 세 화면 다 그대로 두고 툴팁만 추가</td>
+        <td>사이드바 라벨은 tab 이름·검색 결과·즐겨찾기에 그대로 따라다니는 <b>단일 출처</b>다(app.html:412 "이름의 주인은 사이드바"). 툴팁은 마우스를 올려야 보여 처음 쓰는 사람은 여전히 못 찾는다 — 이름 자체를 고치는 것보다 약하다.</td>
+        <td><span class="tagreject">기각</span></td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ── 4. 반입 흐름 가시화 ──────────────────────────────────────── -->
+  <section>
+    <h2><span class="num">4</span>반입 흐름 가시화 — 새 화면 없이</h2>
+    <p class="lead">제품 원칙(메뉴는 보기용·새 화면에 입력칸 금지)을 지키며, <b>기존 자리</b>(내 문서 🩹 반입 탭)를 사이드바에서 미리 알리는 최소안.</p>
+    <div class="grid2">
+      <div class="box">
+        <h3>채택 — "내 문서"에 배지</h3>
+        <div class="mockband" style="gap:10px;">
+          <div class="gn-item top-item" style="width:220px;"><span class="ic"></span><span class="lab">내 문서</span><span class="star">☆</span><span class="upb">3</span></div>
+        </div>
+        <p class="lead" style="margin:10px 0 0;">기존 <code>.gn-upbadge</code> 패턴(nav.js:1439~1468, 진행중 작업·기한초과 배지와 같은 부품) 재사용. 숫자는 "오늘 새로 반입된 문서"(0이면 숨김·99+ 상한 — 이미 있는 규칙 그대로). 누르면 지금과 같이 내 문서 카드가 뜨고, 그 안 🩹 반입 탭이 처음 보이는 탭이 되면 목적지가 한 번에 맞는다.</p>
+        <p class="lead" style="margin:6px 0 0;">근거: 숫자가 우선순위 판단(오늘 볼 게 있다/없다)에 쓰이는 경우에만 숫자 배지를 쓰고 0이면 숨기는 것이 뱃지 UI 통례 — PatternFly·Setproduct 가이드와 우리 기존 배지 둘 다 이 규칙.</p>
+      </div>
+      <div class="box">
+        <h3>대안 B (기각) — 대시보드에 「최근 반입」 판</h3>
+        <p class="lead" style="margin:2px 0 8px;">grouppanels.js에 새 판을 추가하는 방식. 더 풍부하게 보여줄 수 있지만:</p>
+        <table>
+          <tr><td>범위</td><td>대시보드(현황판)는 이 시안(왼쪽 패널)의 대상이 아니다 — 별도 시안·별도 구현 필요</td></tr>
+          <tr><td>비용</td><td>grouppanels.js 새 판 설계(열 규약 4열 등) + 서버 API 확인 필요, 사이드바 배지보다 큰 작업</td></tr>
+          <tr><td>중복 위험</td><td>내 문서 🩹반입 탭과 같은 데이터를 또 보여주면 "어디가 맞는 자리인가"가 새로 생긴다(이 저장소가 반복 경계하는 함정)</td></tr>
+        </table>
+        <p class="lead" style="margin:8px 0 0;">→ 이번 라운드는 배지(A)로 충분 — 부족하면 다음 라운드에 대시보드 판을 별도 시안으로.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 5. 왼쪽 패널 활용 아이디어 판정 ──────────────────────────── -->
+  <section>
+    <h2><span class="num">5</span>왼쪽 패널 활용 아이디어 — 핀 / 최근 / 컨텍스트</h2>
+    <table>
+      <tr><th style="width:14%">아이디어</th><th>판정</th><th>이유</th></tr>
+      <tr>
+        <td><b>핀</b>(즐겨찾기)</td>
+        <td><span class="tagreject">이미 있음 — 손대지 않음</span></td>
+        <td>★/☆ 즐겨찾기 가지가 이미 있다(nav.js:564~580, 2026-07-28부터). 다시 만들면 "같은 것을 두 곳에 적는" 반복 함정.</td>
+      </tr>
+      <tr>
+        <td><b>최근</b></td>
+        <td><span class="tagpick">채택 — §4 배지</span></td>
+        <td>"최근 반입" 배지 하나로 충분한 자리를 찾음(위 §4). 별도 "최근" 목록 가지는 새 그룹이 되어 Hick's Law 원칙(그룹 수 최소화)에 반한다.</td>
+      </tr>
+      <tr>
+        <td><b>컨텍스트</b>(지금 범위·🗂)</td>
+        <td><span class="tagreject">채택 안 함</span></td>
+        <td>범위 표시는 이미 대화창(콘솔)의 몫이다(console.js 범위/scope 상태). 사이드바에 또 두면 "지시는 대화창에서만"·"메뉴는 보기용" 경계가 흐려진다 — 제품이 이미 정한 역할 분리를 존중한다.</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ── 6. 밀도 숫자 ─────────────────────────────────────────────── -->
+  <section>
+    <h2><span class="num">6</span>밀도 숫자</h2>
+    <div class="box">
+      <table class="num-table">
+        <tr><th>항목</th><th>현재</th><th>제안</th><th>증감</th></tr>
+        <tr><td>TOP 고정 (숨김 제외)</td><td class="n">5줄</td><td class="n">5줄</td><td class="delta-flat">±0</td></tr>
+        <tr><td>즐겨찾기 헤더</td><td class="n">1줄</td><td class="n">1줄</td><td class="delta-flat">±0</td></tr>
+        <tr><td>그룹 영역 합계(헤더+항목)</td><td class="n">16줄</td><td class="n">17줄</td><td class="delta-up">+1</td></tr>
+        <tr><td><b>사이드바 총 줄 수</b>(기본 상태, 즐겨찾기 0건 기준)</td><td class="n"><b>22줄</b></td><td class="n"><b>23줄</b></td><td class="delta-up">+1 (+4.5%)</td></tr>
+        <tr><td>그룹(섹션) 개수</td><td class="n">11개</td><td class="n">11개</td><td class="delta-flat">±0</td></tr>
+        <tr><td>새 화면</td><td class="n">-</td><td class="n">0개</td><td class="delta-flat">-</td></tr>
+        <tr><td>이름 변경</td><td class="n">-</td><td class="n">2건</td><td class="delta-flat">-</td></tr>
+        <tr><td>그룹 간 이동</td><td class="n">-</td><td class="n">1건 (intro.html: 추가기능 → 보안제품)</td><td class="delta-flat">-</td></tr>
+      </table>
+    </div>
+    <p class="lead" style="margin-top:10px;">늘어난 1줄의 정체: "등록부"가 항목 1개(대표 모드·헤더 없이 1행)였다가 항목 2개(일반 모드·헤더 1행+항목 2행)가 되면서 +2, "추가 기능"은 항목이 4→3개로 줄며 -1. 순증 +1줄로 그쳤다 — "밀도 우선" 원칙에 맞춰 이름 정리의 대가를 최소화했다.</p>
+  </section>
+
+  <!-- ── 7. 왜 이 안인가 / 포기한 것 / 자가점검 ──────────────────── -->
+  <section>
+    <h2><span class="num">7</span>왜 이 안인지 · 무엇을 포기했는지 · 제품 원칙 자가점검</h2>
+    <div class="grid2">
+      <div class="box">
+        <h3>왜 이 길을 골랐나</h3>
+        <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:12.25px;line-height:1.75;">
+          <li><b>5단계 재편은 하지 않는다.</b> ①~⑤는 이미 업무 순서=세로 순서로 설계돼 있고(사용자 지시로 "건드리지 말 것"), 서버 <code>workflow.test.ts</code>가 <code>id:"s1-find"~"s5-report"</code> 사이 텍스트를 STAGE_SCREENS와 정확 대조한다. 이 구간에 화면을 끼우면(예: 보안로그분석을 ①의 하위 항목으로) 시험이 즉시 깨진다 — 실제로 코드를 읽고 확인했다(§본문 서두 근거).</li>
+          <li><b>대규모 삭제는 하지 않는다.</b> 정찰이 찾은 "삭제 후보 2건"을 직접 대조한 결과 (a)는 이미 숨겨져 있어 지울 대상이 없고, (b)는 진짜 흡수(허브 판 병합)가 코드 변경(grouppanels.js+STAGE_SCREENS)을 요구해 "메뉴 재편"의 범위를 넘는다. 껍데기 화면 자체가 0건이므로 삭제가 이번 라운드의 답이 아니다.</li>
+          <li><b>새 그룹·새 화면을 만들지 않는다.</b> 반입 가시성은 배지로, 이름 충돌은 재명명+그룹 통합으로 풀어 그룹 수(11)를 유지했다 — Hick's Law(그룹이 늘수록 고르는 시간 증가)와 "같은 것을 여러 곳에 적으면 어긋난다"는 이 저장소의 반복 교훈을 함께 지킨다.</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>포기한 것</h3>
+        <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:12.25px;line-height:1.75;">
+          <li>보안로그파일분석을 ①발견·수집 허브 판으로 실제 병합하는 안(더 깔끔하지만 서버·시험 변경 필요 — 별도 구현 과제로 인계).</li>
+          <li>대시보드 "최근 반입" 판(§4 대안 B) — 사이드바 배지로 충분해 보류.</li>
+          <li>사이드바에 범위(🗂) 컨텍스트 표시 — 콘솔의 몫을 침범하지 않기 위해 채택 안 함.</li>
+          <li>화면이름카드(datacard.ts:269~288)에 "우리보안제품"·"보안제품비교" 같은 새 대화 별칭 추가 — 서버 코드라 이 시안 범위 밖(구현 시 함께 검토 권장).</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>제품 원칙 자가점검</h3>
+    <ul class="checklist">
+      <li><span class="ok">✓</span><div><b>카드 계약</b> — screenCard는 파일명으로 찾는다(datacard.ts:334 화면파일카드). 이름만 바꾸는 이번 변경은 카드 조회에 영향 없음. intro.html은 이미 카드예외(361행)라 그룹을 옮겨도 예외표를 고칠 필요 없음.</div></li>
+      <li><span class="ok">✓</span><div><b>5단계 감시</b> — <code>workflow.test.ts</code>가 보는 <code>id:"s1-find"~"s5-report"</code> 구간을 이번 시안은 전혀 건드리지 않는다(항목 이동은 registry·extras 사이에서만 일어남, 두 그룹 다 그 구간 밖).</div></li>
+      <li><span class="ok">✓</span><div><b>TAB_REDIRECT 연쇄</b> — 파일 경로(intro.html·products.html)는 그대로이고 라벨과 소속 그룹만 바뀐다. 죽는 링크·되돌릴 옛 주소가 생기지 않으므로 TAB_REDIRECT에 새 항목을 추가할 필요 없음(코드로 대조 완료).</div></li>
+      <li><span class="ok">✓</span><div><b>이름의 단일 출처</b> — app.html:412 "이름의 주인은 사이드바(nav.js GROUPS)"라 라벨을 여기서 바꾸면 탭 이름·검색 결과에 자동 반영된다(다른 곳을 따로 고칠 필요 없음).</div></li>
+      <li><span class="ok">✓</span><div><b>화면이름카드 별칭</b> — "보안제품"→products 매핑(datacard.ts:283)은 문자열 키라 라벨을 "우리 보안제품"으로 바꿔도 안 깨진다. "제품 소개자료"는 애초 이 표에 없어 깰 것이 없다.</div></li>
+      <li><span class="ok">✓</span><div><b>NN/g 라벨+아이콘 병기</b> — 그룹 아이콘은 그대로 재사용(등록부=drawer 아이콘 유지), 이름만 바꿔 시각적 학습 비용을 최소화.</div></li>
+    </ul>
+  </section>
+
+  <div class="foot">
+    조사 근거: Abby Covert, <i>Information Architecture for Navigation</i>(abbycovert.com) · Intelligent Graphic & Code, <i>Information Architecture for Business Software</i> · Smashing Magazine, <i>Efficiently Simplifying Navigation Pt.1</i>(2013) · PatternFly <i>Notification Badge</i> 가이드라인 · Setproduct, <i>Badge UI design</i> · 제품 내부: GIJO_AS_취약점관리_지침.md, nav.js/app.html/datacard.ts/workflow.ts/workflow.test.ts(직접 열람 확인, 위 본문에 줄번호 인용).
+    <br>이 파일은 자체완결 HTML(외부 CDN·폰트·이미지 없음)이며 더블클릭으로 바로 열립니다. 접기/펼치기·배지 숫자·다크↔흰 전환 버튼은 시연용 정적 동작이며, 실제 데이터와 연결되어 있지 않습니다.
+  </div>
+
+</div>
+</body>
+</html>

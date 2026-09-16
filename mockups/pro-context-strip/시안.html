@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS 프로 셸 — 대화창 상단 맥락 표시 재설계 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 프로 셸 「대화창 상단 맥락 표시」 재설계 (추천 1개)
+  파일: mockups/pro-context-strip/시안.html — 제품 코드는 읽기만 했고 고치지 않았다.
+
+  ■ 요청 배경(2026-08-20 사장님 프로 QA 실측 피드백, 원문)
+    ① "주황색 잘 안 보이고, 주황색 내용이 대화창 상단보단 대화창 안에서 다음 할 일 가이드를
+       같이 주면 어때?"
+    ② "(칩 스트립이) 보기 너무 어렵다. 대화창에서 가이드 주는 게 좋은데."
+    ③ (자산 카드 화면) 중복 IP 등 같은 정보가 상단 칩과 카드에 겹쳐 나온다.
+
+  ■ 실제 코드에서 읽은 것(새로 지어내지 않음 — 파일:행)
+    · client/src/renderer/pages/console.js:36-109 — cs-head(상단 줄) · cs-ctx(화면 칩) ·
+      cs-sel(🎯 이름표 칩) · cs-scope(🗂 범위 칩) · cs-state(🎯 지금 다루는 것 상세 박스) CSS 원문.
+    · console.js:264-282 — 네 요소가 쌓이는 실제 마크업 순서(cs-head → cs-flow → cs-chips →
+      cs-state → cs-drawer → cs-body).
+    · console.js:1094-1103 setSelection() · 1109-1155 선택카드() · 1209-1233 renderSelState() —
+      🎯 칩·🎯 상세박스·대화 안 「고른 항목」 카드 **세 곳**이 같은 값(자산·제목·상태·담당·기한·
+      한글 풀이)을 각자 그린다는 것을 코드로 확인. 겹침 민원③의 정체.
+    · console.js:1157-1166 — 🎯(선택, 화면 바뀌면 사라짐)와 🗂(범위, 화면 넘어가도 남음)는
+      "수명이 반대"라는 주석 — 이번 시안이 존중해야 하는 기존 계약.
+    · client/src/renderer/pages/pro-white.css — 프로 흰 바탕 토큰 전체 확인. **cs-scope·cs-state는
+      단 한 줄도 없다** — grep 재확인(0건). 즉 흰 바탕에서 이 두 요소는 다크용 하드코딩 색을 그대로
+      쓴다(아래 "새로 찾은 것" 절에서 실측 대비율로 증명). cs-sel만 2026-08-20에 앰버-잉크로
+      고쳐졌다(pro-white.css:89-93) — 그런데도 사장님이 재차 "칩 스트립이 어렵다"고 한 것은
+      **색 문제가 아니라 구조 문제**라는 뜻으로 읽었다.
+    · client/src/renderer/pages/app.html:88-107 — 프로 셸의 대화 자리는 chat-home일 때
+      `.console{flex:1 1 auto}`로 **창 전체 폭**(레일 56px 제외)을 쓴다. 380px 옆 패널은
+      프로가 아닌 구(舊) 표준 배치(`.work.console-side{…380px}`, app.html:231)다 — 이번 시안은
+      프로 기준 화면(2026-08-19 결정)을 따라 **넓은 폭**을 전제로 그렸다.
+
+  ■ 설계 전 조사 — 표준·모범사례(직접 WebFetch/WebSearch로 확인, 출처는 본문 "근거" 표에 재수록)
+    · Nielsen Norman Group, AI 챗봇 설계 가이드라인(2026, WebFetch 직접 확인) —
+      "Users won't assume a chatbot knows what they're looking at unless the chatbot makes it
+      explicit to them." · "present them as clickable buttons, rather than text."
+    · AI UX Playground, Follow-up Chips 패턴(WebFetch 직접 확인) — 답 아래 2~4개, 답 내용에
+      묶인 구체적 문구, **매 턴마다 새로 고침**(오래된 제안을 반복하지 않음).
+    · Shapeof.ai, "Follow up" 패턴(WebFetch 직접 확인) — 6갈래 중 "action nudge"가 이번 🎯
+      제안칩과 같은 갈래. Perplexity 실제 사례 인용.
+    · aufaitux.com, Filter UI Design 가이드(WebFetch 직접 확인) — "선택된 옵션을 전부 따로 칩으로
+      보여주면 화면이 금방 복잡해진다 … 덜 중요한 것들은 하나의 요약 칩으로 묶어라"(원문 아래 표).
+      우리 cs-ctx+cs-sel+cs-scope **세 칩을 한 줄로 묶는 것**의 직접 근거.
+    · (내부 선례, console.js:106-108 코드 주석) VS Code 암묵적 맥락 — "보이게 + 뗄 수 있게".
+      이번 시안도 이 계약을 그대로 지킨다(문장으로 바뀌어도 ✕는 남는다).
+
+  ■ 정직 고지 — 이 파일은 원칙적으로 정지 그림이다. 아래 앱 프레임에서 실제로 동작하는 것은
+    **딱 세 가지**뿐이다: ① "제안" 프레임의 장면 전환 버튼 4개, ② "⋯" 보조메뉴 토글,
+    ③ 실측 배지(페이지가 열린 바로 이 브라우저에서 JS로 실제 렌더 높이를 잰 값 — 계산값이 아니다).
+    입력칸·전송·칩 클릭은 눌러도 반응하지 않는다(서버 응답을 흉내 내지 않는다).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ── 문서 바깥 껍데기(설명용, 제품과 무관) ───────────────────────────── */
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#efeeea;color:#232220;line-height:1.65;}
+.docwrap{max-width:1280px;margin:0 auto;padding:26px 22px 70px;}
+h1{font-size:20px;margin:0 0 6px;color:#181614;}
+.lead{font-size:13px;color:#5a5347;max-width:960px;}
+.quotebox{margin:12px 0 16px;background:#fff;border:1px solid #ded5c4;border-left:4px solid #b3241a;
+  border-radius:0 8px 8px 0;padding:11px 15px;font-size:12.5px;color:#4b463d;}
+.quotebox b{color:#181614;}
+.quotebox ol{margin:5px 0 0 18px;padding:0;}
+.quotebox li{margin:3px 0;}
+.banner{margin:16px 0 20px;background:#fff7e0;border:1px solid #e8d68f;color:#6b5a12;font-size:12.25px;
+  font-weight:600;border-radius:8px;padding:10px 14px;line-height:1.7;}
+.banner b{color:#181614;}
+h2{font-size:14.5px;font-weight:800;color:#181614;margin:34px 0 10px;padding-bottom:7px;
+  border-bottom:1px solid #ded5c4;display:flex;align-items:center;gap:8px;}
+h2 .n{color:#5a5347;font-size:10.5px;font-weight:700;letter-spacing:.4px;border:1px solid #b6ab94;
+  border-radius:4px;padding:2px 7px;background:#fff;}
+.note{font-size:12.5px;color:#4b463d;line-height:1.75;margin-bottom:10px;max-width:1080px;}
+.note b.hi{color:#181614;}
+.note b.bad{color:#b3241a;}
+.note b.ok{color:#086b43;}
+table.t{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0 6px;background:#fff;}
+table.t th{text-align:left;color:#5a5347;font-weight:700;padding:6px 9px;border-bottom:1px solid #ded5c4;
+  white-space:nowrap;background:#f5f1e8;}
+table.t td{padding:7px 9px;border-bottom:1px solid #ece7db;vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+code{background:#f0ece0;border-radius:4px;padding:1px 6px;font-size:11px;color:#6b3f00;}
+.summary-box{border:1px solid #1d4f91;background:#eaf1fb;border-radius:10px;padding:14px 18px;
+  margin-bottom:16px;font-size:12.75px;line-height:1.8;color:#232220;}
+.summary-box b{color:#181614;}
+.summary-box ol{margin:4px 0 0 18px;padding:0;}
+.chk-table td:first-child{width:230px;color:#181614;font-weight:700;}
+.chk-ok{color:#086b43;font-weight:800;}
+.chk-warn{color:#8f4d02;font-weight:800;}
+.meas{font-size:12px;color:#5a5347;margin-top:8px;line-height:1.7;}
+.meas b{color:#086b43;}
+footer.docfoot{margin-top:40px;padding-top:14px;border-top:1px solid #ded5c4;font-size:11.5px;color:#786f60;}
+
+/* ── 비교 레이아웃 ─────────────────────────────────────────────────── */
+.compare-row{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0 8px;align-items:flex-start;}
+.compare-col{flex:1 1 560px;min-width:420px;}
+.compare-cap{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.compare-cap .tag{font-size:11.5px;font-weight:800;padding:2px 10px;border-radius:12px;}
+.tag-before{background:#fdeceb;color:#b3241a;}
+.tag-after{background:#e3f6ec;color:#086b43;}
+.compare-cap .badge{margin-left:auto;font-size:11.5px;font-weight:800;color:#181614;background:#fff;
+  border:1px solid #cfc6b6;border-radius:7px;padding:3px 10px;font-variant-numeric:tabular-nums;}
+.compare-desc{font-size:11.75px;color:#5a5347;margin-bottom:9px;line-height:1.6;}
+.scene-switch{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px;}
+.scene-switch button{font-family:inherit;font-size:11.75px;font-weight:800;padding:6px 12px;border-radius:8px;
+  border:1px solid #cfc6b6;background:#fff;color:#4b463d;cursor:pointer;}
+.scene-switch button:hover{border-color:#9a8f78;}
+.scene-switch button.on{background:#232220;border-color:#232220;color:#fdf9ee;}
+.sub-switch{display:flex;gap:6px;align-items:center;margin:2px 0 12px;font-size:11.25px;color:#786f60;}
+.sub-switch button{font-family:inherit;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;
+  border:1px solid #cfc6b6;background:#fff;color:#5a5347;cursor:pointer;}
+.sub-switch button:hover{border-color:#9a8f78;}
+.dupe-note{margin-top:9px;font-size:11.5px;color:#b3241a;background:#fdeceb;border:1px solid #f3c9c5;
+  border-radius:7px;padding:7px 10px;line-height:1.6;}
+.dupe-note b{color:#8a1a10;}
+
+/* ── 앱 프레임(실제 GIJO AS 프로 셸을 축소 재현 — 여기부터 시안 본체) ─────
+   색 토큰은 client/src/renderer/pages/pro-white.css 값 그대로. 레이아웃은
+   app.html(레일 56px·상단 44px)·console.js(cs-head 등) 실측 CSS 그대로 복사. */
+.appframe{
+  --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+  --border:rgba(43,38,33,.12); --border-strong:rgba(43,38,33,.22);
+  --text:#2b2621; --muted:#6b6259; --muted-2:#726960;
+  --blue:#3b82f6; --blue-light:#1d4f91; --teal:#1eb980; --amber:#f0a020; --red:#e2483d;
+  font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+  width:100%;max-width:640px;height:560px;background:var(--bg);color:var(--text);
+  border:1px solid #ded5c4;border-radius:12px;overflow:hidden;
+  box-shadow:0 14px 30px rgba(60,52,36,.16);
+  display:flex;position:relative;
+}
+.appframe *{box-sizing:border-box;}
+.af-rail{flex:0 0 44px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 0;
+  border-right:1px solid var(--border);background:var(--panel-2);}
+.af-rail .r{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);color:var(--muted);
+  font-size:12px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.af-work{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);}
+
+/* console.js:36-109 원문 그대로(색 토큰만 위 --blue-light 등으로 교체) */
+.cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;
+  color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel-2);}
+.cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);
+  border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+.cs-ctx .x{margin-left:5px;color:var(--muted-2);cursor:pointer;font-weight:400;}
+/* ⚠ cs-sel — pro-white.css:89-93에서 고친 값(2026-08-20). 여기만 유일하게 "고쳐진" 요소 */
+.cs-sel{font-size:11.5px;font-weight:700;color:#8f4d02;background:#fdf1e2;border:1px solid rgba(143,77,2,.35);
+  border-radius:12px;padding:1px 9px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+.cs-sel .x{margin-left:5px;color:var(--muted-2);cursor:pointer;font-weight:400;}
+/* ⚠ cs-scope — pro-white.css 어디에도 없다(grep 0건). 다크용 하드코딩 #bcd7ff 그대로 노출 = 결함 재현 */
+.cs-scope{font-size:11.5px;font-weight:700;color:#bcd7ff;border:1px solid rgba(59,130,246,.55);
+  background:rgba(59,130,246,.12);border-radius:12px;padding:1px 9px;white-space:nowrap;
+  max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+.cs-scope .x{margin-left:5px;color:var(--muted-2);cursor:pointer;font-weight:400;}
+.cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11.75px;}
+.cs-btn{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--muted);background:transparent;
+  border:1px solid var(--border-strong);border-radius:7px;padding:3px 8px;white-space:nowrap;}
+
+.cs-chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 11px;border-bottom:1px solid var(--border);}
+.cs-chip{font-size:11.75px;border:1px solid var(--border-strong);border-radius:13px;padding:2px 10px;
+  color:var(--text);background:var(--panel);white-space:nowrap;}
+
+/* ⚠ cs-state — pro-white.css에 없음. .h(#ffd9a8)·.tag.kev(#ff9d9d)가 다크용 하드코딩 그대로 = 결함 재현 */
+.cs-state{margin:0 12px 8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);
+  border-radius:9px;padding:7px 9px;position:relative;}
+.cs-state .h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#ffd9a8;
+  margin-bottom:4px;}
+.cs-state .h .x{margin-left:auto;color:var(--muted-2);cursor:pointer;font-weight:400;}
+.cs-state .t{font-size:12.5px;font-weight:700;color:var(--text);line-height:1.45;}
+.cs-state .m{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.cs-state .p{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55;}
+.cs-state .p b{color:var(--text);font-weight:700;}
+.cs-state .tag{display:inline-block;font-size:11px;font-weight:800;border-radius:4px;padding:0 5px;margin-right:4px;}
+.cs-state .tag.kev{background:rgba(245,80,80,.16);color:#ff9d9d;}
+.cs-state .bugflag{position:absolute;top:-9px;right:8px;font-size:10px;font-weight:800;color:#fff;
+  background:#b3241a;border-radius:4px;padding:1px 6px;}
+.cs-scope-wrap{position:relative;display:inline-block;}
+.cs-scope-wrap .bugflag{position:absolute;top:-9px;right:-6px;font-size:10px;font-weight:800;color:#fff;
+  background:#b3241a;border-radius:4px;padding:1px 5px;white-space:nowrap;}
+
+.cs-body{flex:1;min-height:0;overflow-y:auto;padding:9px 14px;background:var(--bg);}
+.cs-row{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);}
+.cs-row .ci{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:rgba(59,130,246,.12);
+  display:flex;align-items:center;justify-content:center;font-size:11px;}
+.cs-row.instr .ci{background:rgba(30,185,128,.14);}
+.cs-row .cb{flex:1;min-width:0;}
+.cs-row .cn{font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+.cs-row .cm{font-size:12px;color:var(--text);line-height:1.6;}
+.cs-row .cm .asset{color:var(--muted-2);font-size:11.25px;}
+.cs-row .cm .tagline{font-size:10.75px;font-weight:800;border-radius:4px;padding:0 5px;margin-right:4px;
+  background:rgba(245,80,80,.14);color:#b3241a;}
+.cs-row .cm .below{color:var(--muted);font-size:11.5px;}
+.cs-row .cm .plainline{color:var(--muted);}
+.chiprow{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;}
+
+/* 새로 제안하는 것 — 접두 cx- (context, 이번 시안 신규) */
+.cx-line{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:12.25px;
+  color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel-2);}
+.cx-line .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cx-line .txt b.asset{color:var(--blue-light);font-weight:800;}
+.cx-line .txt b.item{color:#8f4d02;font-weight:800;}
+.cx-line .txt.off{color:var(--muted-2);font-style:italic;}
+.cx-more{flex:0 0 auto;width:22px;height:22px;border-radius:6px;border:1px solid var(--border-strong);
+  color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:transparent;position:relative;}
+.cx-more:hover{border-color:var(--blue);color:var(--blue-light);}
+.cx-pop{position:absolute;top:100%;right:14px;margin-top:4px;background:var(--panel);
+  border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 8px 20px rgba(31,27,20,.16);
+  padding:5px;z-index:5;min-width:150px;display:none;}
+.cx-pop.open{display:block;}
+.cx-pop button{display:block;width:100%;text-align:left;font-family:inherit;font-size:11.5px;
+  background:none;border:none;border-radius:6px;padding:6px 8px;color:var(--text);cursor:pointer;}
+.cx-pop button:hover{background:rgba(59,130,246,.08);color:var(--blue-light);}
+
+.cs-next{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong);}
+.cs-next .lb{font-size:11px;font-weight:800;color:var(--muted-2);margin-bottom:5px;}
+.cs-next .chiprow .cs-chip{border-color:rgba(59,130,246,.35);background:rgba(59,130,246,.06);}
+
+.cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 12px 10px;
+  border-top:1px solid var(--border);}
+.cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;
+  color:var(--text);font-size:12px;padding:8px 11px;font-family:inherit;}
+.cs-dock button{flex:0 0 auto;background:var(--blue);color:#fff;border:none;border-radius:9px;
+  font-size:11.75px;font-weight:800;padding:8px 13px;font-family:inherit;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1>프로 셸 — 대화창 상단 맥락 표시 재설계 시안(추천 1개)</h1>
+<p class="lead">
+  대상: <code>client/src/renderer/pages/console.js</code>의 <code>.cs-head</code>(맥락 줄) ·
+  <code>.cs-sel</code>(🎯 선택 칩) · <code>.cs-scope</code>(🗂 범위 칩) · <code>.cs-state</code>(🎯 상세 박스).
+  범위는 <b>상단 맥락 표시</b>부터(화면별 질문 칩 <code>.cs-chips</code>·절차 띠 <code>.cs-flow</code>는 이번 민원 대상이 아니라 그대로 둔다).
+</p>
+<div class="quotebox">
+  <b>사장님 실측 피드백 원문(2026-08-20 프로 QA)</b>
+  <ol>
+    <li>"주황색 잘 안 보이고, 주황색 내용이 대화창 상단보단 대화창 안에서 다음 할 일 가이드를 같이 주면 어때?"</li>
+    <li>"(칩 스트립이) 보기 너무 어렵다. 대화창에서 가이드 주는 게 좋은데."</li>
+    <li>(자산 카드 화면) 중복 IP 등 같은 정보가 상단 칩과 카드에 겹쳐 나온다.</li>
+  </ol>
+</div>
+
+<div class="banner">
+  ⚠ <b>정직 고지</b> — 아래는 원칙적으로 정지 그림이다. 실제로 동작하는 것은
+  <b>제안(오른쪽) 프레임의 장면 전환 버튼 4개</b> · <b>"⋯" 보조메뉴 토글</b> ·
+  <b>실측 배지</b>(계산이 아니라 <u>지금 이 브라우저가 실제로 렌더링한 높이를 JS로 잰 값</u>)뿐이다.
+  입력칸·전송·칩 클릭은 눌러도 반응하지 않는다 — 서버가 답한 것처럼 흉내 내지 않는다.
+  왼쪽 "지금" 프레임은 가장 흔한 실사용 장면(항목 하나를 고른 뒤 대화로 돌아온 상태)에 <b>고정</b>했다.
+</div>
+
+<h2><span class="n">근거</span>설계 전 조사 — 표준·모범사례(직접 확인)</h2>
+<table class="t">
+  <tr><th style="width:230px">출처</th><th style="width:380px">확인한 내용(원문 인용)</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>Nielsen Norman Group — AI 챗봇 설계 가이드라인<br><span style="color:#786f60">nngroup.com/articles/ai-chatbots-design-guidelines/<br>(WebFetch 직접 확인)</span></td>
+    <td><i>"Users won't assume a chatbot knows what they're looking at unless the chatbot makes it explicit to them."</i> ·
+    <i>"present them as clickable buttons, rather than text."</i></td>
+    <td>맥락을 <b>없애지 않고</b> 한 줄 문장으로 <b>명시</b>한다(생략 아님) · 「다음 할 일」은 문장이 아니라 <b>누르는 칩</b>으로.</td>
+  </tr>
+  <tr>
+    <td>AI UX Playground — Follow-up Chips 패턴<br><span style="color:#786f60">aiuxplayground.com/pattern/follow-up-chips/<br>(WebFetch 직접 확인)</span></td>
+    <td><i>"Usually 2-4 high-relevance options. More than that competes with primary actions."</i> ·
+    "각 칩은 실제 다음 질문처럼 읽혀야 한다(범용 문구 금지)" · "새 답이 오면 <b>새로 고쳐야</b> 한다(낡은 제안 반복 금지)".</td>
+    <td>「다음 할 일」 칩 <b>2~3개</b>(요청 상한 준수) · 화면·범위·선택에 따라 문구가 구체적으로 바뀐다(아래 장면 전환에서 확인 가능) · 마지막 답이 바뀔 때마다 새로 그린다(누적 안 함).</td>
+  </tr>
+  <tr>
+    <td>Shapeof.ai — "Follow up" AI UX 패턴<br><span style="color:#786f60">shapeof.ai/patterns/follow-up<br>(WebFetch 직접 확인)</span></td>
+    <td>6갈래(대화 확장·명확화 질문·심화·비교·<b>액션 넛지</b>·공유) 중 우리 제안 칩은 "action nudge"에 해당. Perplexity 실사례 인용.</td>
+    <td>이번이 발명이 아니라 <b>업계에 이름 붙은 패턴의 적용</b>이라는 근거 — 기존 <code>선택카드()</code> 제안 칩(console.js:1133-1143)도 이미 이 갈래였다.</td>
+  </tr>
+  <tr>
+    <td>aufaitux.com — Filter UI Design 가이드<br><span style="color:#786f60">aufaitux.com/blog/filter-ui-design/<br>(WebFetch 직접 확인)</span></td>
+    <td><i>"When users apply multiple filters, showing every selected option as a separate chip can quickly make the interface crowded … combine less important ones into a single expandable chip … to keep the layout clean."</i></td>
+    <td><b>이 시안의 핵심 근거</b> — cs-ctx+cs-sel+cs-scope <b>세 개의 별도 칩</b>을 <b>하나의 요약 문장</b>으로 묶는다.</td>
+  </tr>
+  <tr>
+    <td>(내부 선례) console.js:106-108, 1157-1166 코드 주석</td>
+    <td>"VS Code implicit context의 결론(보이게+뗄 수 있게)" · "🎯는 화면 바뀌면 사라짐, 🗂는 남음 — 수명이 반대".</td>
+    <td>한 줄 문장으로 바뀌어도 <b>✕(떼기/풀기)는 그대로</b> 살린다 · 🎯·🗂 두 계층의 수명 차이를 문장 합성 규칙에 그대로 반영(아래 "합성 규칙").</td>
+  </tr>
+</table>
+
+<h2><span class="n">비교</span>지금(정지) vs 제안(장면 전환 가능) — 눌러 보세요</h2>
+<p class="note">오른쪽 "제안" 프레임 아래 4개 버튼을 눌러 장면을 바꿔 보라. 왼쪽 "지금"은 가장 흔한 문제 장면(항목 하나를 고른 뒤 대화로 돌아온 상태)에 고정해 뒀다 — 두 프레임 모두 위 배지가 <b>실제 렌더 높이(JS 실측)</b>를 보여준다.</p>
+
+<div class="compare-row">
+  <div class="compare-col">
+    <div class="compare-cap"><span class="tag tag-before">지금(BEFORE)</span><span class="badge" id="beforeBadge">실측 …</span></div>
+    <div class="compare-desc">시나리오: <code>srv-web-01</code>에 범위를 걸어 두고, 취약점 화면에서 <code>CVE-2024-6387</code> 하나를 골랐다가 대화로 돌아온 상태(가장 흔한 실사용 장면).</div>
+    <div class="appframe" id="beforeFrame">
+      <div class="af-rail"><div class="r">☰</div><div class="r">💬</div><div class="r">🕘</div></div>
+      <div class="af-work">
+        <div id="beforeChromeWrap">
+          <div class="cs-head">
+            <span class="cs-ctx">취약점<span class="x">✕</span></span>
+            <span class="cs-sel">🎯 CVE-2024-6387<span class="x">✕</span></span>
+            <span class="cs-scope-wrap"><span class="cs-scope">🗂 srv-web-01<span class="x">✕</span></span><span class="bugflag">대비 결함</span></span>
+            <span class="cs-hint">보고 있는 화면 기준으로 지시합니다</span>
+            <button class="cs-btn">⧉ 창으로</button>
+          </div>
+          <div class="cs-chips">
+            <span class="cs-chip">ⓘ 이 화면 안내</span>
+            <span class="cs-chip">지연된 것부터 보여줘</span>
+            <span class="cs-chip">담당자 없는 것 배정해줘</span>
+          </div>
+          <div class="cs-state" id="beforeStateBox">
+            <span class="bugflag" style="top:-9px;right:8px;">대비 결함</span>
+            <div class="h">🎯 지금 다루는 것<span class="x">✕ 풀기</span></div>
+            <div class="m">srv-web-01.internal</div>
+            <div class="t"><span class="tag kev">🚨 KEV</span>CVE-2024-6387 OpenSSL 원격 코드실행 취약점</div>
+            <div class="m">진행중 · 담당 박준영 · 기한 2026-08-22</div>
+            <div class="p">→ 인증 없이 원격에서 임의 명령을 실행할 수 있는 취약점입니다. <b>가장 급한 등급</b>입니다.</div>
+          </div>
+        </div>
+        <div class="cs-body">
+          <div class="cs-row instr"><div class="ci">나</div><div class="cb"><div class="cn">나 → AI 팀</div><div class="cm">오늘 뭐부터 볼까?</div></div></div>
+          <div class="cs-row"><div class="ci">🧭</div><div class="cb"><div class="cn">오케스트레이터</div><div class="cm">critical 3건, 그중 KEV 1건이 가장 급합니다 — srv-web-01의 CVE-2024-6387부터 보시죠.</div></div></div>
+          <div class="cs-row" id="beforeCardDup">
+            <span class="bugflag" style="position:static;display:inline-block;margin-bottom:4px;">↑ 위 박스와 같은 내용 중복</span>
+            <div class="ci">🎯</div>
+            <div class="cb">
+              <div class="cn">고른 항목</div>
+              <div class="cm">
+                <div class="asset">srv-web-01.internal</div>
+                <div><span class="tagline">🚨 KEV</span><b>CVE-2024-6387 OpenSSL 원격 코드실행 취약점</b></div>
+                <div class="below">진행중 · 담당 박준영 · 기한 2026-08-22</div>
+                <div class="plainline">→ 인증 없이 원격에서 임의 명령을 실행할 수 있는 취약점입니다. <b>가장 급한 등급</b>입니다.</div>
+                <div class="chiprow"><span class="cs-chip">이거 조치 완료 처리해줘</span><span class="cs-chip">이거 반려할게</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cs-dock"><input placeholder="지시를 입력하세요…" disabled><button disabled>전송</button></div>
+      </div>
+    </div>
+    <div class="dupe-note">
+      <b>중복 실측(민원③)</b> — 상단 박스(<code>#beforeStateBox</code>)와 대화 카드가 <b>같은 다섯 줄</b>
+      (자산·제목·심각도·상태/담당/기한·한글 풀이)을 각각 그린다: 상단 <span id="dupA">…px</span> ·
+      대화 카드 <span id="dupB">…px</span>. 화면 밖으로 안 나가고 <b>둘 다 항상 보인다.</b>
+    </div>
+  </div>
+
+  <div class="compare-col">
+    <div class="compare-cap"><span class="tag tag-after">제안(AFTER)</span><span class="badge" id="afterBadge">실측 …</span></div>
+    <div class="compare-desc">아래 버튼으로 4가지 장면을 눌러 보라 — 문장이 상황에 맞춰 바뀌고, 상세 박스는 <b>사라졌다</b>(대화 카드가 유일한 원본이 된다).</div>
+    <div class="scene-switch" id="sceneBtns">
+      <button data-s="list" class="on">① 화면만 보는 중</button>
+      <button data-s="scope">② 범위(자산) 안에서 보는 중</button>
+      <button data-s="pin">③ 항목 하나 고른 중</button>
+      <button data-s="off">④ 화면 무관하게 물음</button>
+    </div>
+    <div class="appframe" id="afterFrame">
+      <div class="af-rail"><div class="r">☰</div><div class="r">💬</div><div class="r">🕘</div></div>
+      <div class="af-work">
+        <div id="afterChromeWrap">
+          <div class="cx-line" id="cxLineRow">
+            <span class="txt" id="cxTxt">지금 「취약점」 화면을 보는 중</span>
+            <span style="position:relative;">
+              <button class="cx-more" id="cxMore" title="맥락 옵션">⋯</button>
+              <div class="cx-pop" id="cxPop"></div>
+            </span>
+            <button class="cs-btn">⧉ 창으로</button>
+          </div>
+          <div class="cs-chips">
+            <span class="cs-chip">ⓘ 이 화면 안내</span>
+            <span class="cs-chip">지연된 것부터 보여줘</span>
+            <span class="cs-chip">담당자 없는 것 배정해줘</span>
+          </div>
+        </div>
+        <div class="cs-body" id="afterBody">
+          <div class="cs-row instr"><div class="ci">나</div><div class="cb"><div class="cn">나 → AI 팀</div><div class="cm">오늘 뭐부터 볼까?</div></div></div>
+          <div class="cs-row"><div class="ci">🧭</div><div class="cb"><div class="cn">오케스트레이터</div><div class="cm" id="afterAnswerText">critical 3건, 그중 KEV 1건이 가장 급합니다.</div>
+            <div class="cs-next" id="afterNext" style="display:none">
+              <div class="lb">👉 다음 할 일</div>
+              <div class="chiprow" id="afterNextChips"></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="cs-dock"><input placeholder="지시를 입력하세요…" disabled><button disabled>전송</button></div>
+      </div>
+    </div>
+    <div class="sub-switch">현재 장면: <b id="sceneLabel">① 화면만 보는 중</b> — "⋯"을 눌러 보조 옵션(있을 때만)을 확인.</div>
+  </div>
+</div>
+
+<h2><span class="n">결정</span>핵심 결정 3줄</h2>
+<div class="summary-box">
+  <ol>
+    <li><code>.cs-ctx</code>+<code>.cs-sel</code>+<code>.cs-scope</code> <b>세 개의 별도 칩</b>을 <b>사람 말 한 줄</b>로 합친다 — 화면·범위·선택 중 <b>가장 구체적인 정보</b>가 문장을 채우고 나머지는 자연히 생략된다(코드·IP를 나열하지 않는다).</li>
+    <li><code>.cs-state</code>(🎯 상세 박스, 늘 떠 있던 것)를 <b>없앤다</b> — 그 내용은 이미 대화 안 「고른 항목」 카드가 갖고 있던 것과 <b>같은 값</b>이었다(민원③). 원본을 대화 카드 하나로 합친다.</li>
+    <li>마지막 답 아래 <b>「다음 할 일」 칩 2~3개</b>를 단다 — 누르면 지금과 똑같이 <code>submit()</code>으로 지시가 나간다(새 승인 경로·새 API 없음). 대화가 이어질 때마다 새로 고쳐진다(쌓이지 않음).</li>
+  </ol>
+</div>
+
+<h2><span class="n">발견</span>새로 찾은 것 — 지금 코드의 대비 결함(참고, 이번 시안이 없애는 요소)</h2>
+<p class="note">
+  이번 조사 중 <code>pro-white.css</code>를 <code>cs-scope</code>·<code>cs-state</code>로 grep했더니 <b class="bad">0건</b>이었다 —
+  2026-08-20에 <code>.cs-sel</code>만 고쳐졌고(pro-white.css:89-93), 나머지 둘은 다크용 하드코딩 색이 흰 바탕에 그대로 남아 있다.
+  아래는 같은 WCAG 공식(<code>L=0.2126R+0.7152G+0.0722B</code>, 대비=(L1+.05)/(L2+.05), mockups/pro-white 시안과 같은 방식)으로 <b>직접 계산</b>한 값 — 위 "지금" 프레임의 빨간 "대비 결함" 표시가 가리키는 자리다.
+</p>
+<table class="t">
+  <tr><th>요소</th><th>글자색(하드코딩)</th><th>실제 배경(흰 테마)</th><th>대비</th><th>기준(4.5:1)</th><th>근거(파일:행)</th></tr>
+  <tr><td><code>.cs-scope</code> 칩 글자</td><td><code>#bcd7ff</code></td><td><code>#f2efe9</code>(panel-2)</td>
+    <td style="color:#b3241a;font-weight:800">약 1.28:1</td><td style="color:#b3241a;font-weight:800">미달</td><td>console.js:86</td></tr>
+  <tr><td><code>.cs-state .h</code> "🎯 지금 다루는 것" 라벨</td><td><code>#ffd9a8</code></td><td><code>#f2efe9</code></td>
+    <td style="color:#b3241a;font-weight:800">약 1.16:1</td><td style="color:#b3241a;font-weight:800">미달</td><td>console.js:96</td></tr>
+  <tr><td><code>.cs-state .tag.kev</code> "🚨 KEV" 배지</td><td><code>#ff9d9d</code></td><td>연분홍 틴트(거의 흼)</td>
+    <td style="color:#b3241a;font-weight:800">약 1.3:1 이하</td><td style="color:#b3241a;font-weight:800">미달</td><td>console.js:104</td></tr>
+</table>
+<p class="meas">
+  세 곳 다 <b>실제로 거의 안 보인다</b>(1.2~1.3:1 — 최소 기준 4.5:1의 1/3 이하). 이게 사장님이 색을 한 번 고친 뒤에도
+  "칩 스트립이 어렵다"고 재차 말한 이유의 <b>일부</b>였을 것으로 추정한다 — 다만 정확한 인과는 확인하지 못했다(정직하게 "추정"으로 표시).
+  중요한 건 이 결함들을 <b>하나씩 또 패치</b>하는 대신(문의 다음에도 놓치는 자리가 또 생길 수 있다), 이번 시안은
+  <code>.cs-scope</code> 칩과 <code>.cs-state</code> 박스 <b>자체를 없애</b> 이 결함이 설 자리를 지운다. <code>.cs-ctx</code>는
+  <code>var(--blue-light)</code>를 쓰고 있어 원래도 정상이었다(pro-white.css:24를 통해 자동으로 진한 파랑을 받는다).
+</p>
+
+<h2><span class="n">왜</span>왜 이 안인지 — 기각한 다른 길</h2>
+<table class="t">
+  <tr><th style="width:260px">다른 길</th><th>왜 안 골랐나</th></tr>
+  <tr><td>A. 색만 더 고친다(<code>.cs-scope</code>·<code>.cs-state</code>도 <code>.cs-sel</code>처럼 잉크 색 추가)</td>
+    <td>2026-08-20에 <code>.cs-sel</code> 하나만 고쳤는데도 사장님이 재차 "보기 어렵다"고 했다 — <b>색이 아니라 구조(칩 3개+박스가 겹쳐 나오는 것 자체)</b>가 문제라는 뜻으로 읽었다. 색만 고치면 다음 QA에서 같은 민원이 또 나올 위험이 크다.</td></tr>
+  <tr><td>B. 칩은 그대로 두고 <code>.cs-state</code> 박스만 없앤다(부분안)</td>
+    <td>민원③(중복)은 풀리지만 민원①·②("칩 스트립 자체가 어렵다")는 그대로 남는다 — cs-ctx+cs-sel+cs-scope 세 칩이 여전히 한 줄에 늘어서 있다.</td></tr>
+  <tr><td>C. 상단 맥락 표시를 아예 없앤다(대화 안에서만 맥락을 언급)</td>
+    <td>NN그룹 원칙("사람은 챗봇이 명시하지 않으면 지금 보는 걸 안다고 가정하지 않는다") 위반. 기존 코드가 이미 지킨 "✕로 뗄 수 있어야 한다"는 계약(VS Code 선례)도 깨진다 — 맥락을 뗀 상태를 확인할 자리가 없어진다.</td></tr>
+  <tr><td>D. 계층형(breadcrumb) 표시 — "화면 › 범위 › 항목"</td>
+    <td>브레드크럼은 <b>상위/하위 계층</b>을 뜻하는 은유인데, 🎯(선택)와 🗂(범위)는 계층이 아니라 <b>수명이 다른 두 개의 병렬 상태</b>다(console.js:1157-1166 코드 주석). 계층 은유를 억지로 씌우면 "범위를 풀면 항목도 풀리나?" 같은 그릇된 기대가 생긴다.</td></tr>
+  <tr><td>E. (채택) 한 줄 문장 + 핵심 명사만 색 강조(테두리 없이) + "⋯" 보조메뉴</td>
+    <td>aufaitux 가이드("여러 칩을 하나의 요약으로 묶어라")와 NN그룹("명시적으로 보여줘라")을 동시에 만족. 색 강조는 <b>테두리·배경 없이 글자만</b> 진하게 써서 "칩처럼 보이는 상자"를 하나도 늘리지 않는다 — 다음 QA에서 또 "칩이 안 보인다"는 민원이 나올 표면 자체를 줄인다.</td></tr>
+</table>
+
+<h2><span class="n">규칙</span>문장 합성 규칙 — 세 층을 어떻게 한 줄로 묶었나</h2>
+<p class="note">🎯(선택, 짧은 수명)와 🗂(범위, 긴 수명)의 실제 코드상 수명 차이(console.js:1157-1166)를 그대로 "가장 구체적인 것이 이긴다"는 문장 규칙으로 옮겼다 — 둘 다 있으면 문장 하나에 다 담되, 화면 이름은 이미 뜻이 통하면 생략한다(사람도 "지금 srv-web-01의 CVE-2024-6387 보고 있어"라고 말하지 "지금 취약점 화면에서 srv-web-01의 CVE-2024-6387 보고 있어"라고 매번 화면 이름부터 대지 않는다).</p>
+<table class="t">
+  <tr><th>상태</th><th>문장</th><th>"⋯" 보조메뉴에 뜨는 것</th></tr>
+  <tr><td>화면만(선택·범위 없음)</td><td>지금 「취약점」 화면을 보는 중</td><td>화면 무관하게 묻기</td></tr>
+  <tr><td>범위만(자산 srv-web-01, 목록 3건)</td><td>지금 <b style="color:#1d4f91">srv-web-01</b>의 취약점 <b>3건</b>을 보는 중</td><td>범위 풀기 · 화면 무관하게 묻기</td></tr>
+  <tr><td>항목 하나 고름(범위 유지)</td><td>지금 <b style="color:#1d4f91">srv-web-01</b>의 <b style="color:#8f4d02">CVE-2024-6387</b>을 다루는 중</td><td>선택 풀기(범위는 유지) · 범위까지 풀기 · 화면 무관하게 묻기</td></tr>
+  <tr><td>화면 무관(✕로 뗌)</td><td><i>화면과 무관하게 묻는 중</i></td><td>다시 화면 기준으로</td></tr>
+</table>
+
+<h2><span class="n">포기</span>무엇을 포기했는지</h2>
+<table class="t">
+  <tr><th style="width:260px">포기한 것</th><th>왜 / 대안</th></tr>
+  <tr><td>세 상태(화면·범위·선택)를 <b>동시에 한눈에</b> 구분해 보는 것</td><td>기존엔 색이 다른 칩 세 개가 나란히 있어 "지금 뭐가 몇 겹으로 걸려 있나"가 한눈에 보였다(칩 개수=상태 개수). 문장으로 합치면 가장 구체적인 것만 보이고 나머지는 "⋯"을 눌러야 안다 — <b>드물게</b>(범위+선택이 동시에 걸린 경우) 정보 손실이 있다. 완전히 잃은 것은 아니다: "⋯"에 항상 남아 있고, 위 표처럼 문장 자체도 범위 이름을 같이 담는다.</td></tr>
+  <tr><td>화면 이름(예: 「취약점」)이 <b>항상</b> 보이는 것</td><td>범위·선택이 있으면 문장에서 화면 이름이 빠진다(자연어 압축). "지금 내가 어느 메뉴에 있는지"를 화면 이름으로 확인하던 습관이 있다면 살짝 낯설 수 있다 — 다만 왼쪽 메뉴(레일)나 탭 자체가 이미 그 답을 준다(중복 근거 하나 없앰).</td></tr>
+  <tr><td>화면별 질문 칩(<code>.cs-chips</code>)까지 함께 정리하는 것</td><td>이번 범위 밖으로 뒀다 — 그건 "이 화면에서 물을 수 있는 것"(일반 안내)이고, 이번 시안은 "지금 무엇을 다루는 중인가"(맥락)만 다룬다. 같이 손대면 두 가지 다른 문제(안내 vs 맥락)가 한 시안에 섞여 결정이 흐려진다.</td></tr>
+  <tr><td>대화 카드(선택카드)의 <b>모양</b> 자체를 새로 다듬는 것</td><td>2026-08-19에 이미 승인된 모양(mockups/조치항목_대화창)이 있고 실제로 배선돼 있다 — 이번 시안은 그 카드를 <b>유일한 원본</b>으로 만들 뿐, 카드 안 내용·칩 문구 로직은 그대로 재사용한다(같은 일 하는 코드를 두 번 만들지 않는다).</td></tr>
+</table>
+
+<h2><span class="n">숫자</span>밀도 숫자 — 계산값 + 실측(이 페이지가 지금 잰 값)</h2>
+<p class="note">
+  계산값은 console.js 실제 CSS(패딩·테두리·line-height)를 그대로 더한 값이다(줄 높이 가정은 요소에 명시된 값을 쓰고,
+  없으면 브라우저 기본 1.2로 가정 — mockups/조치항목_대화창과 같은 방식). <b>실측</b>은 위 비교 프레임을 지금 이 브라우저가
+  그린 실제 <code>getBoundingClientRect().height</code>다 — 아래 표의 "실측" 칸은 페이지 로드 시 스크립트가 채운다.
+</p>
+<table class="t">
+  <tr><th style="width:300px">항목(장면)</th><th style="width:130px">계산값</th><th style="width:130px">실측(JS)</th><th>비고 / 근거</th></tr>
+  <tr><td>지금 — 목록만 볼 때(cs-head+cs-chips)</td><td class="meas">≈73px</td><td>—</td><td>선택·범위 없을 때는 지금 구조도 큰 문제가 없다(그래서 이 시안이 없애려는 건 이 상태가 아니다).</td></tr>
+  <tr><td>지금 — 항목 하나 고른 뒤(cs-head+cs-chips+<b>cs-state</b>)</td><td class="meas">≈199px</td><td id="measBeforeChrome">…</td><td>console.js:36-105 값 합산 — cs-state 하나가 ≈125px을 더 얹는다.</td></tr>
+  <tr><td>지금 — 대화 카드(선택카드, 이미 있는 것, 안 바뀜)</td><td class="meas">≈132px</td><td>—</td><td>console.js:1109-1155 — <b>상단 cs-state와 같은 다섯 줄</b>을 또 그린다(민원③의 실체).</td></tr>
+  <tr><td>제안 — 항목 하나 고른 뒤(문장 한 줄+cs-chips, cs-state 없음)</td><td class="meas">≈72px</td><td id="measAfterChrome">…</td><td>어느 장면이든 구조가 안 바뀐다 — 문장 내용만 바뀐다(장면 버튼으로 확인 가능).</td></tr>
+  <tr><td><b>상단 고정 영역 증감</b>(항목 고른 장면 기준)</td><td class="meas"><b style="color:#086b43">−127px(−64%)</b></td><td id="measDelta">…</td><td>199 − 72 = 127. 화면을 옮기지 않는 한 <b>항상</b> 차지하던 자리다.</td></tr>
+  <tr><td>제안 — 「다음 할 일」 칩 블록(신규, <b>대화 흐름 안</b>)</td><td class="meas">≈43px</td><td id="measNext">…</td><td>고정 상단이 아니라 <b>스크롤되는 대화 영역</b>에 산다 — 다음 턴이 오면 새로 그려지고 옛 것은 스크롤로 흘러간다(follow-up chips 원칙 "refresh, don't repeat").</td></tr>
+</table>
+<p class="meas">
+  <b>요약</b> — "항상 화면을 누르고 있는" 고정 영역은 <b>199px → 72px</b>(−64%)로 준다. 그리고 상단 박스가 갖고 있던 정보(≈125px 분량)는
+  <b>사라진 게 아니라</b> 대화 카드(≈132px, 원래 있던 것) <b>한 곳으로만</b> 합쳐진다 — 화면에 남는 총 글자 수는 크게 안 줄어도,
+  <b>같은 값을 두 번 그리던 것을 한 번으로</b> 줄인 것이 이번 시안의 실제 절감분이다. 「다음 할 일」 43px은 새로 추가되지만
+  스크롤 영역 안이라 상단 고정 높이에는 안 잡힌다.
+</p>
+
+<h2><span class="n">점검</span>제품 원칙 자가점검</h2>
+<table class="t chk-table">
+  <tr><td>메뉴는 보기용 · 지시는 대화창</td><td><span class="chk-ok">✓</span> 「다음 할 일」 칩은 새 입력칸이 아니라 기존 <code>submit()</code>으로 그대로 나간다(console.js:1146-1152와 같은 배선) — 누르면 타이핑한 것과 동일하게 처리된다. 새 승인 경로·새 API 없음.</td></tr>
+  <tr><td>화면 설명·사용법은 챗봇(screenguide)으로</td><td><span class="chk-ok">✓</span> 이번 시안은 화면에 설명 문구를 추가하지 않는다 — 맥락 문장은 "지금 무엇을 다루는가"라는 <b>상태 표시</b>이지 사용법 설명이 아니다(ⓘ 안내는 그대로 <code>guideAsk()</code> 몫).</td></tr>
+  <tr><td>정직한 구현 · 가짜 UI 금지</td><td><span class="chk-ok">✓</span> 장면 전환·"⋯"·실측 배지는 실제 DOM/JS로 동작. 서버가 답한 것처럼 보이는 자리는 없다(입력칸·전송은 명시적으로 disabled).</td></tr>
+  <tr><td>기존 계약 회귀 여부(보이게+뗄 수 있게, console.js:106-108)</td><td><span class="chk-ok">✓</span> ✕(맥락 떼기)·범위 풀기·선택 풀기 세 동작 모두 "⋯" 메뉴에 살아 있다 — 하나도 없애지 않았다. 🎯·🗂 수명 차이(선택은 화면 바뀌면 사라짐, 범위는 남음)도 문장 합성 규칙에 그대로 반영했다.</td></tr>
+  <tr><td>11px 미만 글자 금지</td><td><span class="chk-ok">✓</span> 이 시안에서 새로 쓴 글자 중 가장 작은 것은 <code>.cs-next .lb</code> 11px · <code>.cx-pop button</code> 11.5px — 11px 미만 없음.</td></tr>
+  <tr><td>자체완결 HTML(폐쇄망)</td><td><span class="chk-ok">✓</span> 외부 CDN·웹폰트·원격 이미지 0개. 글꼴은 시스템 스택뿐, 아이콘은 전부 유니코드 문자.</td></tr>
+  <tr><td>제품 룩앤필(색·구조)</td><td><span class="chk-ok">✓</span> 색 토큰은 <code>pro-white.css</code>, 구조·클래스명은 <code>console.js</code>에서 그대로 가져왔다(위 "발견" 절처럼 결함까지 그대로 재현) — 지어낸 값 없음.</td></tr>
+</table>
+
+<h2><span class="n">참고</span>구현 참고(메인 에이전트용 — 시안 승인 후)</h2>
+<table class="t">
+  <tr><th style="width:230px">항목</th><th>내용</th></tr>
+  <tr><td>새 함수(가칭)</td><td><code>renderCtxLine()</code> — 현재 <code>applyCtx()</code>(console.js:1055) 안의 <code>chip.innerHTML=…</code> 자리를 문장 조립 로직으로 교체. 위 "문장 합성 규칙" 표를 그대로 분기 조건으로 쓸 수 있다(가장 구체적인 계층 우선).</td></tr>
+  <tr><td><code>.cs-state</code>(renderSelState) 처리</td><td>렌더를 그만두거나, 대화 카드(<code>선택카드()</code>) 쪽으로 완전히 흡수 — 두 함수가 지금 <b>같은 데이터(sel.fields)</b>를 받으므로 병합이 자연스럽다(console.js:1109 vs 1209).</td></tr>
+  <tr><td>「다음 할 일」 배선</td><td><code>선택카드()</code>의 칩 로직(console.js:1131-1152, 자산형/취약점형/일반형 분기)을 <b>그대로 재사용</b> — 신규 API 불필요. 다만 "마지막 답 아래"로 트리거를 옮기려면 매 답변 렌더 지점(<code>replaceTyping</code> 등)에서도 이 로직을 부르도록 배선 확장이 필요(선택이 없을 때는 화면 일반 제안으로 폴백).</td></tr>
+  <tr><td>pro-white.css 결함 정리</td><td>이 시안이 채택되면 <code>.cs-scope</code>·<code>.cs-state</code> 자체가 사라지므로 위 "발견" 절의 3개 대비 결함은 <b>자동 해소</b>된다 — 별도 색 패치가 필요 없다(단, 시안이 기각되면 그 결함은 별도로 남아 처리해야 한다).</td></tr>
+  <tr><td>소스 감시 테스트 권고</td><td>"<code>.cs-state</code>·<code>.cs-scope</code> 클래스가 <code>console.js</code>에서 사라졌는데 어딘가 잔재 참조가 남았는가"를 세는 감시(반쪽 수정 방지, 이 저장소의 반복 함정) 추가를 권한다.</td></tr>
+</table>
+
+<footer class="docfoot">
+  mockups/pro-context-strip/시안.html · GIJO AS 시안 · 제품 코드는 읽기만 했고 수정하지 않았다.
+</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── 실측 배지 — 계산이 아니라 실제 렌더 높이 ──────────────────────────
+  function h(id) {
+    var el = document.getElementById(id);
+    return el ? Math.round(el.getBoundingClientRect().height) : 0;
+  }
+  function updateMeasure() {
+    var b = h("beforeChromeWrap");
+    var a = h("afterChromeWrap");
+    document.getElementById("beforeBadge").textContent = "실측 " + b + "px";
+    document.getElementById("afterBadge").textContent = "실측 " + a + "px";
+    var mb = document.getElementById("measBeforeChrome"); if (mb) mb.textContent = b + "px";
+    var ma = document.getElementById("measAfterChrome"); if (ma) ma.textContent = a + "px";
+    var md = document.getElementById("measDelta");
+    if (md) {
+      var d = b - a, pct = b ? Math.round((d / b) * 100) : 0;
+      md.textContent = "−" + d + "px(−" + pct + "%)";
+    }
+    var dupA = h("beforeStateBox"), dupB = h("beforeCardDup");
+    var da = document.getElementById("dupA"); if (da) da.textContent = dupA + "px";
+    var db = document.getElementById("dupB"); if (db) db.textContent = dupB + "px";
+    var nx = document.getElementById("afterNext");
+    var mn = document.getElementById("measNext");
+    if (mn) mn.textContent = (nx && nx.style.display !== "none") ? h("afterNext") + "px" : "(현재 장면엔 없음)";
+  }
+
+  // ── 제안 프레임 — 장면 전환(문장 합성 규칙 표를 그대로 코드로) ──────────
+  var SCENES = {
+    list: {
+      label: "① 화면만 보는 중",
+      txt: '지금 「취약점」 화면을 보는 중',
+      pop: ['화면 무관하게 묻기'],
+      next: null,
+      answer: "critical 3건, 그중 KEV 1건이 가장 급합니다."
+    },
+    scope: {
+      label: "② 범위(자산) 안에서 보는 중",
+      txt: '지금 <b class="asset">srv-web-01</b>의 취약점 <b>3건</b>을 보는 중',
+      pop: ['범위 풀기', '화면 무관하게 묻기'],
+      next: ["지연된 것부터 보여줘", "담당자 없는 것부터 배정해줘", "KEV만 다시 보여줘"],
+      answer: "srv-web-01의 미조치 취약점 3건 — critical 1 · high 2. KEV는 CVE-2024-6387 하나입니다."
+    },
+    pin: {
+      label: "③ 항목 하나 고른 중",
+      txt: '지금 <b class="asset">srv-web-01</b>의 <b class="item">CVE-2024-6387</b>을 다루는 중',
+      pop: ['선택 풀기(범위는 유지)', '범위까지 풀기', '화면 무관하게 묻기'],
+      next: ["이거 조치 완료 처리해줘", "이거 반려할게", "이거 쉽게 설명해줘"],
+      answer: "CVE-2024-6387 — 인증 없이 원격 코드실행이 가능한 OpenSSL 취약점입니다. 담당 박준영, 기한 08-22."
+    },
+    off: {
+      label: "④ 화면 무관하게 물음",
+      txt: '<i>화면과 무관하게 묻는 중</i>',
+      pop: ['다시 화면 기준으로'],
+      next: null,
+      answer: "NIST CSF는 식별·보호·탐지·대응·복구 5개 기능으로 구성됩니다."
+    }
+  };
+
+  var cxTxt = document.getElementById("cxTxt");
+  var cxPop = document.getElementById("cxPop");
+  var cxMore = document.getElementById("cxMore");
+  var afterAnswer = document.getElementById("afterAnswerText");
+  var afterNext = document.getElementById("afterNext");
+  var afterNextChips = document.getElementById("afterNextChips");
+  var sceneLabel = document.getElementById("sceneLabel");
+
+  function paintScene(key) {
+    var s = SCENES[key];
+    cxTxt.innerHTML = s.txt;
+    cxTxt.classList.toggle("off", key === "off");
+    cxPop.innerHTML = s.pop.map(function (t) {
+      return '<button type="button">' + t + "</button>";
+    }).join("");
+    cxPop.classList.remove("open");
+    afterAnswer.textContent = s.answer;
+    if (s.next) {
+      afterNextChips.innerHTML = s.next.map(function (t) {
+        return '<span class="cs-chip">' + t + "</span>";
+      }).join("");
+      afterNext.style.display = "";
+    } else {
+      afterNext.style.display = "none";
+    }
+    sceneLabel.textContent = s.label;
+    document.querySelectorAll("#sceneBtns button").forEach(function (b) {
+      b.classList.toggle("on", b.dataset.s === key);
+    });
+    updateMeasure();
+  }
+
+  document.querySelectorAll("#sceneBtns button").forEach(function (b) {
+    b.addEventListener("click", function () { paintScene(b.dataset.s); });
+  });
+  cxMore.addEventListener("click", function (e) {
+    e.stopPropagation();
+    cxPop.classList.toggle("open");
+  });
+  document.addEventListener("click", function () { cxPop.classList.remove("open"); });
+
+  paintScene("list");
+  // 초기 측정(폰트 로딩 이후 재측정 — 시스템 폰트라 큰 차이는 없지만 보수적으로 한 번 더)
+  updateMeasure();
+  setTimeout(updateMeasure, 60);
+})();
+</script>
+</body>
+</html>

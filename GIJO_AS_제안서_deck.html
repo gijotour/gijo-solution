@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>GIJO AS 제안서</title>
+<style>
+:root{--bg:#0a0e1a;--bg2:#0e1526;--panel:#121a2e;--panel2:#16203a;--border:rgba(255,255,255,.10);--bs:rgba(255,255,255,.18);--blue:#3b82f6;--blueL:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;--ok:#1eb980;}
+@page{size:1280px 720px;margin:0;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:#000;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);}
+.slide{width:1280px;height:720px;page-break-after:always;position:relative;overflow:hidden;
+  background:radial-gradient(1200px 700px at 80% -10%,rgba(59,130,246,.10),transparent 60%),linear-gradient(160deg,#0a0e1a,#0c1424 60%,#0a1120);
+  padding:54px 64px;display:flex;flex-direction:column;}
+.slide:last-child{page-break-after:auto;}
+.kicker{font-size:15px;font-weight:800;letter-spacing:3px;color:var(--blueL);text-transform:uppercase;}
+.snum{position:absolute;right:34px;bottom:26px;font-size:13px;color:var(--muted2);font-weight:700;}
+.brandftr{position:absolute;left:64px;bottom:26px;font-size:12px;color:var(--muted2);font-weight:700;letter-spacing:.5px;}
+h1{font-size:44px;font-weight:900;color:#fff;line-height:1.15;margin:8px 0 6px;}
+h2{font-size:34px;font-weight:900;color:#fff;line-height:1.2;margin:6px 0 18px;}
+h2 .em{color:var(--blueL);}
+.lead{font-size:18px;color:var(--muted);line-height:1.6;max-width:1000px;}
+.grow{flex:1;display:flex;flex-direction:column;justify-content:center;}
+/* Cover */
+.cover{justify-content:center;background:radial-gradient(900px 600px at 70% 20%,rgba(59,130,246,.16),transparent 55%),linear-gradient(160deg,#0a0e1a,#0b1strivar 60%,#0a1120);}
+.logo{font-size:26px;font-weight:900;letter-spacing:2px;color:#fff;}
+.logo b{color:var(--blueL);}
+.cover h1{font-size:60px;margin:26px 0 14px;}
+.cover .sub{font-size:22px;color:var(--muted);font-weight:600;}
+.pill{display:inline-block;margin-top:30px;padding:9px 18px;border:1px solid var(--bs);border-radius:30px;font-size:15px;color:var(--text);background:rgba(59,130,246,.10);font-weight:700;}
+/* cards */
+.cards{display:grid;gap:16px;}
+.c3{grid-template-columns:repeat(3,1fr);}
+.c2{grid-template-columns:repeat(2,1fr);}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px 24px;}
+.card .ic{font-size:26px;}
+.card .t{font-size:19px;font-weight:800;color:#fff;margin:10px 0 7px;}
+.card .d{font-size:15px;color:var(--muted);line-height:1.55;}
+.card.accent{border-color:rgba(59,130,246,.5);background:linear-gradient(180deg,rgba(59,130,246,.12),var(--panel));}
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:24px;}
+.pil{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;}
+.pil .n{font-size:13px;font-weight:800;color:var(--blueL);letter-spacing:1px;}
+.pil .t{font-size:22px;font-weight:900;color:#fff;margin:8px 0 8px;}
+.pil .d{font-size:15px;color:var(--muted);line-height:1.55;}
+/* table */
+table{width:100%;border-collapse:collapse;font-size:16px;}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+th{font-size:14px;color:var(--muted2);font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
+td.cmd{color:var(--blueL);font-weight:700;}
+td.was{color:var(--muted);}
+td b{color:#fff;}
+tr:last-child td{border-bottom:0;}
+.ok{color:var(--ok);font-weight:800;}
+.no{color:var(--muted2);}
+.small{font-size:14px;color:var(--muted2);margin-top:12px;}
+/* screenshot slide */
+.shotwrap{flex:1;display:flex;align-items:center;justify-content:center;margin-top:10px;}
+.shotwrap img{max-width:100%;max-height:520px;border:1px solid var(--bs);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.55);}
+.cap{font-size:16px;color:var(--muted);margin-top:14px;}
+.cap b{color:var(--teal);}
+/* flow */
+.flow{display:flex;align-items:center;gap:14px;margin-top:20px;flex-wrap:wrap;}
+.step{background:var(--panel);border:1px solid var(--bs);border-radius:14px;padding:18px 22px;font-size:18px;font-weight:800;color:#fff;}
+.step .s{font-size:13px;color:var(--blueL);font-weight:800;display:block;margin-bottom:4px;}
+.arrow{font-size:24px;color:var(--muted2);}
+/* quadrant */
+.quad{position:relative;flex:1;margin-top:10px;border:1px solid var(--border);border-radius:16px;background:var(--bg2);}
+.axis{position:absolute;color:var(--muted2);font-size:14px;font-weight:800;}
+.qcell{position:absolute;width:44%;padding:16px;}
+.qtag{font-size:13px;color:var(--muted);line-height:1.4;}
+.qtag b{color:var(--text);}
+.qgijo{background:linear-gradient(180deg,rgba(30,185,128,.16),rgba(30,185,128,.04));border:1px solid rgba(30,185,128,.5);border-radius:14px;}
+.qgijo .qt{font-size:22px;font-weight:900;color:var(--teal);}
+.qgijo .qd{font-size:14px;color:var(--muted);margin-top:4px;}
+.hl{color:var(--amber);font-weight:800;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:26px;flex:1;align-items:center;}
+.bl{display:flex;gap:12px;margin-bottom:16px;}
+.bl .k{color:var(--red);font-size:18px;flex:none;}
+.bl .v{font-size:16px;color:var(--muted);line-height:1.5;}
+.bl .v b{color:#fff;}
+.summary{font-size:22px;line-height:1.7;color:var(--text);background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:14px;padding:28px 32px;}
+.summary b{color:var(--blueL);}
+.cta{display:flex;gap:16px;margin-top:22px;}
+.ctac{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px 22px;}
+.ctac .t{font-size:18px;font-weight:900;color:#fff;margin-bottom:6px;}
+.ctac .d{font-size:14px;color:var(--muted);line-height:1.5;}
+</style></head>
+<body>
+
+<!-- 1 COVER -->
+<section class="slide cover">
+  <div class="logo">GI<b>J</b>O AS</div>
+  <h1>흩어진 보안을<br>AI가 엮어 자동 처리합니다</h1>
+  <div class="sub">한 명의 보안담당자가 여러 명 몫을 해내도록 — 완전 온프레미스 AI 보안 운영 플랫폼</div>
+  <div><span class="pill">제품 제안서 · 2026.07 · GIJO Technology</span></div>
+  <div class="snum">01</div>
+</section>
+
+<!-- 2 PROBLEM -->
+<section class="slide">
+  <div class="kicker">The Problem</div>
+  <h2>보안담당자의 현실 — <span class="em">인원은 그대로, 일은 폭증</span></h2>
+  <div class="grow">
+    <div class="cards c3">
+      <div class="card"><div class="ic">🧑‍💻</div><div class="t">인원 부족 · 정보 폭증</div><div class="d">제품 로그 · CTI 위협 · 취약점 스캔이 <b>따로따로</b> 도착. 사람이 다 못 따라감.</div></div>
+      <div class="card"><div class="ic">🔗</div><div class="t">대조가 전부 수작업</div><div class="d">"이 위협이 우리 어느 자산에?", "이 자산 문제가 어느 서비스에?"를 <b>눈으로 매칭</b>.</div></div>
+      <div class="card"><div class="ic">🤖</div><div class="t">이제 AI 자산까지</div><div class="d">AI 모델·에이전트·공급망(AI-BOM)이 새 관리 대상으로 추가.</div></div>
+    </div>
+    <div class="lead" style="margin-top:26px">개별 데이터는 있는데 <b style="color:#fff">서로 연결이 안 되어</b>, 담당자가 그 연결을 <span class="hl">머리로 대신</span>하고 있습니다.</div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">02</div>
+</section>
+
+<!-- 3 SOLUTION -->
+<section class="slide">
+  <div class="kicker">The Solution</div>
+  <h2>GIJO AS — 보안 정보를 <span class="em">자동으로 엮는</span> 온프레미스 플랫폼</h2>
+  <div class="lead"><b style="color:#fff">여러 보안장비의 로그·리포트를 모아 자동 분석</b>하고, AI 자산·취약점·위협 인텔·컴플라이언스를 하나의 폐쇄망 플랫폼에서 상관분석합니다. 보안 특화 <b style="color:#fff">Agent AI 팀 + 로컬 LLM</b>이 담당자 업무를 대신 수행하며, 필요하면 <b style="color:#fff">외부 API·MCP로 분석을 확장</b>합니다.</div>
+  <div class="pillars">
+    <div class="pil"><div class="n">CONVERGENCE</div><div class="t">수렴</div><div class="d">AI-BOM · 취약점관리 · LLM 보안 · SOC 분석 · 장비 하드닝을 한곳에.</div></div>
+    <div class="pil"><div class="n">CORRELATION</div><div class="t">자동 상관</div><div class="d">"이 위협이 어느 자산·서비스에?"를 사람 대신 엮음.</div></div>
+    <div class="pil"><div class="n">SOVEREIGNTY</div><div class="t">완전 온프레미스</div><div class="d">데이터도 AI도 조직 경계를 벗어나지 않음.</div></div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">03</div>
+</section>
+
+<!-- 4 CORE: 로그 수집·분석 + MCP/외부 API -->
+<section class="slide">
+  <div class="kicker">Core · 핵심 역량</div>
+  <h2>직접 스캔이 아니라 — <span class="em">보안장비 로그를 모아 분석</span></h2>
+  <div class="grow">
+    <div class="cards c3">
+      <div class="card"><div class="ic">📥</div><div class="t">수집 (Collect)</div><div class="d">방화벽·IDS/IPS·EDR·백신·DLP 등 <b>여러 보안장비의 로그·운영 리포트</b>를 모은다. 드롭존 업로드 + <b>인바운드 SMTP(알림 집수)</b>로 자동 수집 — 이미 쏟아지는 로그를 그대로.</div></div>
+      <div class="card"><div class="ic">🔗</div><div class="t">정규화·상관 (Correlate)</div><div class="d">같은 규격 이벤트로 정규화하고 KEV·EPSS로 우선순위. 같은 IP·호스트가 여러 소스에 나타나면 <b>교차 위험</b>으로 묶는다.</div></div>
+      <div class="card accent"><div class="ic">🧩</div><div class="t">외부 API·MCP 확장</div><div class="d">필요 시 외부 분석 도구·LLM을 <b>MCP·외부 API</b>로 연결해 심화 분석. <b>egress 승인·감사 게이트</b>로 통제(무단 반출 차단).</div></div>
+    </div>
+    <div class="small">→ 스캐너를 새로 도입하는 게 아니라, <b style="color:var(--muted)">이미 있는 보안장비의 로그·리포트를 수집·분석</b>하는 것이 제품의 핵심입니다.</div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">04</div>
+</section>
+
+<!-- 5 AUTOMATION -->
+<section class="slide">
+  <div class="kicker">Core Value · 업무 자동화</div>
+  <h2>보안담당자 업무 자동화 — <span class="em">자연어 한 줄로</span></h2>
+  <div class="grow">
+    <table>
+      <tr><th style="width:38%">담당자의 수작업(기존)</th><th style="width:32%">GIJO AS 자동화</th><th style="width:30%">자연어 지시 예시</th></tr>
+      <tr><td class="was">스캐너 리포트 수백 건 눈으로 정렬해 "뭐부터?"</td><td><b>KEV·EPSS·VPR</b> 전자산 우선순위 자동</td><td class="cmd">"오늘 뭐부터 조치해야 해?"</td></tr>
+      <tr><td class="was">취약점마다 담당자·기한 수기 배정</td><td>담당자·기한 자동 배정(결재 승인)</td><td class="cmd">"가장 급한 취약점 담당자·기한 배정해줘"</td></tr>
+      <tr><td class="was">아침마다 상황 손취합</td><td>오늘의 보안 브리핑 즉석 생성</td><td class="cmd">"오늘 브리핑 해줘"</td></tr>
+      <tr><td class="was">위협이 어느 자산·서비스에? 눈 대조</td><td>위협→자산→서비스 자동 상관</td><td class="cmd">"이 위협 어느 자산에 영향?"</td></tr>
+      <tr><td class="was">주간·임원 보고서 손작성</td><td>보고서 자동 생성(DOCX/PDF)</td><td class="cmd">"주간 보안 리포트 작성해줘"</td></tr>
+      <tr><td class="was">"고쳐졌나?" 수동 재확인</td><td>재스캔으로 해결 자동 검증(closed-loop)</td><td class="cmd">(조치완료→재스캔→완료 자동확정)</td></tr>
+    </table>
+    <div class="small">↑ 실제 제품에서 <b style="color:var(--muted)">라우팅 검증된 실동작 명령</b>입니다 — 비슷한 표현이 와도 같은 기능으로 처리.</div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">05</div>
+</section>
+
+<!-- 5 COMPOSITE -->
+<section class="slide">
+  <div class="kicker">Core Value · 복합 지시</div>
+  <h2>한 문장 지시 → <span class="em">여러 단계 자동 수행</span></h2>
+  <div class="lead">"이 자산 스캔하고 우선순위 분석해서 리포트까지" — 여러 작업을 한 문장으로 지시하면 오케스트레이터가 순서대로 자동 실행하고 각 단계를 실시간 협업 로그로 보여줍니다.</div>
+  <div class="grow">
+    <div class="flow">
+      <div class="step"><span class="s">STEP 1</span>스캔</div><div class="arrow">→</div>
+      <div class="step"><span class="s">STEP 2</span>우선순위 분석</div><div class="arrow">→</div>
+      <div class="step"><span class="s">STEP 3</span>리포트 생성</div><div class="arrow">→</div>
+      <div class="step" style="border-color:rgba(30,185,128,.5);background:rgba(30,185,128,.08)"><span class="s" style="color:var(--teal)">RESULT</span>✓ 완료</div>
+    </div>
+    <div class="lead" style="margin-top:34px">효과 — 여러 콘솔을 오가며 하던 반복 업무가 <span class="hl">"지시 한 줄"</span>로. 1인 담당자가 여러 명 몫을 해내는 핵심 지렛대.</div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">06</div>
+</section>
+
+<!-- 6 SHOT: dashboard -->
+<section class="slide">
+  <div class="kicker">실제 제품 화면 · 실측 데이터</div>
+  <h2>보안 지휘 콘솔 — <span class="em">AI 팀에게 지시</span></h2>
+  <div class="shotwrap"><img src="screenshots/deck/13-메인대시보드-지휘콘솔.png" alt="메인 대시보드"></div>
+  <div class="cap">좌측 <b>자산 탐색기</b> · 가운데 <b>AI 팀 + 지휘 콘솔</b>(자연어 지시→실시간 협업) · 우측 <b>작업 세션</b></div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">07</div>
+</section>
+
+<!-- 7 SHOT: SOC -->
+<section class="slide">
+  <div class="kicker">실제 제품 화면 · 실측 데이터</div>
+  <h2>통합 관제 — <span class="em">4소스를 한 줄로 세운다</span></h2>
+  <div class="shotwrap"><img src="screenshots/deck/14-통합관제-보안분석.png" alt="통합 관제"></div>
+  <div class="cap">취약점 스캐너 · 보안 로그 · 운영 리포트 · 하드닝 점검을 <b>같은 규격으로 정규화</b>하고 KEV·EPSS로 우선순위·상관분석</div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">08</div>
+</section>
+
+<!-- 8 SHOT: approvals -->
+<section class="slide">
+  <div class="kicker">실제 제품 화면 · 실측 데이터</div>
+  <h2>조치·승인 — <span class="em">배정→검증(재스캔)→완료</span></h2>
+  <div class="shotwrap"><img src="screenshots/deck/05-승인워크플로우.png" alt="조치 승인 워크플로"></div>
+  <div class="cap"><b>보안담당자/실수행담당자 이원화</b> · 기한(SLA) · 조치 완료 후 <b>재스캔으로 해결 자동 검증</b> · 반려는 사유·승인자 보존</div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">09</div>
+</section>
+
+<!-- 9 SHOT: AI-BOM -->
+<section class="slide">
+  <div class="kicker">실제 제품 화면 · 차별 플래그십</div>
+  <h2>AI-BOM — <span class="em">AI 공급망 거버넌스</span></h2>
+  <div class="shotwrap"><img src="screenshots/deck/10-AI-BOM-SBOM.png" alt="AI-BOM"></div>
+  <div class="cap">자산별 구성요소 · <b>CycloneDX ML-BOM</b> 내보내기 · AI-BOM→KISA 위협→OWASP/NIST/MITRE→대응현황 연계</div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">10</div>
+</section>
+
+<!-- 10 MARKET -->
+<section class="slide">
+  <div class="kicker">Market · 시장 지형</div>
+  <h2>AI 보안 시장 — <span class="em">5대 카테고리</span></h2>
+  <div class="grow">
+    <div class="cards" style="grid-template-columns:repeat(5,1fr);gap:12px">
+      <div class="card" style="padding:16px 15px"><div class="t" style="font-size:15px">① AI-SPM</div><div class="d" style="font-size:13px">Wiz · Orca · Palo Alto (클라우드 태세관리)</div></div>
+      <div class="card" style="padding:16px 15px"><div class="t" style="font-size:15px">② LLM 방화벽</div><div class="d" style="font-size:13px">Lakera→CheckPoint · Prompt Sec→SentinelOne</div></div>
+      <div class="card" style="padding:16px 15px"><div class="t" style="font-size:15px">③ 모델 보안</div><div class="d" style="font-size:13px">HiddenLayer · Protect AI ModelScan</div></div>
+      <div class="card" style="padding:16px 15px"><div class="t" style="font-size:15px">④ AI 레드팀</div><div class="d" style="font-size:13px">Lakera · Mindgard · Garak</div></div>
+      <div class="card" style="padding:16px 15px"><div class="t" style="font-size:15px">⑤ 온프레미스</div><div class="d" style="font-size:13px">SentinelOne · Aleph Alpha PhariaAI</div></div>
+    </div>
+    <div class="lead" style="margin-top:28px">대부분 <b style="color:#fff">클라우드 SaaS · 단일기능 포인트 솔루션</b>이며, 2025~2026년 급속히 <span class="hl">대형 벤더로 통합</span>되고 있습니다.</div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">11</div>
+</section>
+
+<!-- 11 POSITIONING -->
+<section class="slide">
+  <div class="kicker">Positioning · 차별화</div>
+  <h2>GIJO AS의 자리 — <span class="em">수렴형 온프레미스</span></h2>
+  <div class="quad">
+    <div class="axis" style="top:10px;left:50%;transform:translateX(-50%)">▲ 클라우드 SaaS</div>
+    <div class="axis" style="bottom:10px;left:50%;transform:translateX(-50%)">온프레미스 / 에어갭 ▼</div>
+    <div class="axis" style="left:16px;top:50%;transform:translateY(-50%) rotate(-90deg);transform-origin:left">◀ 단일 기능</div>
+    <div class="axis" style="right:8px;top:50%;transform:translateY(-50%) rotate(90deg);transform-origin:right">통합(수렴) ▶</div>
+    <div class="qcell" style="left:6%;top:14%"><div class="qtag"><b>Wiz · Orca · Palo Alto</b><br>클라우드 AI-SPM (멀티클라우드)</div></div>
+    <div class="qcell" style="right:6%;top:14%;text-align:right"><div class="qtag"><b>Lakera · Prompt Security</b><br>LLM 런타임 (포인트, SaaS)</div></div>
+    <div class="qcell" style="left:6%;bottom:16%"><div class="qtag"><b>HiddenLayer</b><br>모델 보안 (포인트)</div></div>
+    <div class="qcell qgijo" style="right:5%;bottom:12%;width:40%"><div class="qt">★ GIJO AS</div><div class="qd">AI-BOM+VM+LLM보안+SOC+하드닝을 하나로 · 완전 온프레미스</div></div>
+  </div>
+  <div class="cap" style="margin-top:14px">경쟁 제품이 <b>비어 있는 사분면</b>(우측 하단)이 GIJO AS의 자리입니다.</div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">12</div>
+</section>
+
+<!-- 12 COMPARISON -->
+<section class="slide">
+  <div class="kicker">Comparison · 경쟁 비교</div>
+  <h2>경쟁 비교표</h2>
+  <div class="grow">
+    <table style="font-size:15px">
+      <tr><th>항목</th><th>GIJO AS</th><th>클라우드 AI-SPM</th><th>LLM 방화벽</th><th>모델 보안</th></tr>
+      <tr><td>배포</td><td class="ok">완전 온프레미스</td><td class="no">클라우드 SaaS</td><td class="no">SaaS/API</td><td class="no">CI/CD·클라우드</td></tr>
+      <tr><td>데이터 유출</td><td class="ok">없음</td><td class="no">자사 클라우드</td><td class="no">프롬프트 전송</td><td class="no">클라우드</td></tr>
+      <tr><td>분석용 AI</td><td class="ok">로컬 오픈모델</td><td class="no">벤더 클라우드</td><td class="no">벤더 클라우드</td><td class="no">벤더 클라우드</td></tr>
+      <tr><td>AI-BOM + 전통 VM 통합</td><td class="ok">✅ 통합</td><td class="no">일부/인접</td><td class="no">✕</td><td class="no">AI-BOM만</td></tr>
+      <tr><td>SOC 분석 + 장비 하드닝</td><td class="ok">✅ 내장</td><td class="no">일부</td><td class="no">✕</td><td class="no">✕</td></tr>
+      <tr><td>Agent AI 자동 업무수행</td><td class="ok">✅ 자연어 지시</td><td class="no">대시보드</td><td class="no">✕</td><td class="no">✕</td></tr>
+      <tr><td>국내(한국어·KISA)</td><td class="ok">✅ 특화</td><td class="no">글로벌</td><td class="no">영어</td><td class="no">영어</td></tr>
+    </table>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">13</div>
+</section>
+
+<!-- 13 STRENGTHS -->
+<section class="slide">
+  <div class="kicker">Why GIJO AS · 핵심 강점</div>
+  <h2>핵심 강점 6가지</h2>
+  <div class="grow">
+    <div class="cards c3">
+      <div class="card accent"><div class="t">① 완전 온프레미스</div><div class="d">분석 AI 자체가 로컬 GPU 오픈모델 — "AI 보안 쓰려면 데이터 반출" 역설 제거.</div></div>
+      <div class="card accent"><div class="t">② 수렴형 통합</div><div class="d">여러 벤더 제품인 축들을 한 플랫폼에서 상관. 5개 콘솔 오갈 필요 없음.</div></div>
+      <div class="card accent"><div class="t">③ 개방형 LLM (BYOM)</div><div class="d">오픈모델 가져와 자체 합성·미세조정. 벤더 종속·API 비용·데이터 전송 없음.</div></div>
+      <div class="card accent"><div class="t">④ Agent AI</div><div class="d">대시보드가 아니라 자연어 지시로 일하는 보안 에이전트 팀.</div></div>
+      <div class="card accent"><div class="t">⑤ 국내 특화</div><div class="d">CCE/KISA 하드닝 · 한국어 · 국내 데이터 주권 규제 정합.</div></div>
+      <div class="card accent"><div class="t">⑥ 조치 생애주기·감사</div><div class="d">배정→검증(재스캔)→완료 closed-loop + 감사로그 + 학습 루프.</div></div>
+    </div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">14</div>
+</section>
+
+<!-- 14 HONEST -->
+<section class="slide">
+  <div class="kicker">Honest · 정직한 경계</div>
+  <h2>과장하지 않습니다 — <span class="em">설계 선택의 교환</span></h2>
+  <div class="two">
+    <div>
+      <div class="bl"><div class="k">✕</div><div class="v"><b>멀티클라우드 CNAPP 아님</b> — AWS/Azure/GCP 에이전트리스 스캔은 Wiz·Orca 영역. GIJO는 온프레미스 자산 중심.</div></div>
+      <div class="bl"><div class="k">✕</div><div class="v"><b>단일 축 깊이</b>는 전문 제품이 앞섬 — 프롬프트 인젝션 정밀도(Lakera), 모델 포맷 커버리지(HiddenLayer).</div></div>
+      <div class="bl"><div class="k">✕</div><div class="v"><b>탐지 모델은 7~8B 오픈모델</b> — 대형 전용모델 대비 규모 작음(온프레미스 GPU 제약의 교환). 결정적 규칙·가드레일로 보완.</div></div>
+    </div>
+    <div>
+      <div class="summary" style="border-left-color:var(--teal)">이 경계는 약점이 아니라 <b style="color:var(--teal)">설계 선택의 교환</b>입니다.<br><br>"온프레미스에서 · 인원 부족한 팀이 · 여러 축을 하나로" 를 위해 클라우드 규모·단일축 깊이를 일부 포기했습니다.</div>
+    </div>
+  </div>
+  <div class="brandftr">GIJO AS 제안서</div><div class="snum">15</div>
+</section>
+
+<!-- 15 SUMMARY / CTA -->
+<section class="slide">
+  <div class="kicker">Summary · 다음 단계</div>
+  <h2>요약 &amp; 도입 제안</h2>
+  <div class="summary">AI 보안 시장은 <b>클라우드 SaaS · 포인트 솔루션</b>으로 채워져 급속히 대형 벤더로 통합 중입니다. <b>GIJO AS는 그 반대편</b> — 데이터도 AI도 나가지 않는 완전 온프레미스에서 AI-BOM·취약점관리·LLM 보안·SOC 분석·장비 하드닝을 하나로 수렴하고, Agent AI 팀이 인원 부족한 보안팀의 업무를 대신 수행합니다.</div>
+  <div class="cta">
+    <div class="ctac"><div class="t">① 온프레미스 파일럿</div><div class="d">고객 폐쇄망에 설치 → 실데이터로 상관분석·자동화 체감(데이터 무유출).</div></div>
+    <div class="ctac"><div class="t">② 실측 검증</div><div class="d">실제 스캔·자산·AI-BOM으로 우선순위·조치 생애주기 운영 검증.</div></div>
+    <div class="ctac"><div class="t">③ 확장</div><div class="d">CTI·하드닝 정기점검·학습 루프까지 단계적 확대.</div></div>
+  </div>
+  <div class="brandftr">GIJO Technology · GIJO AS</div><div class="snum">16</div>
+</section>
+
+</body></html>

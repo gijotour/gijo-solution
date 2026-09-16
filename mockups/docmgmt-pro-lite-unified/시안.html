@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 문서관리·업로드 통합(프로 기준 · 라이트=부분집합) — 추천안 1개</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안: 「프로 기준 문서관리·업로드 통합, 라이트=부분집합」
+  대상 화면: console.js(콘솔 ＋ 창구) · mydocs.html(내 문서 v4, 🏢 회사 지식·🩹 반입 탭)
+            · lite-memory.html(라이트 「나만의 자료」)
+  사장님 지시(2026-08-22): 「라이트는 프로에서 하는 작업의 일부만 지원이야. 별도 제품으로
+  생각하지 말고, 프로에서 쓰는 것처럼 문서관리 및 업로드하자.」
+  추천안: 1개만(2026-08-09 확립 원칙). 이 파일은 mockups/ 안에만 존재한다 —
+  client/·server/(제품 코드)는 오늘 전부 **읽기만** 했고 한 글자도 고치지 않았다.
+
+  ── 오늘(2026-08-22) 착수 전 정찰에서 확인한 것 — 짐작 아님, 파일:줄 직접 확인 ─────────
+  ★ 가장 중요한 정정: 작업요청서가 "지금은 이렇다"고 적어 준 것 중 절반은 **이미 고쳐져
+    있었다.** 2026-08-22 사장님의 이전 승인(mockups/upload-md-convert 시안)이 서버 쪽엔
+    이미 반영된 상태다. 그런데 **화면(클라이언트)이 그 서버를 아직 안 쓴다** — 그래서
+    겉으로는 "달라진 게 없다"로 보인다. 아래 §1 표가 그 정확한 경계선이다.
+
+  · client/src/renderer/pages/console.js:1780-1811 handleUpload → 1783 window.gijo.uploadAuto
+    → server/src/engine/autoupload.ts:105-121 tryIngest → memory.ts:599 ingestText(...,
+    sourcePath=undefined, ...) — **원본 경로도 안 넘기고, 추출 .md 파일도 안 쓴다.**
+    콘솔 ＋ 는 오늘도 청크(임베딩 조각)만 남긴다. UPLOAD_TYPES 7종(1737-1745)의 자동분류·
+    제품 매뉴얼 연결(routeByType:176-231)은 그대로 살아 있다 — 이건 지킨다(§3).
+  · server/src/engine/memory.ts:1296-1360 `/api/memory/ingest-file`(라이트·📥 .md류가 쓰는
+    창구) — **이미 고쳐져 있었다**: 추출 .md는 1312-1323에서 **항상** 저장하고,
+    원본은 1324-1334에서 `keepOriginal`(기본 꺼짐)일 때만 저장한다. 주석이 그대로 자백한다
+    — "예전엔 원본을 늘 조용히 저장했다(2026-08-22 사장님 「원본만 삭제」·시안 승인으로
+    default-off)". 그런데 **클라이언트가 이 keepOriginal을 보낼 자리 자체가 없다**
+    (client/src/api/knowledge.ts:53-54 ingestFile은 filename·content·scope 세 개만 보낸다) —
+    지금은 아무도 이 옵션을 켤 수 없다. 죽은 스위치다.
+  · memory.ts:1486-1507 `/api/memory/document/file`(원본 다운로드) — **이미 있다.**
+    memory.html의 "📂 원본 열기"가 이미 쓰는 중이다(client/src/preload.ts:423
+    openMemoryDocumentFile). 다만 이 라우트엔 **소유자 검사도 등급 검사도 없다**(아래 참조).
+  · memory.ts:1512-1531 `/api/memory/document/markdown`(추출본 보기) · 1535-1566
+    `/api/memory/document/markdown/save`(추출본 고치기) — **이미 있다.** save는
+    저장 즉시 **멱등 재인입**(재임베딩)까지 한다(1556-1560, ingestText 재호출) —
+    "저장하면 나중에 따로 승인받아 재임베딩"이 아니라 **그 자리에서 바로 반영**된다.
+    ⚠ 그런데 preload.ts·apiClient(client/src/api/knowledge.ts)에 이 두 라우트를 부를
+    다리가 **하나도 없다.** 서버는 준비됐는데 화면이 못 부른다.
+  · mydocs.html(812-822줄, 🏢 회사 지식·🩹 반입 공용 상세 렌더링)은 **아직 옛 모습 그대로**다
+    — "🗔 AI 지식에서 관리" 버튼 하나뿐, 원본·추출본 표시가 없다. 서버가 이미 쥔 카드
+    (hasSource, memory.ts:1137·1177)조차 화면에 안 그려진다.
+  · ⚠ 등급(C/S/O) 검사 재확인 — document/chunks(1436)·document/markdown(1520)·
+    document/markdown/save(1543)는 **개인 문서 소유자 검사**(남의개인문서인가)만 하고
+    등급 검사는 없다. document/file(1486-1507)은 그 소유자 검사조차 **없다** — 세
+    라우트 중 가장 헐겁다. 회사 공유 문서(personal이 아닌)라 소유자 개념은 없지만,
+    **기밀(C) 등급 문서의 원본을 로그인만 하면 누구나 내려받을 수 있다**는 뜻이다.
+  · server/src/engine/dataset.ts:21-34 extractDocumentText — 텍스트 계열(.md·.txt·.csv·
+    .log·.json)은 파이썬 없이 바로 읽는다(2026-08-17 라이트 사고 이후 수정). PDF·HWPX·
+    DOCX·PPTX·XLSX는 scripts/extract_doc.py(파이썬)가 맡는다.
+  · client/scripts/build-server-dist.mjs:47 — 패키지 설치본에 **encrypt-db.mjs·
+    recover-db-key.mjs 딱 둘만** 담는다. scripts/extract_doc.py는 안 담긴다 →
+    **패키지 설치본(프로·라이트 둘 다)에서 PDF·HWPX·DOCX 업로드가 400으로 죽는다.**
+    운영 WSL(소스 그대로 실행)은 그 폴더가 그냥 있어서 이 구멍이 안 드러났다.
+  · server/scripts/extract_doc.py:5·9·184-224 — 지원: .pdf(pypdf, 스캔본은 OCR 폴백)·
+    .hwpx·.docx·.pptx·.xlsx·.txt/.md/.csv/.log/.json. **구형 .doc·.hwp(바이너리)는
+    거절하고 이유를 말한다**("구형 형식은 안전하게 읽을 수 없습니다 — hwpx(으)로 저장해
+    다시 올려 주세요") — 조용히 깨진 글자를 지식으로 넣지 않는다(정직 추출).
+  · client/src/renderer/pages/lite-memory.html — 라이트 「나만의 자료」(lite-screens.json
+    no.7). 80줄 `accept=".md,.txt,.log,.csv"` + 91-93줄 경고 문구로 PDF·워드를 **UI에서부터
+    막아 둔다.** 450-469줄 넣기()는 g.ingestMemoryFile을 keepOriginal 없이 부른다(그 옵션이
+    화면에 없으니 항상 꺼짐과 같다 — 위 §와 같은 죽은 스위치).
+  · client/src/renderer/pages/lite-screens.json:2 — "화면 파일은 전부 `lite-` 접두사로
+    새로 만든다 — 기존 7개를 재사용하면 「회사 데이터 위젯 빼기」가 전부 공용 파일 수정이
+    되기 때문"(2026-08-12 방침). 이 시안은 이 방침을 뒤집지 않는다 — 화면 **파일**은 계속
+    나누되, 원본·추출본을 보여주는 **부품의 생김새·이름·거는 라우트**를 프로와 같게
+    맞춘다(§3에서 이유를 다룬다).
+
+  ── 오늘 다시 정리한 "무엇이 이미 있고 무엇이 없는가" 지도는 §1 표로, 조사·비교·포기·
+     밀도·자가점검은 §2~§6으로, 실제 화면 재현은 아래 시안 ①②③으로 이어진다.
+
+  ── 시안 안의 상호작용 정직성 고지 ─────────────────────────────────────────
+  이 페이지의 토글·행 선택·"고치기"·"저장"·"내려받기" 버튼은 **화면 상태 전환만** 보여준다
+  (순수 JS, 네트워크 호출 0건). 실제 서버에는 아무것도 쓰지 않으며, 지금 동작하지 않는
+  조작을 누르면 그 사실을 각주로 다시 알려 준다(가짜 UI 금지 원칙 — 목업에도 그대로 적용).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  /* 프로(다크) — client/src/renderer/pages/mydocs.html:53-57 :root 그대로 복사 */
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.6;}
+.wrap{max-width:1220px;margin:0 auto;padding:28px 26px 80px;}
+
+/* ── 머리 ─────────────────────────────────────────────────────────── */
+.hd{margin-bottom:20px;}
+.hd .kicker{display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11.75px;font-weight:800;padding:3px 10px;border-radius:20px;margin-bottom:10px;}
+.hd h1{font-size:21px;font-weight:800;color:#fff;margin-bottom:6px;}
+.hd .sub{font-size:12.5px;color:var(--muted);}
+.honest-ribbon{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.3);border-radius:9px;padding:9px 13px;font-size:12px;color:var(--amber);margin-top:12px;line-height:1.7;}
+
+/* ── 근거·결정 패널(공용) ─────────────────────────────────────────── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+.panel h2{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.panel h2 .n{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;background:rgba(59,130,246,.2);color:var(--blue-light);font-size:11.5px;font-weight:800;flex:0 0 auto;}
+.panel p{font-size:12.5px;color:var(--text);margin-bottom:8px;}
+.panel p:last-child{margin-bottom:0;}
+.panel .m{color:var(--muted);}
+.panel ul{margin:6px 0 6px 18px;font-size:12.5px;color:var(--text);}
+.panel li{margin-bottom:5px;line-height:1.65;}
+.panel code{background:rgba(255,255,255,.06);border-radius:4px;padding:1px 5px;font-size:11.5px;color:var(--blue-light);}
+
+table.cmp{width:100%;border-collapse:collapse;font-size:12.25px;margin-top:6px;}
+table.cmp th{text-align:left;padding:8px 10px;background:var(--panel-2);color:var(--muted-2);font-weight:800;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
+table.cmp td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+table.cmp tr:last-child td{border-bottom:none;}
+table.cmp .pick{background:rgba(30,185,128,.07);}
+table.cmp .pick td:first-child{color:var(--teal);font-weight:800;}
+table.cmp .bad{color:var(--muted-2);}
+table.cmp .ok{color:var(--teal);font-weight:800;}
+table.cmp .no{color:var(--red);font-weight:800;}
+table.cmp .warn{color:var(--amber);font-weight:800;}
+
+.chk-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--border);}
+.chk-row:last-child{border-bottom:none;}
+.chk-row .ic{flex:0 0 auto;width:20px;text-align:center;font-size:14px;}
+.chk-row b{color:#fff;}
+.chk-row .verdict{font-size:11.5px;font-weight:800;padding:1px 8px;border-radius:20px;margin-left:6px;white-space:nowrap;}
+.v-ok{background:rgba(30,185,128,.15);color:var(--teal);border:1px solid rgba(30,185,128,.4);}
+.v-part{background:rgba(240,160,32,.14);color:var(--amber);border:1px solid rgba(240,160,32,.4);}
+
+.density-note{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+
+/* ── 목업 섹션 공용 프레임 ────────────────────────────────────────── */
+.mock-h{display:flex;align-items:center;gap:10px;margin:30px 0 10px;flex-wrap:wrap;}
+.mock-h .tag{background:rgba(139,124,240,.14);color:var(--purple);border:1px dashed rgba(139,124,240,.5);font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;}
+.mock-h h2{font-size:15.5px;font-weight:800;color:#fff;}
+.mock-h .src{font-size:11.5px;color:var(--muted-2);}
+.mock-frame{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--bg);}
+.mock-note{font-size:11.5px;color:var(--muted-2);padding:8px 14px;background:var(--panel-2);border-top:1px solid var(--border);}
+.demo-btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.demo-btn:hover{border-color:var(--blue);}
+
+/* ═══════════════ 공용: g-toggle(gijo-ui.css:127-130 그대로 재현) ═══════════════ */
+.g-toggle{width:38px;height:22px;border-radius:20px;position:relative;display:inline-block;cursor:pointer;background:var(--muted-2);transition:background .15s;flex:0 0 auto;}
+.g-toggle.g-on{background:var(--teal);}
+.g-toggle .k{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;transition:left .15s;}
+.g-toggle.g-on .k{left:19px;}
+
+/* ═══════════════ ① 콘솔 ＋ 업로드 창구 재현(console.js) ═══════════════ */
+.cs-shell{background:var(--panel);}
+.cs-body-demo{padding:16px 16px 4px;min-height:44px;font-size:12.25px;color:var(--muted-2);}
+.cs-dock{display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+.cs-dock input{flex:1;background:var(--panel,#30302e);border:1px solid var(--border-strong);border-radius:11px;color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
+.cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel-2);color:var(--muted);border:1px solid var(--border-strong);font-size:17px;line-height:1;cursor:pointer;}
+.cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;flex:0 0 auto;}
+.src-toggle-chip{flex:0 0 auto;height:38px;display:flex;align-items:center;gap:7px;padding:0 12px;border-radius:11px;background:var(--panel-2);border:1px solid var(--border-strong);cursor:pointer;user-select:none;}
+.src-toggle-chip:hover{border-color:var(--blue);}
+.src-toggle-chip .tog-lbl{font-size:11.75px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.src-toggle-chip.on .tog-lbl{color:var(--amber);}
+
+.evt-row{margin:0 14px 12px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.evt-row .h{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;}
+.evt-row .h .ic{font-size:14px;}
+.evt-row .h .fn{color:#fff;}
+.evt-row .cm{font-size:12.25px;color:var(--muted);margin-top:5px;line-height:1.6;}
+.evt-row .cm.ok{color:var(--teal);}
+.evt-hint{font-size:11.25px;color:var(--muted-2);margin-top:5px;line-height:1.6;border-top:1px dashed var(--border);padding-top:6px;}
+.evt-hint b{color:var(--amber);}
+.evt-types{display:flex;gap:5px;flex-wrap:wrap;margin:0 14px 12px;}
+.evt-types span{font-size:11px;color:var(--muted-2);background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:2px 9px;}
+
+/* ═══════════════ ② 내 문서(mydocs.html v4) 재현 ═══════════════ */
+.v4demo{display:flex;height:460px;}
+.v4side{flex:0 0 160px;width:160px;background:var(--panel-2);border-right:1px solid var(--border-strong);padding:5px;overflow:hidden;}
+.v4sh{height:34px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:800;color:#fff;border-bottom:1px solid var(--border);margin:-5px -5px 5px;}
+.v4grouplbl{font-size:10.5px;letter-spacing:.4px;color:var(--muted-2);padding:8px 8px 2px;font-weight:800;}
+.v4node{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;border:none;background:transparent;border-radius:6px;font-size:12px;font-weight:700;color:var(--text);cursor:pointer;text-align:left;font-family:inherit;}
+.v4node .cnt{margin-left:auto;color:var(--muted-2);font-size:11px;font-weight:700;}
+.v4node.on{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.v4node.on .cnt{color:var(--blue-light);}
+
+.v4main{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;}
+.v4toolbar{height:34px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;font-size:11.5px;color:var(--muted-2);}
+.v4content{flex:1 1 auto;display:flex;min-height:0;}
+.v4list{flex:0 0 300px;width:300px;border-right:1px solid var(--border);overflow-y:auto;}
+.g-rows-head{display:grid;gap:6px;align-items:center;height:26px;padding:0 10px;font-size:10.5px;font-weight:800;color:var(--muted-2);letter-spacing:.4px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);position:sticky;top:0;}
+.g-rows-r{display:grid;gap:6px;align-items:center;height:30px;padding:0 10px;font-size:12px;color:var(--text);cursor:pointer;}
+.g-rows-r:nth-child(even){background:rgba(255,255,255,.025);}
+.g-rows-r:hover{background:rgba(59,130,246,.07);}
+.g-rows-r.sel{background:rgba(59,130,246,.12);box-shadow:inset 3px 0 0 var(--blue);}
+.g-rows-r .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ta-r{text-align:right;}
+.gm2{color:var(--muted-2);}
+.gtxt-C{color:var(--red);font-weight:800;} .gtxt-S{color:var(--amber);font-weight:800;} .gtxt-O{color:var(--muted);font-weight:700;}
+
+.v4doc{flex:1 1 auto;overflow-y:auto;padding:12px 16px;}
+.detail{font-size:12.5px;}
+.detail .dn{font-weight:800;font-size:13.5px;margin-bottom:4px;color:#fff;word-break:break-all;}
+.detail .dm{color:var(--muted);line-height:1.6;font-size:12.5px;}
+.detail .dbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.detail .dbt button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);padding:4px 10px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.detail .dbt button:hover{color:#fff;border-color:var(--blue);}
+
+/* 신규 — 원본 상태 줄(src-row) */
+.src-row{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);flex-wrap:wrap;}
+.src-badge{border-radius:20px;padding:2px 10px;font-size:11.75px;font-weight:800;white-space:nowrap;}
+.src-badge.off{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid rgba(255,255,255,.14);}
+.src-badge.on{background:rgba(30,185,128,.15);color:var(--teal);border:1px solid rgba(30,185,128,.4);}
+.src-row .meta{font-size:11.5px;color:var(--muted-2);}
+.src-row .dlbtn{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:4px 10px;font-size:11.75px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;}
+.src-row .dlbtn:hover{border-color:var(--blue);color:#fff;}
+
+/* 신규 — 추출본(.md) 박스(md-box). 기본 접힘 — 목록 자체 밀도는 안 늘리고, 상세를 연 뒤에도
+   "미리보기 78px"까지만 보이게 접어 둔다(§5 밀도 계산의 전제). */
+.md-box{margin-top:10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);overflow:hidden;}
+.md-box-h{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:12px;font-weight:800;color:#fff;border-bottom:1px solid var(--border);}
+.md-box-h .sub{font-weight:400;color:var(--muted-2);font-size:11px;}
+.md-box-h .act{margin-left:auto;display:flex;gap:6px;}
+.md-box-h button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);padding:3px 9px;border-radius:6px;font-size:11.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+.md-box-h button:hover{color:#fff;border-color:var(--blue);}
+.md-prev{padding:10px 12px;font-size:12px;color:var(--text);line-height:1.7;max-height:78px;overflow:hidden;position:relative;}
+.md-prev::after{content:"";position:absolute;left:0;right:0;bottom:0;height:26px;background:linear-gradient(transparent,var(--panel-2));}
+.md-prev h3{font-size:12.5px;color:var(--blue-light);margin-bottom:4px;}
+.md-edit{display:none;padding:10px 12px;}
+.md-edit.on{display:block;}
+.md-edit textarea{width:100%;min-height:110px;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;color:var(--text);font:11.75px/1.7 Consolas,"Cascadia Mono",monospace;padding:9px 10px;outline:none;resize:vertical;}
+.md-edit .warn{font-size:11px;color:var(--muted-2);margin-top:6px;line-height:1.6;}
+.md-edit .warn b{color:var(--amber);}
+.md-edit .btns{display:flex;gap:6px;margin-top:8px;}
+.md-edit .btns button{font-size:11.75px;font-weight:700;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:inherit;}
+.md-edit .save{background:var(--blue);border:none;color:#fff;}
+.md-edit .cancel{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.md-box.editing .md-prev{display:none;}
+.toast{display:none;margin-top:8px;font-size:11.5px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.3);border-radius:7px;padding:6px 10px;}
+.toast.on{display:block;}
+
+/* ═══════════════ ③ 라이트 「나만의 자료」 재현(lite-memory.html) — 부분집합 ═══════════════
+   ⚠ 색만 lite-memory.html:27 :root를 그대로 옮기고, **부품 이름·구조는 위 프로 부품과
+   똑같이**(src-badge·md-box) 재사용한다 — 프로/라이트가 같은 것을 두 번 발명하지 않는다는
+   이 시안의 핵심 주장을 코드 수준에서도 보여주기 위해서다. */
+.lite-frame{
+  --bg:#EBF4EB;--panel:#FFFFFF;--border:rgba(24,48,16,.14);--text:#16241A;--muted:#55684C;
+  --muted-2:#5C6F52;--blue:#2563EB;--blue-light:#2563EB;--teal:#0D6B37;--red:#B3261E;--amber:#7A4E00;
+  --panel-2:#EBF4EB;--border-strong:rgba(24,48,16,.22);
+  background:var(--bg);color:var(--text);
+}
+.lite-wrap{padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
+.lite-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;}
+.lite-card h3{font-size:12.75px;font-weight:800;margin-bottom:3px;color:var(--text);}
+.lite-card .sub{font-size:11.25px;color:var(--muted-2);margin-bottom:9px;line-height:1.6;}
+.lite-ask{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.lite-ask input[type=file]{flex:1;min-width:180px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font:11.75px inherit;}
+.lite-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 13px;color:var(--text);font:inherit;font-size:12px;cursor:pointer;font-family:inherit;}
+.lite-btn.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
+.lite-toggle-chip{display:flex;align-items:center;gap:6px;padding:0 10px;height:32px;border-radius:8px;background:var(--bg);border:1px solid var(--border);cursor:pointer;}
+.lite-toggle-chip .tog-lbl{font-size:11.25px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.lite-toggle-chip.on .tog-lbl{color:var(--amber);}
+.lite-warn{font-size:11.25px;color:var(--amber);line-height:1.7;margin-top:8px;}
+.lite-warn b{color:var(--text);}
+.lite-doc{border-bottom:1px solid var(--border);}
+.lite-doc:last-child{border-bottom:0;}
+.lite-doc-row{display:flex;align-items:center;gap:10px;padding:8px 2px;cursor:pointer;}
+.lite-doc-row .tri{font-size:10px;color:var(--muted-2);width:12px;}
+.lite-doc-row .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
+.lite-doc-row .m{font-size:11px;color:var(--muted-2);flex:0 0 auto;}
+.lite-doc-detail{display:none;padding:0 2px 12px 22px;}
+.lite-doc-detail.on{display:block;}
+.lite-src-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.lite-src-badge{border-radius:20px;padding:2px 10px;font-size:11.25px;font-weight:800;white-space:nowrap;}
+.lite-src-badge.off{background:var(--bg);color:var(--muted);border:1px solid var(--border);}
+.lite-src-badge.on{background:rgba(13,107,55,.12);color:var(--teal);border:1px solid rgba(13,107,55,.4);}
+.lite-md-box{border:1px solid var(--border);border-radius:9px;background:var(--bg);overflow:hidden;}
+.lite-md-box-h{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:11.5px;font-weight:800;color:var(--text);border-bottom:1px solid var(--border);}
+.lite-md-box-h .act{margin-left:auto;display:flex;gap:5px;}
+.lite-md-box-h button{background:transparent;border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;}
+.lite-md-prev{padding:8px 10px;font-size:11.5px;color:var(--text);line-height:1.65;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hd">
+    <span class="kicker">✅ 추천 시안 1개 — 판단 완료, 승인/반려만 남음</span>
+    <h1>문서관리·업로드 통합 — 프로 기준, 라이트=부분집합</h1>
+    <div class="sub">대상: 콘솔 ＋ 업로드 창구(console.js) · 내 문서 🏢 회사 지식·🩹 반입 상세(mydocs.html v4) · 라이트 「나만의 자료」(lite-memory.html) — 제품 코드는 오늘 읽기만 했고 이 파일 하나만 새로 썼습니다.</div>
+    <div class="honest-ribbon">⚠ 이 페이지의 토글·행 선택·"고치기"·"저장"·"내려받기" 버튼은 화면 전환만 보여줍니다. 실제 업로드·저장·다운로드는 하지 않으며, 누르면 그 사실을 각주로 다시 알려 줍니다(가짜 동작 금지 원칙).</div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">1</span>지금 코드가 실제로 하는 일 — 무엇이 이미 있고 무엇이 없는가</h2>
+    <p><b>가장 중요한 발견</b>: 이 작업의 절반은 <b style="color:var(--teal)">서버에 이미 구현돼 있었습니다</b>(2026-08-22 사장님의 이전 승인 — mockups/upload-md-convert 시안이 반영됨). 그런데 <b style="color:var(--amber)">화면이 그 서버를 아직 못 부릅니다</b> — 다리(preload·apiClient)가 없거나, 있는 다리도 옵션 하나를 안 보냅니다. 그래서 겉보기엔 아무것도 안 바뀐 것처럼 보였습니다. 아래 표가 정확한 경계선입니다.</p>
+    <table class="cmp">
+      <tr><th>무엇</th><th>서버(백엔드)</th><th>화면·다리(클라이언트)</th></tr>
+      <tr><td>라이트 창구(<code>/api/memory/ingest-file</code>) — 추출본(.md) 저장</td><td class="ok">✅ 있음, 무조건(memory.ts:1312-1323)</td><td class="ok">✅ 서버가 알아서 함(화면 조작 불필요)</td></tr>
+      <tr><td>같은 창구 — 원본 보관 옵션(keepOriginal, 기본 꺼짐)</td><td class="ok">✅ 있음(memory.ts:1300·1324-1334)</td><td class="no">❌ 다리가 그 값을 안 보냄(knowledge.ts:53-54) — <b>지금은 아무도 못 켬</b></td></tr>
+      <tr><td>원본 다운로드(<code>document/file</code>)</td><td class="warn">△ 있음 — 단 <b>소유자·등급 검사 둘 다 없음</b>(memory.ts:1486-1507)</td><td class="ok">✅ memory.html "📂 원본 열기"가 이미 씀(openMemoryDocumentFile)</td></tr>
+      <tr><td>추출본 보기(<code>document/markdown</code>)</td><td class="warn">△ 있음 — 등급 검사 없음(1512-1531)</td><td class="no">❌ 다리 자체가 없음</td></tr>
+      <tr><td>추출본 고치기+재인입(<code>document/markdown/save</code>)</td><td class="warn">△ 있음, <b>저장 즉시 멱등 재임베딩</b>(1556-1560) — 등급 검사 없음</td><td class="no">❌ 다리 자체가 없음</td></tr>
+      <tr><td>프로 ＋(콘솔) — 원본·추출본</td><td class="no">❌ 없음(autoupload.ts tryIngest, sourcePath 항상 undefined)</td><td class="no">❌ 토글 자체가 없음</td></tr>
+      <tr><td>PDF·HWPX·DOCX 추출(패키지 설치본)</td><td class="no">❌ scripts/extract_doc.py 미번들(build-server-dist.mjs:47) → 400</td><td class="m">—</td></tr>
+      <tr><td>내 문서 화면에 원본·추출본 표시</td><td class="m">—</td><td class="no">❌ mydocs.html 812-822줄 그대로(옛 "🗔 AI 지식에서 관리" 뿐)</td></tr>
+    </table>
+    <p class="m" style="margin-top:10px">그래서 이 시안이 실제로 그리는 작업은 <b style="color:#fff">① 이미 있는 서버 라우트에 화면 다리를 놓고(원본 다운로드는 재사용, 추출본 보기·고치기는 신설) ② 콘솔 ＋(프로) 창구도 라이트와 같은 방식으로 원본·추출본을 다루게 하고 ③ 세 라우트에 등급 검사를 태우고 ④ 라이트 화면도 같은 부품(원본 배지·추출본 상자)을 축소판으로 물려받는 것</b>입니다 — "새 기능을 만든다"보다 "이미 있는 것을 눈에 보이게, 안전하게 잇는다"에 가깝습니다.</p>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">2</span>설계 전 조사 — 표준·모범사례 근거</h2>
+    <ul>
+      <li><b>GDPR 제25조(Data Protection by Design and by Default)</b> — 선택적으로 더 보관·공유하는 기능이 있다면 <b>기본값은 가장 보호적이어야</b> 한다. 폐쇄망 온프렘 제품이라 직접 적용 대상은 아니지만 "선택적 보관은 기본 꺼짐" 원칙만 차용했습니다. (이 원칙은 이미 memory.ts:1314 주석에도 같은 근거로 적혀 있습니다 — 새로 끌어온 게 아니라 기존 결정과 일치를 확인한 것입니다.)</li>
+      <li><b>RAG 추출·청킹 모범사례(2026)</b> — 마크다운 추출은 <b>헤더(제목) 경계를 기준으로 나눠야</b> 조각이 문맥을 유지한다(Firecrawl "Best Chunking Strategies for RAG", MachineLearningMastery "7 Chunking Strategies"). 한 조각에 여러 주제가 섞이면 모델이 엉뚱한 부분을 근거로 써 환각 위험이 커진다(Extend "Semantic Chunking"). 잘못된 청킹 전략은 최선/최악 사이 <b>재현율(recall) 최대 9%p 차이</b>를 만든다(Airbyte "RAG Document Chunking"). → "사람이 추출 결과(.md)를 보고 고칠 수 있어야 한다"는 이 시안의 전제와 일치 — 저품질 추출을 조용히 묻지 않고 드러내는 쪽이 검색 품질에 직결됩니다.</li>
+      <li><b>에디션=기능 부분집합, 코드 한 벌</b> — 2026년 SaaS 아키텍처 정리(teamseven "SaaS Architecture Best Practices", designrevision "SaaS Feature Flags")는 공통적으로 "같은 코드베이스에서 기능을 켜고 끄는" 구조가 <b>여러 벌을 유지보수하는 것보다 결함이 덜 생긴다</b>고 정리합니다(플래그 100개를 넘기면 PR 리뷰가 25~40% 느려진다는 반대 사례도 함께 — 그래서 이 시안은 "모든 걸 플래그로"가 아니라 <b>부품(시각 언어·라우트)만 공유</b>하는 절충을 택했습니다, §3·§4).</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">3</span>왜 이 안인가 — 다른 길을 왜 안 골랐나</h2>
+    <table class="cmp">
+      <tr><th>안</th><th>내용</th><th>문제</th></tr>
+      <tr><td class="bad">A. 라이트 전용 화면 유지(lite-screens.json 원 방침 그대로)</td><td>lite-memory.html을 지금처럼 독립 로직으로 계속 발전시킨다.</td><td>2026-08-12 방침("공용 파일 수정 위험 차단")은 여전히 유효한 이유지만, "프로에서 쓰는 것처럼"이라는 2026-08-22 지시와 정면충돌 — 원본 배지·추출본 상자를 <b>두 번 설계·두 번 버그를 낸다.</b> 실제로 오늘도 두 창구의 keepOriginal 누락이 <b>같은 실수를 두 번</b> 만들 뻔했다(§1).</td></tr>
+      <tr><td class="bad">B. 콘솔 ＋를 없애고 ingest-file 하나로 통합(자동분류 포기)</td><td>업로드 창구를 한 곳(ingest-file류)으로 합친다.</td><td>autoupload.ts의 <b>3갈래 자동 라우팅</b>(취약점 스캔 자동 반영·제품 매뉴얼 자동 연결·통합 분석 이벤트)을 잃는다 — 이건 계획서의 제품 1차 목표(3소스 통합 분석)와 직결된 기능이라 포기 불가.</td></tr>
+      <tr><td class="bad">C. 프로 ＋도 원본을 무조건 저장(토글 없이 항상 켬)</td><td>콘솔 ＋에 옵션 없이 원본을 늘 보관한다.</td><td>데이터 최소화 원칙 위배(§2) + 등급 검사가 아직 세 라우트에 없는 지금(§1) 원본이 무조건 쌓이면 <b>기밀 문서 무방비 노출 범위가 그만큼 커진다</b> — 순서가 틀렸다(등급 검사부터).</td></tr>
+      <tr class="pick"><td>D. 이 시안 — 자동분류는 유지, 원본은 옵션(기본 꺼짐), 추출본은 항상 저장, <b>같은 부품(src-badge·md-box)을 프로·라이트가 이름까지 그대로 공유</b>, 화면 파일은 나눠 둔 채(2026-08-12 방침 존중) 부품·라우트만 통일</td><td>콘솔 ＋는 자동분류를 지키며 원본 옵션·추출본을 더한다 · 내 문서는 이미 있는 라우트에 다리를 놓는다 · 라이트는 같은 부품의 축소판을 쓴다 · 세 라우트에 등급 검사를 더한다.</td><td>(포기한 것은 §4에) — 결함을 한 곳에서만 만들고, 화면별 위험 격리(2026-08-12 방침)도 그대로 지킨다.</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">4</span>무엇을 포기했나</h2>
+    <ul>
+      <li><b>라이트가 mydocs.html을 그대로 iframe으로 품는 안</b> — 포기(이번 시안 범위 밖). 라이트는 nav.js·탭 셸을 안 쓰는 독립 구조라(lite-memory.html이 스스로 밝힘 — "이 화면은 nav.js를 안 실어서") 그대로 품으면 v4 작업공간의 폭 계약(≈820px)·셸 여백 상쇄 같은 전제가 깨진다. <b>이 시안은 사용자 눈에 보이는 결과(같은 배지·같은 상자·같은 부분집합 관계)만 확정</b>하고, "화면 파일을 어떻게 나눌지"는 승인 후 설계관이 정한다.</li>
+      <li><b>목록(리스트) 행에 원본 상태 배지를 넣는 안</b> — 포기. <code>.g-rows-r</code> 30px 한 줄에 열을 더 끼우면 문서명이 더 잘린다. 원본 유무는 문서 하나를 열었을 때(상세 패널)만 — 목록 밀도는 그대로 30px(§5).</li>
+      <li><b>업로드마다 모달로 매번 물어보는 안</b> — 포기. 자주 쓰는 창구에서 매번 팝업이 뜨면 마찰이 크다. 상시 토글(기본 꺼짐)로 "설정해 두고 잊는" 방식.</li>
+      <li><b>원본을 별도 "원본 보관함" 화면으로 신설하는 안</b> — 포기(2026-08-20~21 「내 문서」 v4 통합을 거스른다).</li>
+      <li><b>등급 검사를 이 시안에서 직접 구현</b> — 이번 시안은 화면(시각적 계약)만 확정한다. 등급 검사는 §1에서 발견한 그대로 <b>구현 필수 조건</b>으로 §6에 못박아 두고, 실제 코드는 설계관 검토 뒤 구현 단계에서.</li>
+      <li><b>라이트 파일 인식 확장을 자동 감지로 처리(“어떤 파일이든 받고 서버가 알아서 판단”)</b> — 포기. lite-memory.html의 accept 속성을 넓히더라도 <b>어떤 형식을 지원하는지 화면에 명시</b>한다(정직 원칙) — extract_doc.py가 실제로 무엇을 읽을 수 있는지와 화면의 말이 어긋나면 안 된다.</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">5</span>밀도 숫자 — 늘어난 줄 높이·세로 총합</h2>
+    <table class="cmp">
+      <tr><th>요소</th><th>기존</th><th>변경 후</th><th>증감</th></tr>
+      <tr><td>콘솔 ＋ 도크(<code>.cs-dock</code>, console.js:247)</td><td>59px<br><span class="m">(패딩 9+38+12)</span></td><td>59px<br><span class="m">토글 칩을 ＋·입력칸과 같은 38px 줄에 끼움</span></td><td style="color:var(--teal);font-weight:800">+0px (0%)</td></tr>
+      <tr><td>내 문서 목록 행(<code>.g-rows-r</code>, gijo-ui.css:359)</td><td>30px</td><td>30px</td><td style="color:var(--teal);font-weight:800">+0px (0%) — 목록 밀도 불변</td></tr>
+      <tr><td>내 문서 상세(🏢/🩹, <b>문서 선택 시만</b>, mydocs.html:130-141 실측 산수)</td><td>≈114px<br><span class="m">(제목 20+메타 3줄 60+버튼줄 34)</span></td><td>≈256px<br><span class="m">(+원본 배지줄 42, +추출본 상자(접힘) 100)</span></td><td>+142px (+125%)</td></tr>
+      <tr><td>라이트 「자료 넣기」 도구줄(<code>.ask</code>, lite-memory.html:37)</td><td>32px</td><td>32px<br><span class="m">토글을 같은 줄에 끼움</span></td><td style="color:var(--teal);font-weight:800">+0px (0%)</td></tr>
+      <tr><td>라이트 「넣어 둔 자료」 행(<code>.doc</code>, lite-memory.html:43)</td><td>≈34px</td><td>≈34px<br><span class="m">기본 접힘 — 화살표(▸)만 추가</span></td><td style="color:var(--teal);font-weight:800">+0px (0%, 접었을 때)</td></tr>
+      <tr><td>같은 행, <b>펼쳤을 때만</b></td><td>—</td><td>+원본 배지줄 34 · 추출본 상자(접힘) 84</td><td>+118px<br><span class="m">(펼친 문서 1건당, 상시 아님)</span></td></tr>
+    </table>
+    <div class="density-note">계산 방식: CSS 선언값(패딩·줄높이·폰트크기·line-height) 기반 산수이며 브라우저 실측이 아니다 — 이번엔 목업이 만든 임의 CSS가 아니라 <b>실제 mydocs.html(53-141줄)·console.js(247-267줄)·lite-memory.html(26-59줄)의 현재 CSS 선언값</b>을 그대로 가져와 계산했다(측정 수칙). 구현 후 실앱 재확인은 여전히 필요하다. 목록·도구줄 밀도는 그대로 두고 <b>상세를 열었을 때만</b> 늘어나는 구조라, "평소 화면"은 오늘과 똑같다.</div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="n">6</span>제품 원칙 자가점검</h2>
+    <div class="chk-row"><span class="ic">🔍</span><div><b>정직 추출</b> — 추출본(.md)을 사람이 보고 고칠 수 있다(document/markdown/save는 이미 저장 즉시 재임베딩까지 한다, §1). 구형 .doc·.hwp는 extract_doc.py가 조용히 깨진 글자를 넣는 대신 <b>명확히 거절하고 이유를 말한다</b>(§ 상단 정찰).<span class="verdict v-ok">충족</span></div></div>
+    <div class="chk-row"><span class="ic">🗂</span><div><b>문서 허브 일관</b> — 새 화면·새 창 없이 mydocs.html v4의 기존 상세 패널을 확장한다. 라이트도 새 메뉴를 만들지 않고 기존 「나만의 자료」 카드를 확장한다.<span class="verdict v-ok">충족</span></div></div>
+    <div class="chk-row"><span class="ic">🔒</span><div><b>격리·등급</b> — <b>구현 조건(필수)</b>: document/file·document/markdown·document/markdown/save 세 라우트에 등급(C/S/O) 검사가 없다(§1 재확인). document/file은 소유자 검사조차 없다. 원본·추출본을 화면에 노출하기 **전에** 이 세 라우트부터 고쳐야 한다 — 안 그러면 이 시안이 기밀 노출 통로를 넓히는 결과가 된다.<span class="verdict v-part">구현 조건부(미충족 상태로 방치 금지)</span></div></div>
+    <div class="chk-row"><span class="ic">🪶</span><div><b>가벼움</b> — 원본 기본값이 꺼짐이라 함부로 안 쌓인다. 목록·도구줄 밀도는 그대로, 상세를 열 때만 늘어난다(§5). 라이트 쪽 신규 UI도 펼쳤을 때만 자리를 차지한다.<span class="verdict v-ok">충족</span></div></div>
+    <div class="chk-row"><span class="ic">🧩</span><div><b>부분집합 일관</b> — 라이트는 프로와 같은 이름(src-badge·md-box)·같은 배지 규칙·같은 백엔드 라우트를 쓴다. 회사 지식(🏢)·제품 안내(📘)·학습(🎓) 탭처럼 <b>혼자 쓰는 PC에 뜻이 없는 것은 라이트에 없다</b> — 부분집합이지 축소 복제가 아니다.<span class="verdict v-ok">충족</span></div></div>
+  </div>
+
+  <!-- ═══════════════ ① 프로 ＋ 콘솔 업로드 창구 ═══════════════ -->
+  <div class="mock-h">
+    <span class="tag">시안 ①</span>
+    <h2>프로 콘솔 ＋ — 원본 보관 옵션 · PDF도 올라감</h2>
+    <span class="src">재현 대상: client/src/renderer/pages/console.js:271-330(도크)·1780-1811(업로드) — 자동분류(UPLOAD_TYPES 7종)는 그대로 유지</span>
+  </div>
+  <div class="mock-frame">
+    <div class="cs-shell">
+      <div class="cs-body-demo">지시하면 여기서 실시간으로 흐릅니다. 파일은 아래 ＋ 하나로 올립니다 — 자동 분류(취약점·매뉴얼·보안로그·운영리포트·문서), 애매하면 유형을 물어봅니다.</div>
+
+      <div class="evt-row">
+        <div class="h"><span class="ic">📥</span><span>파일 올리기</span> — <span class="fn">보안취약점_점검_결과서_2026Q3.pdf</span></div>
+        <div class="cm ok" id="evtResult">✓ 텍스트(.md)로 저장 — 42조각 · 취약점 영역 (문서 형식 인식)</div>
+        <div class="evt-hint" id="evtHint">추출한 텍스트(.md)만 저장했습니다 — 가볍고 내용은 그대로입니다. 원본 PDF는 서버에 남지 않았습니다.</div>
+      </div>
+      <div class="evt-types"><span>🩹 취약점 리포트</span><span>🚨 보안 로그 원본</span><span>📈 운영 리포트</span><span>🛡 보안제품 자산</span><span>📊 로그 매뉴얼</span><span>📄 일반 문서</span><span>📘 가이드라인</span></div>
+
+      <div class="cs-dock">
+        <button class="cs-plus" title="파일 올리기 — PDF·HWPX·DOCX·TXT·MD 등">＋</button>
+        <span class="src-toggle-chip" id="srcToggleChip" title="다음 업로드부터 원본 파일도 서버에 함께 보관합니다(기본 꺼짐)">
+          <span class="g-toggle" id="srcToggle"><span class="k"></span></span>
+          <span class="tog-lbl" id="srcTogLbl">원본 보관 꺼짐</span>
+        </span>
+        <input placeholder="지시를 입력하세요…" disabled>
+        <button class="cs-send" disabled>전송</button>
+      </div>
+    </div>
+    <div class="mock-note">
+      토글은 ＋ 버튼과 같은 38px 줄에 있어 <b>도크 바 높이가 그대로입니다</b>(§5, +0px). 기본값은 꺼짐 — 켜면 칩이 호박색으로 바뀌고 결과 카드 문구도 바뀝니다. ⚠ 지금 콘솔 ＋는 이 토글이 <b>아예 없고</b>, 원본도 추출본(.md)도 안 남깁니다(§1) — 이 그림은 "구현 후" 상태입니다.
+      <div style="margin-top:8px"><button class="demo-btn" onclick="toggleSrc()">🖱 토글 눌러보기(시연)</button></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ② 내 문서 — 🏢 회사 지식 / 🩹 반입 ═══════════════ -->
+  <div class="mock-h">
+    <span class="tag">시안 ②</span>
+    <h2>「내 문서」 — 🏢 회사 지식 · 🩹 반입 상세 패널</h2>
+    <span class="src">재현 대상: client/src/renderer/pages/mydocs.html(v4 작업공간, 812-822줄 상세 렌더링 확장 — 새 탭·새 화면 없음)</span>
+  </div>
+  <div class="mock-frame">
+    <div class="v4demo">
+      <div class="v4side">
+        <div class="v4sh">📁 내 문서</div>
+        <div class="v4grouplbl">내가 쓰는 것</div>
+        <button class="v4node">👤 내 것<span class="cnt">12</span></button>
+        <div class="v4grouplbl">회사가 가진 것</div>
+        <button class="v4node on" id="tabKnow">🏢 회사 지식<span class="cnt">86</span></button>
+        <button class="v4node">📘 제품 안내<span class="cnt">12</span></button>
+        <div class="v4grouplbl">기록</div>
+        <button class="v4node">🎓 학습<span class="cnt">214</span></button>
+        <button class="v4node" id="tabIngest">🩹 반입<span class="cnt">7</span></button>
+      </div>
+      <div class="v4main">
+        <div class="v4toolbar">제목·이름으로 좁히기… (필터 전용)</div>
+        <div class="v4content">
+          <div class="v4list">
+            <div class="g-rows-head" style="grid-template-columns:1fr 74px 44px"><span>문서</span><span>등급</span><span class="ta-r">조각</span></div>
+            <div class="g-rows-r sel" style="grid-template-columns:1fr 74px 44px" onclick="selectRow('A')">
+              <span class="trunc">📕 보안취약점_점검_결과서_2026Q3.pdf</span>
+              <span class="gtxt-C" title="열람 등급: 기밀">C 기밀</span><span class="ta-r gm2">42</span>
+            </div>
+            <div class="g-rows-r" style="grid-template-columns:1fr 74px 44px" onclick="selectRow('B')">
+              <span class="trunc">📄 제품_비교표_v3.hwpx</span>
+              <span class="gtxt-S" title="열람 등급: 민감">S 민감</span><span class="ta-r gm2">9</span>
+            </div>
+            <div class="g-rows-r" style="grid-template-columns:1fr 74px 44px;cursor:default;opacity:.6">
+              <span class="trunc">📄 침해대응_매뉴얼_v2.docx</span>
+              <span class="gtxt-O" title="열람 등급: 공개">O 공개</span><span class="ta-r gm2">15</span>
+            </div>
+          </div>
+          <div class="v4doc">
+            <div class="detail" id="detailA">
+              <div class="dn">보안취약점_점검_결과서_2026Q3.pdf</div>
+              <div class="dm">영역 취약점 · <span class="gtxt-C">C 기밀</span> · 조각 42<br>올린 이 김보안 · 반입 2026-08-19 14:02</div>
+              <div class="dbt"><button class="go">🗔 AI 지식에서 관리(삭제·영역·등급)</button></div>
+
+              <!-- 신규: 원본 상태 — 미보관 -->
+              <div class="src-row">
+                <span class="src-badge off">🗄 원본 미보관(추출본만)</span>
+                <span class="meta">가벼움 — 필요하면 다시 올려 원본을 추가할 수 있습니다</span>
+              </div>
+
+              <!-- 신규: 추출본(.md) — 기본 접힘, 미리보기 78px까지 -->
+              <div class="md-box" id="mdBoxA">
+                <div class="md-box-h">📝 추출본(.md) <span class="sub">— AI가 실제로 읽은 내용</span>
+                  <span class="act"><button onclick="startEdit('A')">✏ 고치기</button><button onclick="fakeAction(this,'전체 보기(팝오버 확장)')">👁 전체 보기</button><button onclick="fakeAction(this,'.md 내려받기')">⬇ 내려받기</button></span>
+                </div>
+                <div class="md-prev">
+                  <h3># 보안취약점 점검 결과서 (2026Q3)</h3>
+                  <p>1. 점검 개요 — 대상 자산 128대, 점검 기간 2026-08-01~08-15. 발견된 취약점은 심각 6건, 높음 22건, 중간 51건...</p>
+                </div>
+                <div class="md-edit" id="mdEditA">
+                  <textarea># 보안취약점 점검 결과서 (2026Q3)
+
+1. 점검 개요 — 대상 자산 128대, 점검 기간 2026-08-01~08-15.
+   발견된 취약점은 심각 6건, 높음 22건, 중간 51건...
+
+(추출이 깨진 표·머리글은 여기서 직접 고칠 수 있습니다)</textarea>
+                  <div class="warn">✓ 이 문서는 <b>기밀(C)</b> 등급입니다 — 저장·내려받기 전에 열람 등급 검사를 통과해야 합니다(구현 필수 조건, §6). 저장하면 서버가 <b>즉시 다시 임베딩</b>합니다(document/markdown/save가 이미 그렇게 동작함, §1).</div>
+                  <div class="btns"><button class="save" onclick="fakeAction(this,'저장')">💾 저장</button><button class="cancel" onclick="cancelEdit('A')">취소</button></div>
+                </div>
+              </div>
+              <div class="toast" id="toastA"></div>
+            </div>
+
+            <div class="detail" id="detailB" style="display:none">
+              <div class="dn">제품_비교표_v3.hwpx</div>
+              <div class="dm">영역 사내규정 · <span class="gtxt-S">S 민감</span> · 조각 9<br>올린 이 이담당 · 반입 2026-08-17 09:41</div>
+              <div class="dbt"><button class="go">🗔 AI 지식에서 관리(삭제·영역·등급)</button></div>
+
+              <!-- 신규: 원본 상태 — 보관됨(사용자가 업로드 시 토글을 켠 경우) -->
+              <div class="src-row">
+                <span class="src-badge on">🗄 원본 보관됨 · HWPX · 1.8MB</span>
+                <button class="dlbtn" onclick="fakeAction(this,'원본 내려받기(memory.html의 openMemoryDocumentFile 재사용)')">⬇ 원본 내려받기</button>
+              </div>
+
+              <div class="md-box" id="mdBoxB">
+                <div class="md-box-h">📝 추출본(.md) <span class="sub">— AI가 실제로 읽은 내용</span>
+                  <span class="act"><button onclick="startEdit('B')">✏ 고치기</button><button onclick="fakeAction(this,'전체 보기(팝오버 확장)')">👁 전체 보기</button><button onclick="fakeAction(this,'.md 내려받기')">⬇ 내려받기</button></span>
+                </div>
+                <div class="md-prev">
+                  <h3># 제품 비교표 v3</h3>
+                  <p>| 제품 | 가격 | 지원기간 |&#10;|---|---|---|&#10;| A | ... (표 추출이 깨져 열이 밀렸습니다 — 아래 「고치기」로 바로잡을 수 있습니다)</p>
+                </div>
+                <div class="md-edit" id="mdEditB">
+                  <textarea>| 제품 | 가격 | 지원기간 |
+|---|---|---|
+| A제품 | 320만원 | 3년 |
+| B제품 | 410만원 | 5년 |
+
+(원본 표가 추출 과정에서 열이 밀렸던 것을 여기서 바로잡았습니다)</textarea>
+                  <div class="warn">✓ 이 문서는 <b>민감(S)</b> 등급입니다 — 저장하면 서버가 즉시 다시 임베딩합니다.</div>
+                  <div class="btns"><button class="save" onclick="fakeAction(this,'저장')">💾 저장</button><button class="cancel" onclick="cancelEdit('B')">취소</button></div>
+                </div>
+              </div>
+              <div class="toast" id="toastB"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mock-note">
+      두 번째 행(제품_비교표_v3.hwpx)을 눌러 보세요 — "원본 미보관"과 "원본 보관됨 + ⬇ 내려받기"가 <b>같은 「내 문서」 항목 안에서</b> 함께 보입니다. 등급(C/S/O) 배지도 같이 보여 — <b>등급 검사가 아직 없다는 사실(§1·§6)</b>이 왜 위험한지 이 화면에서 바로 체감되게 했습니다. 세 번째 행은 예시로만 두고 상호작용을 시연하지 않았습니다.
+    </div>
+  </div>
+
+  <!-- ═══════════════ ③ 라이트 「나만의 자료」 — 부분집합 ═══════════════ -->
+  <div class="mock-h">
+    <span class="tag">시안 ③</span>
+    <h2>라이트 「나만의 자료」 — 프로의 부분집합</h2>
+    <span class="src">재현 대상: client/src/renderer/pages/lite-memory.html(76-119줄) — 화면 파일은 그대로 나눠 둔다(lite-screens.json:2 방침 존중), 부품(원본 배지·추출본 상자)만 프로와 이름까지 같게</span>
+  </div>
+  <div class="mock-frame">
+    <div class="lite-frame">
+      <div class="lite-wrap">
+        <div style="font-size:11.5px;color:var(--muted)"><b style="color:var(--text)">나만의 자료</b> — 내가 넣은 자료를 쌓아 두고, 물으면 그 안에서 찾습니다. <span style="color:var(--teal);font-weight:700">(프로 「내 문서」의 부분집합 — 회사 지식·제품 안내·학습 탭은 혼자 쓰는 PC엔 없습니다)</span></div>
+
+        <section class="lite-card">
+          <h3>자료 넣기</h3>
+          <div class="sub">넣으면 바로 찾을 수 있습니다. <b id="liteAcceptNote">지금은 .md·.txt·.log·.csv만 됩니다.</b></div>
+          <div class="lite-ask">
+            <input type="file" disabled title="목업 — 실제 파일 선택은 하지 않습니다">
+            <span class="lite-toggle-chip" id="liteToggleChip" title="다음에 넣을 자료부터 원본 파일도 이 PC에 함께 보관합니다(기본 꺼짐)">
+              <span class="g-toggle" id="liteToggle"><span class="k"></span></span>
+              <span class="tog-lbl" id="liteTogLbl">원본 보관 꺼짐</span>
+            </span>
+            <button class="lite-btn go" disabled>넣기</button>
+          </div>
+          <div class="lite-warn" id="liteWarn">⚠ <b>글자 파일(.md·.txt·.log·.csv)</b>만 됩니다. PDF·워드는 추출기가 따로 필요해 라이트에는 아직 없습니다.</div>
+        </section>
+
+        <section class="lite-card">
+          <h3>넣어 둔 자료 <span style="font-size:11px;color:var(--muted);font-weight:600">2건</span></h3>
+          <div class="sub">제품과 함께 온 것은 빼고, 내가 넣은 것만 보여 줍니다. 행을 누르면 원본·추출본을 펼칩니다.</div>
+
+          <div class="lite-doc">
+            <div class="lite-doc-row" onclick="liteToggleRow('L1')">
+              <span class="tri" id="liteTriL1">▸</span>
+              <span class="n">보안규제_법적근거_모음_메모.md</span>
+              <span class="m">3조각 · 08-15</span>
+            </div>
+            <div class="lite-doc-detail" id="liteDetailL1">
+              <div class="lite-src-row"><span class="lite-src-badge off">🗄 원본 미보관(추출본만)</span></div>
+              <div class="lite-md-box">
+                <div class="lite-md-box-h">📝 추출본(.md) <span class="act"><button onclick="fakeAction(this,'전체 보기')">👁 전체</button><button onclick="fakeAction(this,'.md 내려받기')">⬇ .md</button></span></div>
+                <div class="lite-md-prev">## 백업 주기 메모 — 매주 화요일 02:00, 보관 90일...</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lite-doc">
+            <div class="lite-doc-row" onclick="liteToggleRow('L2')">
+              <span class="tri" id="liteTriL2">▸</span>
+              <span class="n">방화벽_점검서_2026-08.pdf</span>
+              <span class="m">18조각 · 08-20</span>
+            </div>
+            <div class="lite-doc-detail" id="liteDetailL2">
+              <div class="lite-src-row"><span class="lite-src-badge on">🗄 원본 보관됨 · PDF · 2.4MB</span><button class="lite-btn" onclick="fakeAction(this,'원본 내려받기')" style="margin-left:auto">⬇ 원본</button></div>
+              <div class="lite-md-box">
+                <div class="lite-md-box-h">📝 추출본(.md) <span class="act"><button onclick="fakeAction(this,'고치기')">✏ 고치기</button><button onclick="fakeAction(this,'.md 내려받기')">⬇ .md</button></span></div>
+                <div class="lite-md-prev"># 방화벽 정책 점검서 — 2026-08 · 룰셋 214건 중 만료 3건, 미사용 12건...</div>
+              </div>
+              <div class="lite-warn" style="margin-top:6px">이 문서는 <b>PDF입니다</b> — 지금 화면(lite-memory.html)은 PDF를 못 받지만, 이 예시는 "확장 후" 모습입니다. 실제로 되려면 설치본에 scripts/extract_doc.py가 함께 나가야 합니다(§1 구현 조건).</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <div class="mock-note">
+      토글·행을 눌러 보세요. <b>목록 기본 상태는 오늘과 같은 밀도</b>입니다(§5, 접었을 때 +0px) — 행을 펼쳐야 원본·추출본이 나옵니다. 정리본(LLM 위키) 카드는 이 시안 범위 밖이라 그대로 뒀습니다(변경 없음).
+      <div style="margin-top:8px"><button class="demo-btn" onclick="toggleLite()">🖱 원본 보관 토글 눌러보기(시연)</button> <button class="demo-btn" onclick="toggleAccept()">🖱 "PDF도 받는다면" 문구 미리보기(시연)</button></div>
+    </div>
+  </div>
+
+</div>
+<script>
+  // ── 시연 전용 JS. 네트워크 호출 0건 — 화면 상태 전환만 보여준다(정직 고지 그대로). ──
+  var srcOn = false;
+  function toggleSrc() {
+    srcOn = !srcOn;
+    document.getElementById('srcToggle').classList.toggle('g-on', srcOn);
+    document.getElementById('srcToggleChip').classList.toggle('on', srcOn);
+    document.getElementById('srcTogLbl').textContent = srcOn ? '원본 보관 켜짐' : '원본 보관 꺼짐';
+    var res = document.getElementById('evtResult');
+    var hint = document.getElementById('evtHint');
+    if (srcOn) {
+      res.textContent = '✓ 텍스트(.md) + 원본(PDF·4.1MB) 저장 — 42조각 · 취약점 영역';
+      hint.innerHTML = '⚠ <b>원본 PDF도 서버에 함께 보관했습니다</b> — 법적 증빙·재추출용입니다. 「내 문서 › 🩹 반입」에서 언제든 내려받거나 지울 수 있습니다.';
+    } else {
+      res.textContent = '✓ 텍스트(.md)로 저장 — 42조각 · 취약점 영역 (문서 형식 인식)';
+      hint.textContent = '추출한 텍스트(.md)만 저장했습니다 — 가볍고 내용은 그대로입니다. 원본 PDF는 서버에 남지 않았습니다.';
+    }
+  }
+
+  function selectRow(which) {
+    var rows = document.querySelectorAll('.v4list .g-rows-r');
+    rows.forEach(function (r) { r.classList.remove('sel'); });
+    if (which === 'A') rows[0].classList.add('sel'); else rows[1].classList.add('sel');
+    document.getElementById('detailA').style.display = which === 'A' ? '' : 'none';
+    document.getElementById('detailB').style.display = which === 'B' ? '' : 'none';
+  }
+
+  function startEdit(which) {
+    document.getElementById('mdBox' + which).classList.add('editing');
+    document.getElementById('mdEdit' + which).classList.add('on');
+  }
+  function cancelEdit(which) {
+    document.getElementById('mdBox' + which).classList.remove('editing');
+    document.getElementById('mdEdit' + which).classList.remove('on');
+  }
+  function fakeAction(el, label) {
+    var box = el && el.closest ? el.closest('.detail') : null;
+    var toast = box ? box.querySelector('.toast') : null;
+    if (!toast) { alert('(목업) "' + label + '"은 실제로 동작하지 않습니다 — 승인 후 구현 단계에서 서버 API와 연결합니다.'); return; }
+    toast.textContent = '(목업) "' + label + '"은 실제로 동작하지 않습니다 — 승인 후 구현 단계에서 서버 API와 연결합니다.';
+    toast.classList.add('on');
+    setTimeout(function () { toast.classList.remove('on'); }, 3200);
+  }
+
+  var liteSrcOn = false;
+  function toggleLite() {
+    liteSrcOn = !liteSrcOn;
+    document.getElementById('liteToggle').classList.toggle('g-on', liteSrcOn);
+    document.getElementById('liteToggleChip').classList.toggle('on', liteSrcOn);
+    document.getElementById('liteTogLbl').textContent = liteSrcOn ? '원본 보관 켜짐' : '원본 보관 꺼짐';
+  }
+  var liteAcceptWide = false;
+  function toggleAccept() {
+    liteAcceptWide = !liteAcceptWide;
+    document.getElementById('liteAcceptNote').textContent = liteAcceptWide
+      ? '.pdf · .hwpx · .docx · .md · .txt · .log · .csv가 됩니다(구현 조건 충족 후).'
+      : '지금은 .md·.txt·.log·.csv만 됩니다.';
+    document.getElementById('liteWarn').innerHTML = liteAcceptWide
+      ? '✓ PDF·HWPX·DOCX도 받습니다 — 단 구형 .doc·.hwp(바이너리)는 안전하게 못 읽어 정중히 거절하고 이유를 보여 줍니다(extract_doc.py가 이미 그렇게 동작합니다).'
+      : '⚠ <b>글자 파일(.md·.txt·.log·.csv)</b>만 됩니다. PDF·워드는 추출기가 따로 필요해 라이트에는 아직 없습니다.';
+  }
+  function liteToggleRow(id) {
+    var d = document.getElementById('liteDetail' + id);
+    var t = document.getElementById('liteTri' + id);
+    var on = d.classList.toggle('on');
+    t.textContent = on ? '▾' : '▸';
+  }
+</script>
+</body>
+</html>

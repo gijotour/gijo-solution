@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「내 문서함 = 내 것들의 집」 통합 시안 (추천 1개)
+  경로: mockups/제품자료-내문서함통합/시안.html · gijo-mockup(mockups/ 전용 쓰기) · 제품 코드는 한 줄도 안 건드렸다.
+  다크 배색(제품 기본 다크 토큰 그대로) · 외부 CDN·웹폰트·원격 이미지 0 · 더블클릭으로 바로 열린다.
+
+  ── 지시 원문(둘 다 verbatim) ──────────────────────────────────────────────
+  [1] 2026-08-22 사장님(1차): 「보안제품 비교·소개 → 내 문서함에 통합하자」
+  [2] 같은 날, 작업 도중 범위 확장(2차): 「라이트에 있는 연락처관리 메뉴도 내문서에 넣어주고」
+      「라이트에는 내문서 기능만 일단 있었으면해」「프로에서 필요한 기능은 하나씩 요청해서
+      라이트에 맛보기로 넣는 형태로 가자」 — 내 문서함이 <b>라이트의 유일한 업무 화면</b>이 되고,
+      사이드바를 <b>8항목 한 번에</b> 다시 설계해야 하는 과제가 붙었다.
+
+  ── 확인한 실코드(읽기만) ─────────────────────────────────────────────────
+  · client/src/renderer/pages/intro.html 전체(187줄) — 정체성·데이터(productintro 대장,
+    보안제품 등록부와 별도)·목록(.prow, ~27px)·비교(체크박스 최대 3개, 없는 칸 "—")·삭제(🗑)·
+    빈 상태 문구(자료없음+사내특정 표적안내).
+  · client/src/renderer/pages/mydocs.html 1~465행(머리 주석·v4 CSS·본문) · 253-346행(사이드바
+    3그룹 6노드, 270행 "제품 안내") · 347-390행(상태 변수 탭="mine" 등) ·
+    <b>1288-1314행(★신규로 읽음)</b> — <code>?edition=lite</code> 폴딩의 실제 동작 코드:
+    <code>라이트판</code>이 참이면 <code>["learn","future"]</code> 노드를 <code>display:none</code>
+    처리하고 "기록" 묶음 라벨은 그대로 둔다(항목이 🩹 반입 하나만 남아도 라벨을 안 지운다 — 빈
+    묶음이 아니라서). <code>?tab=</code> 딥링크는 <code>["mine","know","guide","learn","ingest"]</code>
+    화이트리스트만 받는다(1309행) — 새 탭 키를 추가하려면 이 배열에도 넣어야 한다.
+  · client/src/renderer/pages/lite-mydocs.html 전체(48줄) — <b>화면이 아니라 이름표</b>다.
+    location.replace로 <code>mydocs.html?embed=1&edition=lite</code>로 넘긴다(iframe 아님,
+    "window.top이 달라지면 신호를 못 받는다"는 이유가 명시돼 있다).
+  · client/src/renderer/pages/lite-contacts.html 전체(277줄) — <b>핵심은 커버리지 매트릭스</b>
+    (테리토리×제품 표, td 74×46px, 빈 칸=빨강). 저장은 <b>localStorage</b>(키
+    <code>gijo.lite.contacts</code>, 서버 IPC 아님). 담당자 CRUD는 화면 안 입력 폼(이름·역할·
+    전화·이메일·테리토리 칩·제품 칩·메모)으로 <b>이미 하고 있다</b>(신규 예외가 아니라 기존
+    예외). 108행 경고문 원문: <i>"⚠ 전화·이메일은 개인정보입니다 — 이 PC에만 저장되고
+    백업·동기화되지 않습니다. (조직 공유는 스탠다드의 몫)"</i>. 셀 색(cov-in/ven/gap, 20·42-45행)이
+    이미 <code>rgba(30,185,128,…)</code>·<code>rgba(240,160,32,…)</code>·<code>rgba(226,72,61,…)</code>
+    를 쓰는데, 이 rgb 값은 GIJO AS 다크 토큰의 <code>--teal:#1eb980</code>·<code>--amber:#f0a020</code>·
+    <code>--red:#e2483d</code>와 <b>정확히 같은 색</b>이다 — 연초록 배경 위에 다크 팔레트 색을
+    이미 쓰고 있었다는 뜻이라, 다크 패널로 옮겨도 <b>칸 색 자체는 안 바뀐다</b>(배경만 바뀐다).
+  · client/src/renderer/pages/lite-screens.json 139-163행 — lite-mydocs 항목("프로의 「내
+    문서」를 그대로 쓴다 … 포크하면 프로에서 고친 게 라이트에 안 온다"), lite-contacts 항목
+    ("보안 장비 등록부의 짝(누구) … localStorage(이 PC 전용)").
+  · nav.js 135-156행(registry — <code>id: "registry"</code> 무변경) · 206-284행(TAB_REDIRECT
+    관례) · grep 결과 <code>"연락처"</code> 문자열이 nav.js에 <b>0건</b> — 이름 충돌 없음 확인.
+  · server/test/workflow.test.ts 24-35행 — ⑤ 보고 슬라이스 끝 경계가
+    <code>navSrc.indexOf('id: "registry"', i)</code>임을 직접 코드로 확인(문자열 존재만 요구).
+  · client/src/renderer/pages 디렉터리 대조 — docbox.html(옛 문서함)은 mydocs.html에 완전
+    흡수되며 파일이 지워졌다(Glob 확인). agent.html·memory.html은 반대로 파일이 남는다
+    (허브가 iframe으로 부분 흡수). intro.html·lite-contacts.html은 어느 쪽인지 §9에서 판정한다.
+
+  ── 설계 전 조사 ──────────────────────────────────────────────────────────
+  [외부1] NN/G, "Fixing Bad Intranet Navigation: 3 Workarounds"
+    (nngroup.com/articles/fixing-bad-intranet-navigation/) — 사내 도구에서 라벨 모호성은
+    실재하는 문제이고, 정공법은 <b>라벨을 구체적으로 바꾸는 것</b>이며 라벨을 못 바꿀 때만
+    아이콘·설명 텍스트 같은 차선책을 쓴다. → §1에서 "제품 안내"를 "GIJO AS 안내"로 바꾸는
+    근거.
+  [외부2] NN/G, "Comparison Tables for Products, Services, and Features"
+    (nngroup.com/articles/comparison-tables/) — "Most dynamic comparison tables accept
+    3–4 items only." → intro.html이 이미 쓰던 최대 3개 담기를 그대로 승계하는 근거(§4-1).
+  [외부3] Atlassian, "Heatmap: A Complete Guide"
+    (atlassian.com/data/charts/heatmap-complete-guide) — 그리드 히트맵은 "행=한 차원, 열=다른
+    차원"으로 배치할 때 사람 눈이 표보다 훨씬 빨리 군집·이상치·행렬 패턴을 읽는다고 설명한다.
+    → §4-4에서 커버리지 매트릭스를 30px 행 목록으로 욱여넣지 않고 <b>전폭 그리드로 그대로</b>
+    두는 근거 — 억지로 표로 바꾸면 오히려 "공백이 한눈에 보인다"는 이 화면의 존재 이유가
+    사라진다.
+  [내부 선례, 승계] mockups/docs-hub-v4-workspace/시안.html — 사이드바 200px+목록 400px+
+    문서창 가변 3단, .g-rows 부품(행 30px), "살아있는 시안" 관례를 그대로 승계한다.
+
+  ── 이 파일이 하는 일 / 안 하는 일 ────────────────────────────────────────
+  한다: §5의 두 프레임(Before/After)은 실제 CSS 값 그대로이고, 사이드바 전환·체크박스 담기·
+    행 클릭 상세·비교표·분류 접기·연락처 매트릭스↔목록 전환·담당자 입력 폼(저장은 안 함, 고지)·
+    빈 상태 데모 토글·<b>라이트 모드 토글(같은 화면이 스스로 접히는 것을 실시간으로 보여줌)</b>까지
+    실제로 동작한다. 목록 시작 y·행 높이는 브라우저가 직접 측정한다.
+  안 한다: nav.js·mydocs.html·workflow.test.ts·lite-contacts.html·lite-screens.json은 <b>한
+    글자도 안 고쳤다</b>. 서버·IPC·localStorage 스키마를 새로 설계하지 않는다(기존 필드
+    그대로). intro.html·lite-contacts.html의 실제 삭제는 하지 않는다(권고만).
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 내 문서함 통합(보안제품 자료·연락처) 시안</title>
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);font-size:13px;line-height:1.7;}
+.docwrap{max-width:1280px;margin:0 auto;padding:30px 24px 100px;}
+h1{font-size:21px;font-weight:800;color:var(--white);margin-bottom:8px;}
+h2{font-size:15.5px;font-weight:800;color:var(--white);margin:30px 0 10px;padding-top:14px;border-top:1px solid var(--border);}
+h2 .num{color:var(--blue-light);margin-right:6px;}
+h3{font-size:13px;font-weight:800;color:var(--blue-light);margin:16px 0 6px;}
+p{font-size:12.75px;color:var(--text);margin-bottom:8px;max-width:980px;}
+.lead{font-size:13.25px;color:var(--muted);max-width:980px;}
+.quote{margin:10px 0;font-size:12.5px;color:var(--text);border-left:3px solid var(--blue);background:rgba(59,130,246,.07);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.quote b{color:var(--blue-light);}
+.warnbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--amber);background:rgba(240,160,32,.08);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.warnbox b{color:var(--amber);}
+.okbox{margin:10px 0;font-size:12.25px;color:var(--text);border-left:3px solid var(--teal);background:rgba(30,185,128,.08);
+  padding:9px 13px;border-radius:0 8px 8px 0;line-height:1.7;}
+.okbox b{color:var(--teal);}
+code{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;
+  font:11.5px Consolas,"Cascadia Mono",monospace;color:#a7d3ff;}
+a{color:var(--blue-light);}
+ul.doc,ol.doc{margin:6px 0 10px 22px;font-size:12.5px;color:var(--text);}
+ul.doc li,ol.doc li{margin-bottom:5px;line-height:1.65;}
+table.doc{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:12.25px;}
+table.doc th{background:var(--panel-2);color:var(--muted);text-align:left;padding:7px 10px;border:1px solid var(--border-strong);font-weight:800;}
+table.doc td{padding:7px 10px;border:1px solid var(--border);color:var(--text);vertical-align:top;}
+table.doc td.num,table.doc th.num{text-align:right;font-variant-numeric:tabular-nums;}
+.tag{display:inline-block;font-size:11px;font-weight:800;padding:1px 8px;border-radius:10px;margin-right:4px;}
+.tag.take{background:rgba(30,185,128,.15);color:var(--teal);}
+.tag.drop{background:rgba(226,72,61,.15);color:#f5928a;}
+.tag.limit{background:rgba(240,160,32,.15);color:var(--amber);}
+.src{font-size:11px;color:var(--muted-2);}
+.checklist{list-style:none;margin:8px 0 14px;padding:0;}
+.checklist li{font-size:12.5px;padding:6px 0 6px 26px;position:relative;border-bottom:1px solid var(--border);line-height:1.6;}
+.checklist li:before{content:"✓";position:absolute;left:2px;color:var(--teal);font-weight:800;}
+.checklist li.warn:before{content:"⚠";color:var(--amber);}
+
+.framewrap{margin:16px 0 26px;}
+.framecap{font-size:12px;color:var(--muted-2);margin-bottom:6px;}
+.framecap b{color:var(--text);}
+.measurebox{display:inline-block;background:var(--panel-2);border:1px solid var(--blue);border-radius:8px;
+  padding:8px 12px;font-size:12px;color:var(--text);margin-bottom:10px;font-variant-numeric:tabular-nums;}
+.measurebox b{color:var(--blue-light);}
+.scrollhint{font-size:11px;color:var(--muted-2);margin-top:6px;}
+.democtl{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);border:1px dashed var(--border-strong);
+  border-radius:7px;padding:4px 10px;font-size:11.25px;color:var(--muted);margin-left:8px;cursor:pointer;font-family:inherit;}
+.democtl:hover{border-color:var(--amber);color:var(--amber);}
+.democtl.on{border-color:var(--teal);color:var(--teal);}
+
+.simframe{width:1224px;max-width:100%;height:820px;overflow:hidden;border:1px solid var(--border-strong);
+  border-radius:10px;background:var(--bg);display:flex;flex-direction:column;font-size:13px;color:var(--text);}
+.simshell{flex:0 0 77px;height:77px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);
+  display:flex;align-items:center;padding:0 16px;font-size:11.5px;color:var(--muted-2);gap:8px;}
+.simshell b{color:var(--muted);font-weight:800;}
+
+/* ── Before(intro.html 재현) ── */
+.ibody{flex:1 1 auto;min-height:0;overflow-y:auto;padding:18px 22px 40px;}
+.iscrid{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+.iscrid b{color:var(--text);font-weight:800;}
+.ichips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;}
+.ichip{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:6px 13px;border-radius:18px;font-size:12.25px;font-weight:700;cursor:pointer;}
+.ichip.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#fff;}
+.ipanel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;min-width:0;margin-bottom:12px;}
+.iph{font-size:13px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.iph .cnt{margin-left:auto;font-size:12px;color:var(--muted-2);font-weight:700;}
+.ihonest{font-size:11.75px;color:var(--muted-2);margin-bottom:8px;}
+.iprow{display:flex;align-items:center;gap:10px;padding:3px 6px;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px;min-width:0;}
+.iprow:first-child{border-top:none;}
+.iprow:hover{background:rgba(255,255,255,.03);}
+.iprow input{flex:0 0 auto;width:13px;height:13px;accent-color:var(--blue);cursor:pointer;}
+.iprow .nm{flex:0 0 220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-weight:800;}
+.ic-cat{flex:0 0 auto;font-size:11.5px;font-weight:800;padding:1px 8px;border-radius:9px;color:var(--blue-light);background:rgba(59,130,246,.13);white-space:nowrap;}
+.iprow .sub{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted-2);}
+.iprow .docs{flex:0 0 auto;color:var(--muted);font-size:12px;white-space:nowrap;}
+.iempty{font-size:12.5px;color:var(--muted-2);padding:10px 2px;line-height:1.7;}
+
+/* ── .g-rows 부품(원본 그대로) ── */
+.g-rows{border:1px solid var(--border);border-radius:8px 8px 0 0;overflow:hidden;background:var(--panel);
+  flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+.g-rows-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;}
+.g-rows-head{display:grid;align-items:center;height:26px;padding:0 12px;font-size:11px;font-weight:800;
+  color:var(--muted-2);letter-spacing:.4px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);
+  position:sticky;top:0;z-index:2;}
+.g-rows-gh{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px;font-size:12px;font-weight:800;
+  color:var(--text);background:var(--panel-2);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;
+  position:sticky;top:26px;z-index:1;}
+.g-rows-gh .tri{width:10px;color:var(--muted-2);font-size:11px;}
+.g-rows-gh .cnt{margin-left:auto;color:var(--muted-2);font-weight:700;font-size:11.5px;}
+.g-rows-body.folded{display:none;}
+.g-rows-r{display:grid;align-items:center;height:30px;padding:0 12px;font-size:12.5px;color:var(--text);cursor:pointer;}
+.g-rows-body .g-rows-r:nth-child(even),.g-rows-flat .g-rows-r:nth-child(even){background:rgba(255,255,255,.025);}
+.g-rows-r:hover{background:rgba(59,130,246,.07);}
+.g-rows-r.sel{background:rgba(59,130,246,.12);box-shadow:inset 3px 0 0 var(--blue);}
+.g-rows-r input[type=checkbox]{width:13px;height:13px;accent-color:var(--blue);cursor:pointer;}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ta-r{text-align:right;font-variant-numeric:tabular-nums;}
+.gm{color:var(--muted);} .gm2{color:var(--muted-2);}
+.empty{padding:24px 14px;text-align:center;color:var(--muted-2);font-size:12.5px;line-height:1.7;}
+
+/* ── After(mydocs.html v4 — 원본 값 그대로) ── */
+.v4wrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+.v4banner{flex:0 0 auto;background:rgba(240,160,32,.1);border-bottom:1px solid rgba(240,160,32,.35);
+  color:var(--amber);font-size:11.25px;font-weight:700;padding:5px 14px;}
+.v4root{flex:1 1 auto;min-height:0;display:flex;}
+.v4sidebar{flex:0 0 200px;width:200px;display:flex;flex-direction:column;background:var(--panel-2);
+  border-right:1px solid var(--border-strong);overflow:hidden;}
+.v4sh{flex:0 0 36px;height:36px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+  gap:6px;padding:0 8px;font-size:12px;font-weight:800;color:var(--text);}
+.v4sh .lbl{flex:1 1 auto;overflow:hidden;white-space:nowrap;}
+.v4collapse{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:6px;
+  width:22px;height:22px;font-size:11px;cursor:pointer;font-family:inherit;flex:0 0 auto;line-height:1;}
+.v4tree{flex:1 1 auto;overflow-y:auto;padding:5px;}
+.v4node{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;border:none;background:transparent;
+  border-radius:6px;font-size:12px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;
+  white-space:nowrap;overflow:hidden;text-align:left;}
+.v4node:hover{background:rgba(255,255,255,.05);}
+.v4node.on{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.v4node .cnt{margin-left:auto;color:var(--muted-2);font-size:11px;font-weight:700;}
+.v4node.on .cnt{color:var(--blue-light);}
+.v4node.future{opacity:.6;border:1px dashed var(--border-strong);}
+.v4node.future .cnt{color:var(--amber);}
+.v4node.new .cnt{color:var(--teal);}
+.v4node.foldedout{display:none;}
+.v4grouplbl{font-size:11px;letter-spacing:.4px;color:var(--muted-2);padding:8px 8px 2px;font-weight:800;}
+.v4main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+.v4toolbar{flex:0 0 38px;height:38px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+  gap:8px;padding:0 10px;}
+.vfilter{flex:1 1 auto;min-width:100px;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;
+  color:var(--text);font-size:12px;padding:0 10px;height:26px;outline:none;font-family:inherit;}
+.vfilter:focus{border-color:var(--blue);}
+.vbtn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+  padding:0 10px;height:26px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.vbtn:hover{border-color:var(--blue);}
+.vbtn.on{background:rgba(59,130,246,.18);border-color:var(--blue);color:var(--blue-light);}
+#vActs{display:flex;align-items:center;gap:6px;}
+.v4content{flex:1 1 auto;min-height:0;display:flex;}
+.v4content.full .v4list,.v4content.full .v4docpane{display:none;}
+.v4full{flex:1 1 auto;min-width:0;overflow-y:auto;padding:12px 16px;display:none;}
+.v4content.full .v4full{display:block;}
+.v4list{flex:0 0 400px;width:400px;display:flex;flex-direction:column;border-right:1px solid var(--border);min-height:0;}
+.v4list .g-rows{border:none;border-radius:0;flex:1 1 auto;min-height:0;}
+.v4docpane{flex:1 1 auto;min-width:0;overflow-y:auto;padding:12px 16px;}
+.detail{font-size:12.5px;}
+.detail .dn{font-weight:800;font-size:13.5px;margin-bottom:4px;word-break:break-all;}
+.detail .dm{color:var(--muted);line-height:1.6;margin-bottom:2px;}
+.detail .dbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.detail .dbt button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);
+  padding:4px 10px;border-radius:7px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.detail .dbt button:hover{color:#fff;border-color:var(--blue);}
+.detail .dbt button.warn:hover{color:#f5928a;border-color:var(--red);}
+.v4ph{color:var(--muted-2);font-size:12.5px;padding:30px 10px;text-align:center;line-height:1.8;}
+
+.cmptable{width:100%;border-collapse:collapse;font-size:12.25px;margin-bottom:8px;}
+.cmptable th,.cmptable td{padding:6px 9px;border-top:1px solid rgba(255,255,255,.06);text-align:left;vertical-align:top;line-height:1.55;}
+.cmptable th{color:var(--muted-2);font-weight:700;white-space:nowrap;width:96px;}
+.cmptable td b{color:#fff;}
+.honestline{font-size:11.5px;color:var(--muted-2);margin-bottom:8px;line-height:1.6;}
+
+/* ── 연락처 탭 전용(신규) — 매트릭스는 lite-contacts.html 톤을 다크로 옮긴 것, 색 rgb값은 무변경 ── */
+.seg{display:flex;gap:0;border:1px solid var(--border-strong);border-radius:7px;overflow:hidden;flex:0 0 auto;}
+.seg button{background:var(--panel-2);border:none;color:var(--muted);padding:0 12px;height:26px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.seg button.on{background:rgba(59,130,246,.18);color:var(--blue-light);}
+.ckpi{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;}
+.ckpi .b{font-size:19px;font-weight:800;color:#fff;}
+.ckpi .b.gap{color:var(--red);}
+.ckpi .l{font-size:11px;color:var(--muted-2);}
+.mxwrap{overflow-x:auto;padding-bottom:4px;margin-bottom:10px;}
+table.mx{border-collapse:separate;border-spacing:4px;}
+table.mx th{font-size:11px;font-weight:700;color:var(--muted);padding:4px 8px;text-align:center;white-space:nowrap;}
+table.mx th.rowh{text-align:left;color:var(--text);font-weight:800;}
+table.mx td{width:78px;height:46px;border-radius:8px;text-align:center;vertical-align:middle;cursor:pointer;font-size:11px;font-weight:700;border:1px solid transparent;}
+table.mx td:hover{border-color:var(--border-strong);}
+td.cov-in{background:rgba(30,185,128,.18);color:#7fe3bf;border-color:rgba(30,185,128,.4);}
+td.cov-ven{background:rgba(240,160,32,.16);color:#f3c06a;border-color:rgba(240,160,32,.38);}
+td.cov-gap{background:rgba(226,72,61,.13);color:#e88a82;border-color:rgba(226,72,61,.32);}
+.clegend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:6px;}
+.clegend span{display:inline-flex;align-items:center;gap:6px;}
+.csw{width:12px;height:12px;border-radius:4px;display:inline-block;}
+.csw.in{background:rgba(30,185,128,.5);}.csw.ven{background:rgba(240,160,32,.5);}.csw.gap{background:rgba(226,72,61,.45);}
+.cform{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;}
+.cform .full{grid-column:1 / -1;}
+.cform label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;}
+.cform input,.cform select{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;padding:6px 9px;color:var(--text);font:inherit;font-size:12px;}
+.cchips{display:flex;gap:6px;flex-wrap:wrap;}
+.cchip{font-size:11px;border:1px solid var(--border-strong);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted);background:var(--panel);}
+.cchip.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
+.pconly{font-size:11.25px;color:var(--amber);margin-top:8px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+  <h1>내 문서함 통합 시안 — 보안제품 자료 + 연락처</h1>
+  <p class="lead">사장님 1차 지시: <b>「보안제품 비교·소개 → 내 문서함에 통합하자」</b>. 작업 도중
+    2차 지시로 범위가 늘었다: <b>「라이트 연락처관리도 내 문서에」·「라이트는 내 문서 기능만
+    일단」·「프로 기능은 하나씩 요청해서 라이트에 맛보기로」</b>. 그 결과 내 문서함이 <b>「내
+    것들의 집」</b>이 되고 사이드바가 6→8항목이 된다 — 이 시안은 그 8항목을 한 번에 설계하고,
+    셋 중 하나는 여전히 이름 충돌 문제(§1), 다른 하나는 시각 언어 자체가 다른 문제(§4-4)를
+    안고 있다.</p>
+
+  <h2><span class="num">§1</span>이름 충돌 — 「제품」은 여전히 하나만 바꾸면 풀린다</h2>
+  <p>2026-08-21에 갈라놓은 "제품" 중의성(products.html의 우리 것 ↔ 타사 카탈로그)이 내 문서함
+    안에서 되살아나는 지점은 여전히 <b>제품 안내 ↔ 보안제품 자료</b> 하나뿐이다. 새로 추가되는
+    <b>연락처</b>는 nav.js 전체를 grep해도 겹치는 라벨이 0건이라 이름 충돌이 없다(확인함, 상단
+    주석).</p>
+  <table class="doc">
+    <tr><th style="width:190px">후보</th><th style="width:100px">판정</th><th>근거</th></tr>
+    <tr><td><b>라벨 자체를 바꾼다</b><br>📘 제품 안내→<b>GIJO AS 안내</b><br>신규→<b>📦 보안제품 자료</b></td>
+      <td><span class="tag take">채택</span></td>
+      <td>[외부1] "라벨을 바꿀 수 있으면 그게 정공법" — GIJO AS 안내는 이 제품(우리 것) 하나,
+        보안제품 자료는 복수의 타사 제품. products.html의 기존 명명("우리 보안제품")과 어형이
+        맞아 뿌리 낱말이 같다는 것도 드러난다.</td></tr>
+    <tr><td>아이콘만 바꾼다</td><td><span class="tag drop">기각</span></td>
+      <td>[외부1]이 명시하는 차선책(라벨을 못 바꿀 때만). 이번엔 사내 화면 문구라 바꿀 수 있다.</td></tr>
+  </table>
+
+  <h2><span class="num">§2</span>사이드바 전체 설계 — 8항목, 그룹은 그대로 3개</h2>
+  <p>제안 축을 검토했다: 코디네이터가 제안한 「내가 만든 것 / 회사가 준 것 / 참고 자료」 3축과,
+    <b>이미 있는</b> 「내가 쓰는 것 / 회사가 가진 것 / 기록」 3축을 나란히 놓고 판정한다.</p>
+  <table class="doc">
+    <tr><th>새 항목</th><th>후보 축(제안)</th><th>채택 축(기존)</th><th>이유</th></tr>
+    <tr><td>📦 보안제품 자료</td><td>참고 자료</td><td><b>회사가 가진 것</b></td>
+      <td>회사가 검토·비교하려고 모아 둔 자료라는 점에서 "회사가 가진 것"의 뜻(반드시 회사가
+        <i>만든</i> 것일 필요는 없다, 이미 🏢 회사 지식도 외부 표준 문서를 담는다)에 이미
+        들어간다.</td></tr>
+    <tr><td>📞 연락처</td><td>내가 만든 것</td><td><b>내가 쓰는 것</b></td>
+      <td>localStorage(이 PC 전용)·직접 입력·직접 CRUD — 👤 내 것과 <b>완전히 같은 지위</b>다
+        (개인만 보고 개인이 관리, 회사와 안 섞임). "내가 쓰는 것"이라는 기존 라벨이 이미 이
+        뜻이었다(👤 내 것=개인 문서 CRUD).</td></tr>
+  </table>
+  <div class="okbox"><b>결론 — 새 그룹을 만들지 않는다.</b> 기존 3그룹 라벨을 그대로 쓴다(코디네이터
+    제안 축과 결국 같은 뜻이라 이름만 다시 지으면 사용자에게 <b>같은 개념에 두 이름</b>이 생겨
+    오히려 혼란이다 — 이미 게시된 라벨을 아무 문제 없는데 바꾸는 것은 §1의 "고칠 수 있으면
+    고친다"와 다른 상황이다: 여기는 <b>고칠 이유 자체가 없다</b>). [내부 선례] Notion 2단 규칙
+    (docs-hub-v4-workspace §1)도 3그룹·최대 3항목을 벗어나지 않아 그대로 유지된다.</div>
+  <table class="doc">
+    <tr><th style="width:150px">그룹</th><th>지금(6항목)</th><th>추천(8항목)</th></tr>
+    <tr><td>내가 쓰는 것</td><td>👤 내 것</td><td>👤 내 것 · <b>📞 연락처</b>(신규)</td></tr>
+    <tr><td>회사가 가진 것</td><td>🏢 회사 지식 · 📘 제품 안내</td>
+      <td>🏢 회사 지식 · 📘 <b>GIJO AS 안내</b>(개명) · <b>📦 보안제품 자료</b>(신규)</td></tr>
+    <tr><td>기록</td><td>🎓 학습 · 🩹 반입 · 🗂 산출물</td><td>변경 없음</td></tr>
+  </table>
+  <p class="src">2/3/3 = 8 — 코디네이터가 우려한 "그냥 늘어놓으면 흐려진다"는 그룹 소제목이 이미
+    있어서 실제로는 안 흐려진다(§5 After 프레임에서 직접 확인 가능).</p>
+
+  <h2><span class="num">§3</span>무엇이 어디로 옮겨가나</h2>
+  <table class="doc">
+    <tr><th>지금(별도 화면)</th><th>내 문서함(추천, 탭 안)</th><th>비고</th></tr>
+    <tr><td>intro.html 분류 chips</td><td>목록 안 접기 그룹머리(.g-rows-gh)</td><td>🏢 회사 지식과 같은 언어</td></tr>
+    <tr><td>intro.html 비교 패널</td><td>오른쪽 문서창(비교표)</td><td>목록이 안 사라진 채 비교</td></tr>
+    <tr><td>intro.html 삭제 🗑</td><td>문서창 단건 보기 안 버튼</td><td>기능 동일, 자리만 이동</td></tr>
+    <tr><td>lite-contacts.html 매트릭스</td><td>연락처 탭 기본 뷰(전폭)</td><td>§4-4 — 30px 행으로
+      안 바꾼다(치수·근거 그대로)</td></tr>
+    <tr><td>lite-contacts.html 담당자 목록+편집 폼</td><td>연락처 탭 "담당자 목록" 뷰(목록+문서창)</td>
+      <td>입력 폼은 기존 예외 승계(§4-5)</td></tr>
+    <tr><td>lite-contacts.html "이 PC에만 저장" 경고</td><td>연락처 탭 안 그대로(1자도 안 바꿈)</td>
+      <td>개인정보 안심 근거라 반드시 승계(§4-5)</td></tr>
+  </table>
+
+  <h2><span class="num">§4</span>결정해야 할 것 — 답</h2>
+  <h3>4-1. 비교(2~3개 담기) — 가져간다, 경계 충돌 아니다</h3>
+  <p>productintro 대장에 쓰기 0, 화면 상태(담김 배열)만 바뀐다. 📘 GIJO AS 안내 탭의 [📝 요청
+    만들기]도 "읽기전용" 탭 안에서 조작이 있는 선례다. [외부2] 최대 3개도 업계 권고 안이라
+    그대로 승계.</p>
+
+  <h3>4-2. 사이드바 "보안제품" 그룹(products.html) — 유지, id 무변경</h3>
+  <p><code>id: "registry"</code>는 그대로 둔다. workflow.test.ts 26-30행이 이 문자열의 <b>존재</b>
+    만 요구한다(직접 코드 확인) — 항목 수는 무관하다. 1항목 그룹 선례(<code>id:"supplychain"</code>)
+    도 이미 있다.</p>
+
+  <h3>4-3. 비어 있을 때</h3>
+  <p>intro.html 빈 상태 문구를 1자도 안 바꾸고 승계(§6 After 프레임에서 토글로 확인 가능).</p>
+
+  <h3>4-4. 연락처 — 매트릭스가 핵심이다, 30px 표로 안 욱여넣는다</h3>
+  <p>lite-contacts.html을 직접 읽은 결론: <b>이 화면의 존재 이유가 매트릭스</b>다("빈 칸=커버리지
+    구멍이 한눈에 보인다"). [외부3] Atlassian 히트맵 가이드: 그리드는 표보다 <b>훨씬 빨리</b>
+    군집·공백 패턴을 읽게 한다 — 74×46px 칸을 30px 행으로 눌러 담으면 이 화면이 있는 이유 자체가
+    없어진다.</p>
+  <div class="okbox"><b>해법</b> — mydocs.html에 <b>이미 있는</b> "전폭 목록" 매커니즘(v4content.full,
+    🎓 학습 탭이 이미 이렇게 목록+문서창 분할 없이 전폭을 쓴다)을 재사용한다. 연락처 탭은 안에
+    작은 세그먼트([매트릭스]/[담당자 목록]) 하나를 둔다 — 기본값 <b>매트릭스</b>(전폭), 담당자
+    추가·고치기가 필요할 때만 <b>담당자 목록</b>으로 바꾸면 그때는 다른 탭과 같은 400px 목록+
+    문서창 3단(행 30px)으로 돌아온다. 새 CSS 메커니즘을 안 만들고 기존 것 재사용 — §7 구현
+    참고.</div>
+
+  <h3>4-5. 연락처의 입력칸·PC 전용 저장 — 그대로 승계, 새 예외 아니다</h3>
+  <p>연락처 편집 폼(이름·전화·이메일·메모)은 자유 입력칸이지만 <b>새로 만드는 예외가 아니다</b>
+    — lite-contacts.html이 2026-08-16부터 이미 이 형태로 게시돼 있다. "지시는 대화창"은 AI에게
+    내리는 지시를 막는 원칙이지 개인 주소록 같은 순수 데이터 입력까지 막는 것이 아니다 — 👤
+    내 것 편집기·📝 요청 만들기와 같은 지위(mydocs.html 기존 예외 목록에 이미 있다).</p>
+  <div class="warnbox"><b>절대 빠지면 안 되는 문구</b> — "⚠ 전화·이메일은 개인정보입니다 — 이
+    PC에만 저장되고 백업·동기화되지 않습니다." 이 문구가 사라지면 사용자가 "이거 서버로 가나?"를
+    다시 걱정해야 한다. §5·§6에서 1자도 안 바꾸고 그대로 넣었다. 저장 방식도 <b>localStorage
+    그대로</b>(서버 IPC로 바꾸지 않는다 — 바꾸면 이 문구 자체가 거짓말이 된다).</p></div>
+
+  <h2><span class="num">§5</span>라이트에서는 이렇게 접힌다 — 같은 화면의 두 모습</h2>
+  <p>실제 코드(mydocs.html 1288-1304행)가 이미 하고 있는 일: <code>?edition=lite</code>면
+    <code>["learn","future"]</code>를 숨긴다. 이 시안은 <b>같은 판단 기준</b>으로 신규 항목의
+    운명을 정한다.</p>
+  <table class="doc">
+    <tr><th>항목</th><th style="width:110px">라이트</th><th>이유</th></tr>
+    <tr><td>👤 내 것 · 🏢 회사 지식 · 📘 GIJO AS 안내 · 🩹 반입</td><td><span class="tag take">보임(기존)</span></td>
+      <td>변경 없음(1288-1292행 그대로)</td></tr>
+    <tr><td>📞 연락처</td><td><span class="tag take">보임(신규)</span></td>
+      <td>사장님이 <b>이번에 직접 요청</b>했다("연락처관리 메뉴도 내문서에 넣어주고") — 라이트에
+        원래 있던 화면(lite-contacts.html)이 자리를 옮기는 것뿐, 기능이 준 게 아니다.</td></tr>
+    <tr><td>📦 보안제품 자료</td><td><span class="tag drop">접힘(신규)</span></td>
+      <td>"라이트에는 내 문서 기능만 일단" + "프로 기능은 하나씩 요청해서 맛보기로" — 이번에
+        <b>요청받은 것은 연락처뿐</b>이다. 보안제품 비교는 여러 벤더를 동시에 검토하는 조직
+        규모의 일이라 1인 라이트 사용자의 첫 필요는 아니라고 판단했다 — 필요해지면 다음 "한
+        스푼"으로 요청받아 편다.</td></tr>
+    <tr><td>🎓 학습 · 🗂 산출물</td><td><span class="tag drop">접힘(기존)</span></td><td>변경 없음</td></tr>
+  </table>
+  <p>§6 After 프레임 위쪽의 <button class="democtl" style="cursor:default">🔁 라이트 모드로 보기</button>
+    토글을 눌러 보면 사이드바가 8→5항목으로 실시간으로 접힌다(포크가 아니라 <b>같은 DOM이 스스로
+    접는 것</b> — 실제 코드와 같은 방식).</p>
+
+  <h2><span class="num">§6</span>살아있는 시안 — 실제로 눌러 볼 수 있다</h2>
+  <p>아래 두 프레임은 폭 1224px × 높이 820px이다. Before는 intro.html 스타일 값, After는
+    mydocs.html v4 스타일 값 그대로다.</p>
+
+  <h3>Before — 지금(intro.html, 별도 화면)</h3>
+  <div class="framewrap">
+    <div class="framecap"><b>목록에 닿기 전 껍데기</b> — 아래 measurebox는 이 문서를 지금 여신
+      브라우저가 직접 측정한 값이다.</div>
+    <div class="measurebox" id="beforeMeasure">측정 중…</div>
+    <div class="simframe" style="height:800px">
+      <div class="simshell"><b>제품 셸(고정, 77px)</b> — 도킹 머리·탭줄 · 이 파일 밖</div>
+      <div class="ibody" id="beforeBody">
+        <div class="iscrid" id="beforeScrid"><b>제품 소개자료</b> — 보안 제품을 분류별로 훑고, 골라서 비교합니다. 자료는 대화창 ＋로 올립니다.</div>
+        <div class="ichips" id="beforeChips"></div>
+        <div class="ipanel">
+          <div class="iph">📦 제품 목록 <span class="cnt" id="beforeListCnt"></span></div>
+          <div id="beforeList"></div>
+        </div>
+        <div class="ipanel" style="margin-bottom:0">
+          <div class="iph">⚖ 비교 <span class="cnt" id="beforeCmpCnt"></span></div>
+          <div class="ihonest">비교는 등록부·반입 자료에 적힌 것만 보여 줍니다 — 자료에 없는 칸은 "—" 입니다.</div>
+          <div id="beforeCmp"><div class="iempty">위 카드에서 [비교]를 2~3개 담으면 여기 표가 생깁니다.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>After — 추천(내 문서함, 8항목), <span style="color:var(--teal)">아래는 실제로 동작합니다</span><br>
+    <button class="democtl" id="emptyToggle" title="시안 데모 전용">🔁 보안제품 자료 0건 상태로 보기(§4-3)</button>
+    <button class="democtl" id="liteToggle" title="시안 데모 전용">🔁 라이트 모드로 보기(§5)</button>
+  </h3>
+  <div class="framewrap">
+    <div class="framecap"><b>목록에 닿기 전 껍데기</b> — mydocs.html이 이미 게시한 값(셸 77px+
+      툴바 38px=115px). 아래 measurebox는 지금 이 문서가 직접 잰 값이다.</div>
+    <div class="measurebox" id="afterMeasure">측정 중…</div>
+    <div class="simframe">
+      <div class="simshell"><b>제품 셸(고정, 77px)</b> — 도킹 머리·탭줄 · 이 파일 밖</div>
+      <div class="v4banner">⚠ 이 워크스페이스는 살아있는 시안입니다 — 사이드바 전환·체크박스·행
+        클릭·비교표·매트릭스↔목록 전환·담당자 입력 폼이 실제로 동작합니다. 서버 저장·
+        localStorage 저장·삭제는 시뮬레이션만 합니다(실제 API·저장 호출 없음).</div>
+      <div class="v4root">
+        <div class="v4sidebar">
+          <div class="v4sh"><span class="lbl">📁 내 문서</span><button class="v4collapse" title="시안 — 접기 생략">«</button></div>
+          <div class="v4tree" id="v4tree"></div>
+        </div>
+        <div class="v4main">
+          <div class="v4toolbar">
+            <input class="vfilter" id="vSearch" placeholder="제목·이름으로 좁히기… (필터 전용 — 지시가 아닙니다)">
+            <span id="vActs"></span>
+          </div>
+          <div class="v4content" id="v4contentBox">
+            <div class="v4list">
+              <div class="g-rows"><div class="g-rows-scroll" id="afterListWrap"></div></div>
+            </div>
+            <div class="v4docpane" id="afterDoc"><div class="v4ph">왼쪽 사이드바에서 탭을 눌러 보세요.</div></div>
+            <div class="v4full" id="afterFull"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="scrollhint">※ 왼쪽 사이드바의 👤/🏢/🎓/🩹 탭은 오늘 이미 게시된 mydocs.html 그대로이며
+    이번 시안이 손대지 않는다 — 눌러 보면 "정적 예시(변경 없음)" 안내만 뜬다. 이 시안이 손댄
+    자리는 <b>📘 GIJO AS 안내(개명)</b>·<b>📦 보안제품 자료(신규)</b>·<b>📞 연락처(신규)</b> 셋뿐이다.</div>
+
+  <table class="doc" style="margin-top:16px">
+    <tr><th></th><th class="num">Before(지금)</th><th class="num">After(추천)</th><th class="num">차이</th></tr>
+    <tr><td>화면 자체</td><td colspan="2" style="text-align:center">별도 화면(intro.html) + 별도 화면(lite-contacts.html) → 내 문서함 안 탭 둘</td><td class="num">화면 −2</td></tr>
+    <tr><td>목록 시작 전 껍데기(셸 제외, 실측)</td><td class="num" id="tBeforeChrome">…</td><td class="num" id="tAfterChrome">…</td><td class="num" id="tChromeDiff">…</td></tr>
+    <tr><td>보안제품 자료 행 높이(실측)</td><td class="num" id="tBeforeRow">…</td><td class="num" id="tAfterRow">30px(고정)</td><td class="num" id="tRowDiff">…</td></tr>
+    <tr><td>800px에서 온전히 보이는 줄 수(보안제품 자료)</td><td class="num" id="tBeforeRows">…</td><td class="num" id="tAfterRows">…</td><td class="num" id="tRowsDiff">…</td></tr>
+    <tr><td>연락처 매트릭스 칸 높이</td><td class="num">46px(변경 없음)</td><td class="num">46px(변경 없음)</td><td class="num">0 — 의도적(§4-4)</td></tr>
+  </table>
+  <p class="src">계산식: (800 − 셸77 − 껍데기 − 헤더26) ÷ 행높이, 내림. 매트릭스 칸은 애초에 이
+    계산에 안 들어간다(전폭 뷰라 목록 행 계산과 다른 잣대 — §4-4).</p>
+  <div class="warnbox"><b>정직하게 밝힌다</b> — 보안제품 자료 행 높이는 27px→30px로 늘어난다(다른
+    탭과 같은 부품을 쓰는 대가). 연락처 매트릭스는 <b>의도적으로 안 줄였다</b>(§4-4, 줄이면
+    화면의 존재 이유가 사라진다). 이 시안의 진짜 이득은 밀도가 아니라 <b>화면 개수(−2)</b>와
+    <b>이름 충돌 해소</b>다.</div>
+
+  <h2><span class="num">§7</span>무엇을 포기했는지</h2>
+  <ul class="doc">
+    <li><b>가로 pill 분류 chips(보안제품 자료)</b> — 접기 그룹머리로 교체, §2와 같은 이유.</li>
+    <li><b>연락처의 독립 URL·독립 창</b> — lite-contacts.html을 직접 열던 진입로가 사라지고
+      탭 파라미터 경유가 된다(§9 TAB_REDIRECT로 안내는 유지).</li>
+    <li><b>매트릭스 축 편집 UI 전체 재현</b> — §6 시안에서는 테리토리·제품 이름 자체를 바꾸는
+      입력칸(lite-contacts.html 111-126행 "매트릭스 축" 카드)까지는 재현하지 않았다 — 담당자
+      CRUD와 매트릭스 보기 두 가지가 이 시안의 핵심 판단(4-4·4-5)이고, 축 이름 편집은 구현
+      단계에서 그대로 옮기면 되는 부차 기능이라 시안 범위에서 뺐다.</li>
+  </ul>
+
+  <h2><span class="num">§8</span>제품 원칙 자가점검</h2>
+  <ul class="checklist">
+    <li>추천 시안 1개(2026-08-09 확정 원칙) — 복수 시안 아님</li>
+    <li>자체완결 HTML — 외부 CDN·폰트·이미지 0, 더블클릭으로 열림</li>
+    <li>설계 전 조사 — [외부1]·[외부2]·[외부3] 3건, 출처·인용 상단 주석</li>
+    <li>입력칸 원칙 — 검색칸은 필터 전용. 연락처 편집 폼은 <b>새 예외가 아니라 기존 예외 승계</b>(§4-5)</li>
+    <li>화면엔 정체성 한 줄+⚠경고만 — 연락처의 "이 PC에만 저장" 경고는 반드시 유지(§4-5)</li>
+    <li>다크 배경·기존 색 토큰 그대로 — 매트릭스 칸 색은 lite-contacts.html의 rgb 값과 <b>동일</b>(상단 주석에서 대조 확인)</li>
+    <li>엑셀처럼 촘촘 — 보안제품 자료 행 30px. 매트릭스는 의도적 예외(§4-4, 근거 있음)</li>
+    <li>정직성 — 비교표 "—", 빈 상태 문구 무변경, 매트릭스 빈 칸도 그대로 "공백" 의미 유지</li>
+    <li>격리·경계 원칙 무위반 — productintro 쓰기 0(§4-1), 연락처는 애초에 서버로 안 감(localStorage, §4-5)</li>
+    <li>id: "registry" 무변경(§4-2), workflow.test.ts 직접 확인</li>
+    <li>라이트 포크 금지 — 같은 파일이 스스로 접는다(§5), 두 벌 안 만듦</li>
+    <li class="warn">nav.js·mydocs.html·lite-contacts.html·lite-screens.json·workflow.test.ts는 이 시안에서 <b>한 글자도 안 고쳤다</b> — 구현은 메인 몫(§9)</li>
+  </ul>
+
+  <h2><span class="num">§9</span>구현 참고 — 메인이 구현할 때 걸릴 것</h2>
+  <table class="doc">
+    <tr><th style="width:190px">항목</th><th>메모</th></tr>
+    <tr><td>nav.js registry 그룹</td><td>142-145행에서 <code>intro.html</code> 줄만 지운다.
+      <code>id: "registry"</code>는 그대로(§4-2).</td></tr>
+    <tr><td>mydocs.html 사이드바</td><td>270행 텍스트 "제품 안내"→"GIJO AS 안내". 262행 아래
+      <code>👤 내 것</code> 그룹에 <code>📞<span class="txt">연락처</span></code> 버튼 추가,
+      269행 아래(회사가 가진 것)에 <code>📦<span class="txt">보안제품 자료</span></code> 버튼
+      추가. 상태 변수 <code>탭</code>에 <code>"vendor"</code>·<code>"contacts"</code> 분기.</td></tr>
+    <tr><td>1309행 <code>?tab=</code> 화이트리스트</td><td><code>["mine","know","guide","learn","ingest"]</code>
+      에 <code>"vendor"</code>·<code>"contacts"</code> 추가 필요 — 안 넣으면 딥링크가 무시된다
+      (직접 코드로 확인, 추측 아님).</td></tr>
+    <tr><td>1297행 라이트 폴딩 배열</td><td><code>["learn","future"]</code> →
+      <code>["learn","future","vendor"]</code>로 한 항목만 추가(§5 표 그대로). "기록" 묶음처럼
+      "회사가 가진 것" 묶음도 2항목으로 줄지만 라벨은 유지(1301-1303행과 같은 근거).</td></tr>
+    <tr><td>연락처 데이터 계층</td><td>다른 5개 탭과 달리 <b>서버 IPC가 아니라 localStorage
+      직접</b>(키 <code>gijo.lite.contacts</code>, lite-contacts.html 137행 그대로 재사용).
+      mydocs.html이 이 탭에서만 <code>window.gijo</code> 대신 <code>localStorage</code>를
+      부른다는 걸 구현 시 반드시 인지할 것 — 다른 탭의 "격리는 서버 쿼리 하드 필터" 원칙이 이
+      탭에는 원래 해당 없다(로컬 파일이라 쿼리할 서버가 없다).</td></tr>
+    <tr><td>연락처 전폭/분할 전환</td><td>기존 <code>v4content.full</code>(🎓 학습이 이미 씀)을
+      재사용 — 매트릭스=<code>.full</code> 켬(신규 <code>.v4full</code> 자리에 그린다), 담당자
+      목록=<code>.full</code> 끔(기존 <code>.v4list</code>+<code>.v4docpane</code>).</td></tr>
+    <tr><td>TAB_REDIRECT(nav.js 208행 표)</td><td>추가: <code>"intro.html": "mydocs.html?tab=vendor"</code>,
+      <code>"lite-contacts.html": "mydocs.html?tab=contacts&edition=lite"</code>(및 각 embed 짝) —
+      기존 <code>mydocs.html?tab=guide</code> 관례 그대로.</td></tr>
+    <tr><td>intro.html·lite-contacts.html 파일 자체</td><td><b>삭제를 권고</b> — docbox.html
+      선례(완전 흡수 후 파일 삭제)와 같은 모양이다(agent.html 같은 부분 흡수와 다름, §상단 주석).
+      단, lite-contacts.html은 lite-screens.json의 <code>lite-contacts</code> 항목(no 9)도 함께
+      정리해야 한다(id를 지우거나 "mydocs.html로 흡수" 메모로 남길지는 메인 판단).</td></tr>
+    <tr><td>workflow.test.ts</td><td>무영향(§4-2). 구현 후 <code>npm test -- workflow</code>(WSL)
+      확인은 관례대로.</td></tr>
+  </table>
+
+  <h2><span class="num">§10</span>이 시안이 안 한 일</h2>
+  <ul class="doc">
+    <li>실서버·localStorage 연동 없음 — §6 프레임은 전부 이 문서 안 상태 전환이다(표본 데이터,
+      실데이터 아님).</li>
+    <li>nav.js·mydocs.html·lite-contacts.html·lite-screens.json·workflow.test.ts를 한 글자도
+      안 고쳤다.</li>
+    <li>intro.html·lite-contacts.html 실제 삭제를 하지 않았다 — §9는 권고이지 실행이 아니다.</li>
+    <li>매트릭스 축(테리토리·제품 이름) 편집 UI는 재현하지 않았다(§7에서 밝힘).</li>
+    <li>담당자 저장 폼은 "저장" 눌러도 실제로 저장하지 않는다 — 눌러 보면 그렇게 고지한다.</li>
+  </ul>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function 값(v){ return v && String(v).trim() ? esc(v) : "—"; }
+
+  // ── 표본 데이터: 보안제품 자료(productintro 필드 모델) ──
+  var VENDORS = [
+    {id:"v1",name:"SecureGate NGFW",category:"방화벽",vendor:"파이어웍스",summary:"차세대 방화벽·IPS 통합",docName:"SecureGate_소개서.pdf"},
+    {id:"v2",name:"EdgeWall Pro",category:"방화벽",vendor:"",summary:"",docName:null},
+    {id:"v3",name:"BorderShield X1",category:"방화벽",vendor:"시큐어텍",summary:"클라우드 연동 방화벽",docName:"BorderShield_카탈로그.pdf"},
+    {id:"v4",name:"EndpointHawk",category:"EDR",vendor:"호크시큐리티",summary:"AI 기반 엔드포인트 탐지·대응",docName:"EndpointHawk_백서.pdf"},
+    {id:"v5",name:"GuardianEDR",category:"EDR",vendor:"가디언랩스",summary:"",docName:null},
+    {id:"v6",name:"ThreatLens EDR",category:"EDR",vendor:"렌즈시큐리티",summary:"행위 기반 탐지",docName:"ThreatLens_소개서.pdf"},
+    {id:"v7",name:"DataVault DLP",category:"DLP",vendor:"볼트소프트",summary:"문서 유출 방지·워터마킹",docName:null},
+    {id:"v8",name:"InfoSeal",category:"DLP",vendor:"",summary:"",docName:null}
+  ];
+  var CATS = ["방화벽","EDR","DLP"];
+
+  // ── 표본 데이터: 연락처(lite-contacts.html 필드 모델) ──
+  var TERR = ["본사망","지사","DMZ","클라우드"];
+  var PROD = ["방화벽","EDR","백신","NAC"];
+  var CONTACTS = [
+    {id:"c1",name:"김보안",role:"사내",territories:["본사망","DMZ"],products:["방화벽","EDR"],phone:"010-1234-5678",email:"kim@company.com",memo:""},
+    {id:"c2",name:"박관제",role:"사내",territories:["지사"],products:["백신"],phone:"010-2222-3333",email:"",memo:"주간 당직"},
+    {id:"c3",name:"이엔지니어",role:"벤더",territories:["본사망","DMZ","클라우드"],products:["방화벽"],phone:"",email:"support@firewx.co.kr",memo:"방화벽 유지보수 벤더"},
+    {id:"c4",name:"최총판",role:"총판",territories:["지사"],products:["NAC"],phone:"02-000-0000",email:"",memo:""}
+  ];
+
+  // ══════════════ Before(intro.html 재현) ══════════════
+  var beforeCat = "전체";
+  var beforePicked = [];
+  function 자료요약(p){ return p.docName ? "📄 소개서 연결" : "자료 없음"; }
+  function renderBeforeChips(){
+    var cats = ["전체"].concat(CATS);
+    document.getElementById("beforeChips").innerHTML = cats.map(function(c){
+      var n = c==="전체" ? VENDORS.length : VENDORS.filter(function(p){return p.category===c;}).length;
+      return '<div class="ichip'+(beforeCat===c?" on":"")+'" data-c="'+esc(c)+'">'+esc(c)+" "+n+"</div>";
+    }).join("");
+    document.querySelectorAll("#beforeChips .ichip").forEach(function(ch){
+      ch.addEventListener("click", function(){ beforeCat = ch.dataset.c; renderBeforeChips(); renderBeforeList(); });
+    });
+  }
+  function renderBeforeList(){
+    var rows = beforeCat==="전체" ? VENDORS : VENDORS.filter(function(p){return p.category===beforeCat;});
+    document.getElementById("beforeListCnt").textContent = rows.length ? rows.length+"개" : "";
+    document.getElementById("beforeList").innerHTML = rows.map(function(p){
+      var picked = beforePicked.indexOf(p.id)>=0;
+      return '<div class="iprow" data-id="'+esc(p.id)+'">'+
+        '<input type="checkbox" title="비교에 담기"'+(picked?" checked":"")+'>'+
+        '<span class="nm">'+esc(p.name)+'</span>'+
+        '<span class="ic-cat">'+esc(p.category)+'</span>'+
+        '<span class="sub">'+값(p.vendor)+(p.summary?" · "+esc(p.summary):"")+'</span>'+
+        '<span class="docs">'+자료요약(p)+'</span></div>';
+    }).join("");
+    document.querySelectorAll("#beforeList input").forEach(function(ck){
+      ck.addEventListener("change", function(){
+        var id = ck.closest(".iprow").dataset.id;
+        if (ck.checked){
+          if (beforePicked.length>=3){ ck.checked=false; return; }
+          beforePicked.push(id);
+        } else { beforePicked = beforePicked.filter(function(x){return x!==id;}); }
+        renderBeforeList(); renderBeforeCmp();
+      });
+    });
+  }
+  function renderBeforeCmp(){
+    var picked = beforePicked.map(function(id){return VENDORS.filter(function(p){return p.id===id;})[0];}).filter(Boolean);
+    document.getElementById("beforeCmpCnt").textContent = picked.length ? picked.length+"개 담김" : "";
+    var box = document.getElementById("beforeCmp");
+    if (picked.length<2){ box.innerHTML = '<div class="iempty">위 카드에서 [비교]를 2~3개 담으면 여기 표가 생깁니다.</div>'; return; }
+    var 행 = function(label,f){ return "<tr><th style='width:96px;color:var(--muted-2);font-weight:700;padding:6px 9px;border-top:1px solid rgba(255,255,255,.06);text-align:left'>"+label+"</th>"+picked.map(function(p){return "<td style='padding:6px 9px;border-top:1px solid rgba(255,255,255,.06)'>"+f(p)+"</td>";}).join("")+"</tr>"; };
+    box.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'+
+      "<tr><th></th>"+picked.map(function(p){return "<td style='padding:6px 9px'><b style=\"color:#fff\">"+esc(p.name)+"</b></td>";}).join("")+"</tr>"+
+      행("분류", function(p){return 값(p.category);})+
+      행("벤더", function(p){return 값(p.vendor);})+
+      행("한 줄 소개", function(p){return 값(p.summary);})+
+      행("소개서", function(p){return p.docName?"📄 "+esc(p.docName):"—";})+
+      "</table></div>";
+  }
+  renderBeforeChips(); renderBeforeList(); renderBeforeCmp();
+
+  // ══════════════ After(mydocs.html v4 + 신규 탭 2개) ══════════════
+  var v4tab = "vendor";
+  var vendorFold = {};
+  var vendorPicked = [];
+  var vendorSel = null;
+  var emptyDemo = false;
+  var liteDemo = false;
+  var contactView = "matrix"; // matrix | list
+  var contactSel = null;
+  var contactAdding = false;
+
+  var SIDE = [
+    {group:"내가 쓰는 것", nodes:[
+      ["mine","👤","내 것",34,false,false],
+      ["contacts","📞","연락처",CONTACTS.length,true,true]
+    ]},
+    {group:"회사가 가진 것", nodes:[
+      ["know","🏢","회사 지식",22,false,false],
+      ["guide","📘","GIJO AS 안내",9,false,false],
+      ["vendor","📦","보안제품 자료",VENDORS.length,true,false]
+    ]},
+    {group:"기록", nodes:[
+      ["learn","🎓","학습",128,false,false],
+      ["ingest","🩹","반입",11,false,false]
+    ]}
+  ];
+  // node: [key, icon, label, cnt, isNew, liteVisible]
+
+  function renderSide(){
+    var html = SIDE.map(function(g){
+      var visNodes = g.nodes.filter(function(n){ return !liteDemo || n[5]; });
+      if (!visNodes.length) return "";
+      return '<div class="v4grouplbl">'+esc(g.group)+'</div>'+visNodes.map(function(n){
+        var key=n[0],ic=n[1],lb=n[2],cnt=n[3],isNew=n[4];
+        return '<button class="v4node'+(v4tab===key?" on":"")+(isNew?" new":"")+'" data-t="'+key+'">'+ic+
+          '<span class="txt">'+esc(lb)+'</span><span class="cnt">'+(emptyDemo&&key==="vendor"?0:cnt)+(isNew?" 신규":"")+'</span></button>';
+      }).join("");
+    }).join("");
+    if (!liteDemo) html += '<div class="v4grouplbl">예정</div><button class="v4node future" title="아직 동작하지 않습니다">🗂<span class="txt">산출물</span><span class="cnt">예정</span></button>';
+    document.getElementById("v4tree").innerHTML = html;
+    document.querySelectorAll("#v4tree .v4node[data-t]").forEach(function(b){
+      b.addEventListener("click", function(){ v4tab = b.dataset.t; vendorSel=null; contactSel=null; renderSide(); renderMain(); });
+    });
+    if (liteDemo && ["vendor","learn"].indexOf(v4tab)>=0) { v4tab="mine"; }
+  }
+
+  function renderMain(){
+    document.getElementById("v4contentBox").className = "v4content" + ((v4tab==="contacts"&&contactView==="matrix") ? " full" : "");
+    var actsEl = document.getElementById("vActs");
+    if (v4tab==="vendor"){
+      actsEl.innerHTML = '';
+      renderVendorList(); renderVendorDoc();
+    } else if (v4tab==="contacts"){
+      // 세그(매트릭스/담당자 목록)를 툴바에 둔다 — 목록 뷰 안에서도 항상 매트릭스로 돌아갈 수 있어야 한다.
+      actsEl.innerHTML = '<div class="seg" id="cSeg" style="margin-right:6px"><button data-v="matrix">매트릭스</button><button data-v="list">담당자 목록</button></div><button class="vbtn" id="btnAddContact">+ 담당자 추가</button>';
+      document.querySelectorAll("#cSeg button").forEach(function(b){
+        b.addEventListener("click", function(){ contactView=b.dataset.v; renderContacts(); });
+      });
+      var ab = document.getElementById("btnAddContact");
+      if (ab) ab.addEventListener("click", function(){ contactView="list"; contactAdding=true; contactSel=null; renderContacts(); });
+      renderContacts();
+    } else {
+      actsEl.innerHTML = v4tab==="guide" ? '<button class="vbtn" disabled title="시안 — 실제 화면과 동일 자리">📝 요청 만들기</button>' : '';
+      var label = {mine:"👤 내 것",know:"🏢 회사 지식",guide:"📘 GIJO AS 안내",learn:"🎓 학습",ingest:"🩹 반입"}[v4tab] || v4tab;
+      document.getElementById("afterListWrap").innerHTML = '<div class="empty">'+esc(label)+' — 오늘 이미 게시된 mydocs.html 그대로입니다(정적 예시, 이 시안이 손대지 않았습니다).</div>';
+      document.getElementById("afterDoc").innerHTML = '<div class="v4ph">이 시안은 <b>📦 보안제품 자료</b>·<b>📞 연락처</b> 탭에 집중합니다 — 왼쪽에서 다시 눌러 보세요.</div>';
+    }
+  }
+
+  // ── 보안제품 자료 ──
+  function renderVendorList(){
+    var q = (document.getElementById("vSearch").value||"").trim().toLowerCase();
+    var data = emptyDemo ? [] : VENDORS.filter(function(p){
+      if (!q) return true;
+      return (p.name||"").toLowerCase().indexOf(q)>=0 || (p.vendor||"").toLowerCase().indexOf(q)>=0;
+    });
+    var wrap = document.getElementById("afterListWrap");
+    if (!data.length){
+      wrap.innerHTML = '<div class="g-rows-head" style="grid-template-columns:1fr;gap:8px"><span>보안제품 자료</span></div>'+
+        '<div class="empty">등록된 소개자료가 없습니다.<br>대화창에 「제품 소개자료 등록: 제품명, 분류: 방화벽, 벤더: ○○」라고 하면 결재판 확인 후 여기 쌓입니다.<br>소개서 파일은 대화창 ＋로 올립니다.</div>';
+      return;
+    }
+    var byCat = {};
+    data.forEach(function(p){ (byCat[p.category]=byCat[p.category]||[]).push(p); });
+    var html = '<div class="g-rows-head" style="grid-template-columns:22px 1fr 78px 46px;gap:8px"><span></span><span>제품명</span><span>벤더</span><span class="ta-r">자료</span></div>';
+    CATS.forEach(function(c){
+      if (!byCat[c]) return;
+      var folded = !!vendorFold[c];
+      html += '<div class="g-rows-gh" data-cat="'+esc(c)+'"><span class="tri">'+(folded?"▸":"▾")+'</span>🗂 '+esc(c)+'<span class="cnt">'+byCat[c].length+'개</span></div>'+
+        '<div class="g-rows-body'+(folded?" folded":"")+'">'+byCat[c].map(function(p){
+          var picked = vendorPicked.indexOf(p.id)>=0;
+          return '<div class="g-rows-r'+(vendorSel===p.id?" sel":"")+'" data-id="'+esc(p.id)+'" style="grid-template-columns:22px 1fr 78px 46px;gap:8px">'+
+            '<input type="checkbox" title="비교에 담기(최대 3)"'+(picked?" checked":"")+'>'+
+            '<span class="trunc">'+esc(p.name)+'</span>'+
+            '<span class="trunc gm">'+값(p.vendor)+'</span>'+
+            '<span class="ta-r gm2">'+(p.docName?"📄":"—")+'</span></div>';
+        }).join("")+'</div>';
+    });
+    wrap.innerHTML = html;
+    wrap.querySelectorAll(".g-rows-gh").forEach(function(gh){
+      gh.addEventListener("click", function(){ var c=gh.dataset.cat; vendorFold[c]=!vendorFold[c]; renderVendorList(); });
+    });
+    wrap.querySelectorAll(".g-rows-r").forEach(function(r){
+      r.addEventListener("click", function(ev){
+        if (ev.target && ev.target.tagName==="INPUT") return;
+        vendorSel = r.dataset.id; renderVendorList(); renderVendorDoc();
+      });
+      r.querySelector("input").addEventListener("change", function(ev){
+        var id = r.dataset.id;
+        if (ev.target.checked){
+          if (vendorPicked.length>=3){ ev.target.checked=false; document.getElementById("afterDoc").innerHTML = '<div class="v4ph" style="color:var(--amber)">비교는 한 번에 3개까지입니다 — 하나를 빼고 담아 주세요.</div>'; return; }
+          vendorPicked.push(id);
+        } else { vendorPicked = vendorPicked.filter(function(x){return x!==id;}); }
+        renderVendorList(); renderVendorDoc();
+      });
+    });
+  }
+  function renderVendorDoc(){
+    var box = document.getElementById("afterDoc");
+    if (vendorPicked.length>=2){
+      var picked = vendorPicked.map(function(id){return VENDORS.filter(function(p){return p.id===id;})[0];}).filter(Boolean);
+      var 행 = function(label,f){ return "<tr><th>"+label+"</th>"+picked.map(function(p){return "<td>"+f(p)+"</td>";}).join("")+"</tr>"; };
+      box.innerHTML = '<div class="detail"><div class="dn">⚖ 비교 — '+picked.length+'개 담김</div>'+
+        '<div class="honestline">비교는 등록부·반입 자료에 적힌 것만 보여 줍니다 — 자료에 없는 칸은 "—" 입니다.</div>'+
+        '<div style="overflow-x:auto"><table class="cmptable">'+
+        "<tr><th></th>"+picked.map(function(p){return "<td><b>"+esc(p.name)+"</b></td>";}).join("")+"</tr>"+
+        행("분류", function(p){return 값(p.category);})+
+        행("벤더", function(p){return 값(p.vendor);})+
+        행("한 줄 소개", function(p){return 값(p.summary);})+
+        행("소개서", function(p){return p.docName?"📄 "+esc(p.docName):"—";})+
+        "</table></div>"+
+        '<div class="honestline">더 깊은 비교(기능·성능)는 대화창에 「'+picked.map(function(p){return p.name;}).join("와 ")+' 비교해줘」라고 물으면 반입된 매뉴얼·소개서를 근거로 답합니다.</div>'+
+        '<div class="dbt"><button id="vClearCmp">✕ 비교 지우기</button></div></div>';
+      var cb = document.getElementById("vClearCmp");
+      if (cb) cb.addEventListener("click", function(){ vendorPicked=[]; renderVendorList(); renderVendorDoc(); });
+      return;
+    }
+    if (vendorSel){
+      var p = VENDORS.filter(function(x){return x.id===vendorSel;})[0];
+      if (!p){ box.innerHTML = '<div class="v4ph">행을 누르면 여기서 자료를 봅니다. 체크박스로 2~3개 담으면 비교표가 뜹니다.</div>'; return; }
+      box.innerHTML = '<div class="detail"><div class="dn">'+esc(p.name)+'</div>'+
+        '<div class="dm">분류: '+esc(p.category)+' · 벤더: '+값(p.vendor)+'</div>'+
+        '<div class="dm">'+값(p.summary)+'</div>'+
+        '<div class="dm">자료: '+(p.docName?"📄 "+esc(p.docName):"—")+'</div>'+
+        '<div class="dbt"><button id="vAddCmp">⚖ 비교에 담기</button><button class="warn" id="vDel" title="시안 — 실제로 지우지 않습니다">🗑 대장에서 지우기</button></div></div>';
+      var ac = document.getElementById("vAddCmp");
+      if (ac) ac.addEventListener("click", function(){
+        if (vendorPicked.indexOf(p.id)<0){ if (vendorPicked.length>=3) return; vendorPicked.push(p.id); }
+        renderVendorList(); renderVendorDoc();
+      });
+      return;
+    }
+    box.innerHTML = '<div class="v4ph">행을 누르면 여기서 자료를 봅니다. 체크박스로 2~3개 담으면 비교표가 뜹니다.</div>';
+  }
+
+  // ── 연락처 ──
+  function covers(t,p){ return CONTACTS.filter(function(c){ return (c.territories||[]).indexOf(t)>=0 && (c.products||[]).indexOf(p)>=0; }); }
+  function cellClass(list){ if(!list.length) return "cov-gap"; if(list.some(function(c){return c.role==="사내";})) return "cov-in"; return "cov-ven"; }
+
+  function renderContacts(){
+    var full = document.getElementById("afterFull");
+    var list = document.getElementById("afterListWrap");
+    var doc = document.getElementById("afterDoc");
+    document.getElementById("v4contentBox").className = "v4content" + (contactView==="matrix" ? " full" : "");
+    // 세그 상태 동기화(툴바 #cSeg는 vActs 안에 살아있다 — full/list만 다시 그려도 안 사라진다)
+    document.querySelectorAll("#cSeg button").forEach(function(b){ b.classList.toggle("on", b.dataset.v===contactView); });
+
+    if (contactView==="matrix"){
+      var gap=0, tot=TERR.length*PROD.length;
+      var thead = '<th class="rowh"></th>'+PROD.map(function(p){return "<th>"+esc(p)+"</th>";}).join("");
+      var rows = TERR.map(function(t){
+        var tds = PROD.map(function(p){
+          var l = covers(t,p); var cls=cellClass(l); if(cls==="cov-gap")gap++;
+          return '<td class="'+cls+'" data-t="'+esc(t)+'" data-p="'+esc(p)+'">'+(l.length?esc(l[0].name)+(l.length>1?" 외 "+(l.length-1):""):"—")+'</td>';
+        }).join("");
+        return "<tr><th class='rowh'>"+esc(t)+"</th>"+tds+"</tr>";
+      }).join("");
+      var 내부 = CONTACTS.filter(function(c){return c.role==="사내";}).length;
+      full.innerHTML =
+        '<div class="ckpi"><div><div class="b">'+CONTACTS.length+'</div><div class="l">담당자</div></div>'+
+        '<div><div class="b">'+내부+'</div><div class="l">사내</div></div>'+
+        '<div><div class="b">'+(CONTACTS.length-내부)+'</div><div class="l">벤더·총판</div></div>'+
+        '<div><div class="b gap">'+gap+' / '+tot+'</div><div class="l">공백 칸</div></div></div>'+
+        '<div class="mxwrap"><table class="mx"><tr>'+thead+'</tr>'+rows+'</table></div>'+
+        '<div class="clegend"><span><i class="csw in"></i> 사내 담당 있음</span><span><i class="csw ven"></i> 벤더/총판만</span><span><i class="csw gap"></i> 공백(담당 없음)</span></div>'+
+        '<div id="cellDetail"></div>'+
+        '<div class="pconly">⚠ 전화·이메일은 개인정보입니다 — 이 PC에만 저장되고 백업·동기화되지 않습니다. (조직 공유는 스탠다드의 몫)</div>';
+      full.querySelectorAll("table.mx td[data-t]").forEach(function(td){
+        td.addEventListener("click", function(){
+          var t=td.dataset.t, p=td.dataset.p, l=covers(t,p);
+          var cd = document.getElementById("cellDetail");
+          if (!l.length){ cd.innerHTML = '<div class="detail" style="border-left:3px solid var(--red)"><b>'+esc(t)+' × '+esc(p)+'</b><div class="dm" style="color:#e88a82;margin-top:4px">담당자가 없습니다 — 커버리지 공백입니다. 「담당자 목록」에서 담당자를 추가하고 이 구역·제품을 지정하세요.</div></div>';
+            return; }
+          cd.innerHTML = '<div class="detail"><b>'+esc(t)+' × '+esc(p)+'</b>'+l.map(function(c){
+            return '<div class="dm" style="margin-top:6px">'+esc(c.name)+' <span class="'+(c.role==="사내"?"gm":"")+'" style="font-size:11px">('+esc(c.role)+')</span> — '+값(c.phone)+' · '+값(c.email)+'</div>';
+          }).join("")+'</div>';
+        });
+      });
+      return;
+    }
+
+    // 목록 뷰(30px 행) — g-rows 재사용
+    var html = '<div class="g-rows-head" style="grid-template-columns:1fr 60px 1fr;gap:8px"><span>이름</span><span>역할</span><span>담당(테리토리·제품)</span></div>'+
+      '<div class="g-rows-flat">'+CONTACTS.map(function(c){
+        var tags = (c.territories||[]).concat(c.products||[]).join(" · ");
+        return '<div class="g-rows-r'+(contactSel===c.id?" sel":"")+'" data-id="'+esc(c.id)+'" style="grid-template-columns:1fr 60px 1fr;gap:8px">'+
+          '<span class="trunc">'+esc(c.name)+'</span><span class="gm2">'+esc(c.role)+'</span><span class="trunc gm">'+esc(tags||"담당 미지정")+'</span></div>';
+      }).join("")+'</div>';
+    list.innerHTML = html;
+    list.querySelectorAll(".g-rows-r").forEach(function(r){
+      r.addEventListener("click", function(){ contactSel=r.dataset.id; contactAdding=false; renderContacts(); });
+    });
+
+    if (contactAdding){
+      doc.innerHTML = renderContactForm(null);
+      wireContactForm(null);
+      return;
+    }
+    if (contactSel){
+      var c = CONTACTS.filter(function(x){return x.id===contactSel;})[0];
+      if (!c){ doc.innerHTML = '<div class="v4ph">행을 누르면 여기서 담당자를 봅니다.</div>'; return; }
+      doc.innerHTML = '<div class="detail"><div class="dn">'+esc(c.name)+' <span class="gm2" style="font-size:12px">('+esc(c.role)+')</span></div>'+
+        '<div class="dm">담당 테리토리: '+값((c.territories||[]).join(", "))+'</div>'+
+        '<div class="dm">담당 제품: '+값((c.products||[]).join(", "))+'</div>'+
+        '<div class="dm">전화: '+값(c.phone)+' · 이메일: '+값(c.email)+'</div>'+
+        (c.memo?'<div class="dm">메모: '+esc(c.memo)+'</div>':'')+
+        '<div class="dbt"><button id="cEdit">✏ 고치기</button><button class="warn" id="cDel" title="시안 — 실제로 지우지 않습니다">🗑 삭제</button></div>'+
+        '<div class="pconly">⚠ 전화·이메일은 이 PC에만 저장됩니다.</div></div>';
+      var eb = document.getElementById("cEdit");
+      if (eb) eb.addEventListener("click", function(){ doc.innerHTML = renderContactForm(c); wireContactForm(c); });
+      return;
+    }
+    doc.innerHTML = '<div class="v4ph">행을 누르면 여기서 담당자를 봅니다. 위 [+ 담당자 추가]로 새로 넣을 수 있습니다.</div>';
+  }
+
+  function renderContactForm(c){
+    c = c || {name:"",role:"사내",territories:[],products:[],phone:"",email:"",memo:""};
+    var tChips = TERR.map(function(t){ return '<span class="cchip'+((c.territories||[]).indexOf(t)>=0?" on":"")+'" data-k="t" data-v="'+esc(t)+'">'+esc(t)+'</span>'; }).join("");
+    var pChips = PROD.map(function(p){ return '<span class="cchip'+((c.products||[]).indexOf(p)>=0?" on":"")+'" data-k="p" data-v="'+esc(p)+'">'+esc(p)+'</span>'; }).join("");
+    return '<div class="cform">'+
+      '<div><label>이름</label><input id="f_name" value="'+esc(c.name)+'"></div>'+
+      '<div><label>역할</label><select id="f_role"><option'+(c.role==="사내"?" selected":"")+'>사내</option><option'+(c.role==="벤더"?" selected":"")+'>벤더</option><option'+(c.role==="총판"?" selected":"")+'>총판</option></select></div>'+
+      '<div><label>전화</label><input id="f_phone" value="'+esc(c.phone)+'" placeholder="010-0000-0000"></div>'+
+      '<div><label>이메일</label><input id="f_email" value="'+esc(c.email)+'" placeholder="name@company.com"></div>'+
+      '<div class="full"><label>담당 테리토리</label><div class="cchips" id="f_terr">'+tChips+'</div></div>'+
+      '<div class="full"><label>담당 제품</label><div class="cchips" id="f_prod">'+pChips+'</div></div>'+
+      '<div class="full"><label>메모</label><input id="f_memo" value="'+esc(c.memo)+'"></div>'+
+      '<div class="full" style="display:flex;gap:8px;margin-top:2px"><button class="vbtn on" id="f_save">저장</button><button class="vbtn" id="f_cancel">취소</button></div>'+
+      '<div class="full pconly">⚠ 전화·이메일은 개인정보입니다 — 이 PC에만 저장되고 백업·동기화되지 않습니다. 이 시안에서는 실제로 저장하지 않습니다.</div>'+
+      '</div>';
+  }
+  function wireContactForm(){
+    document.querySelectorAll(".cchip").forEach(function(ch){ ch.addEventListener("click", function(){ ch.classList.toggle("on"); }); });
+    var sv = document.getElementById("f_save");
+    if (sv) sv.addEventListener("click", function(){
+      var doc = document.getElementById("afterDoc");
+      doc.innerHTML = '<div class="v4ph" style="color:var(--teal)">이 시안에서는 저장하지 않습니다 — 실제 화면에서는 여기서 localStorage(gijo.lite.contacts)에 저장되고 매트릭스가 즉시 갱신됩니다.</div>';
+      contactAdding=false;
+    });
+    var cn = document.getElementById("f_cancel");
+    if (cn) cn.addEventListener("click", function(){ contactAdding=false; renderContacts(); });
+  }
+
+  document.getElementById("vSearch").addEventListener("input", function(){ if (v4tab==="vendor") renderVendorList(); });
+  document.getElementById("emptyToggle").addEventListener("click", function(){
+    emptyDemo = !emptyDemo; vendorPicked=[]; vendorSel=null;
+    this.classList.toggle("on", emptyDemo);
+    renderSide(); renderMain();
+  });
+  document.getElementById("liteToggle").addEventListener("click", function(){
+    liteDemo = !liteDemo;
+    this.classList.toggle("on", liteDemo);
+    renderSide(); renderMain();
+  });
+
+  renderSide(); renderMain();
+
+  // ══════════════ 실측 — getBoundingClientRect, 주장 아니라 계측 ══════════════
+  function measure(){
+    try {
+      var bBody = document.getElementById("beforeBody");
+      var bFirstRow = document.querySelector("#beforeList .iprow");
+      var bChrome = bFirstRow ? Math.round(bFirstRow.getBoundingClientRect().top - bBody.getBoundingClientRect().top + bBody.scrollTop) : null;
+      var bRowH = bFirstRow ? Math.round(bFirstRow.getBoundingClientRect().height) : null;
+
+      var aFirstRow = document.querySelector("#afterListWrap .g-rows-r");
+      var aChrome = 77 + 38;
+      var aRowH = aFirstRow ? Math.round(aFirstRow.getBoundingClientRect().height) : 30;
+
+      document.getElementById("beforeMeasure").innerHTML =
+        "제목줄+분류칩+패널머리 = <b>"+(bChrome==null?"측정불가":bChrome+"px")+"</b> (실측) · 첫 행 높이 <b>"+(bRowH==null?"-":bRowH+"px")+"</b>";
+      document.getElementById("afterMeasure").innerHTML =
+        "셸77+툴바38 = <b>115px</b>(explicit height 합) · 첫 행 높이 <b>"+aRowH+"px</b>(고정)";
+
+      var bChromeVal = bChrome==null?120:bChrome, bRowVal = bRowH==null?27:bRowH;
+      var aChromeVal = aChrome, aRowVal = aRowH;
+      var bRows = Math.floor((800-77-bChromeVal)/bRowVal);
+      var aRows = Math.floor((800-aChromeVal-26)/aRowVal);
+
+      document.getElementById("tBeforeChrome").textContent = bChromeVal+"px";
+      document.getElementById("tAfterChrome").textContent = aChromeVal+"px";
+      document.getElementById("tChromeDiff").textContent = (aChromeVal-bChromeVal>=0?"+":"")+(aChromeVal-bChromeVal)+"px";
+      document.getElementById("tBeforeRow").textContent = bRowVal+"px";
+      document.getElementById("tRowDiff").textContent = "+"+(aRowVal-bRowVal)+"px";
+      document.getElementById("tBeforeRows").textContent = bRows+"줄";
+      document.getElementById("tAfterRows").textContent = aRows+"줄";
+      document.getElementById("tRowsDiff").textContent = (aRows-bRows>=0?"+":"")+(aRows-bRows)+"줄";
+    } catch (e) {
+      document.getElementById("beforeMeasure").textContent = "측정 실패: "+(e&&e.message||e);
+    }
+  }
+  window.addEventListener("load", function(){ setTimeout(measure, 30); });
+  setTimeout(measure, 200);
+})();
+</script>
+</body>
+</html>

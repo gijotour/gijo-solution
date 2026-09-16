@@ -1,0 +1,128 @@
+[
+ {
+  "title": "AND·쉼표로 이어진 표기에서 NC 판정이 통째로 삼켜지고 「알아보지 못한 표기」라는 거짓 근거가 나간다",
+  "severity": "중",
+  "where": "server/src/engine/licenserisk.ts:286-293 (+77-80), server/src/engine/sbomimport.ts:155-157",
+  "why": "NC를 「판정불가」 등급으로 둔 설계와, AND 갈래가 판정불가 조각을 후보에서 빼는 기존 로직이 정면충돌한다. `MIT AND CC-BY-NC-4.0`(또는 쉼표/슬래시 결합)을 넣으면 아는것=[MIT]만 남아 등급이 🟢고지만으로 확정되고, 근거에는 「그중 1개는 알아보지 못한 표기라 더 무거울 수도 있습니다」가 붙는다. 실제로는 알아봤고 그 조각이 가장 무거운 조건(상용 사용 불가)이었다 — 판정기가 자기가 방금 읽은 사실을 「못 읽었다」고 말하는 거짓 출력이다. 특히 SPDX 반입 경로는 licenseDeclared와 licenseConcluded가 다르면 ` AND `로 이어 붙이므로(sbomimport.ts:155), 선언=CC-BY-NC-4.0·확정=MIT 같은 흔한 조합이 곧바로 이 갈래로 들어온다. 게시 관문은 원문 문자열에 상용사용금지()를 걸어 막는데(gen-sbom-self.mjs:305) 검수 화면은 초록을 보이므로, 같은 입력에 두 창구가 다른 답을 낸다.",
+  "evidence": "licenserisk.ts:286-288 `const 아는것 = 판정들.filter((p) => p.등급 !== \"판정불가\"); … 고른것 = (아는것.length ? 아는것 : 판정들)…sort(무거운순)[0]` / 291 `⚠ 그중 ${모르는수}개는 알아보지 못한 표기라 **더 무거울 수도 있습니다**`. 규칙 첫 줄(77-80)이 NC/ND에 등급 \"판정불가\"를 주므로 위 필터에 걸려 빠진다. sbomimport.ts:155 `const 합 = 라이선스합치기([conc, decl]);` → 51-58에서 ` AND ` 결합. 새 시험(licenserisk.test.ts +356~)은 단일 표기(`CC-BY-NC-4.0`)만 확인하고 결합 표기 케이스가 없다."
+ },
+ {
+  "title": "ND(변경금지)를 「상용 사용 금지」로 단정한다 — 오탐으로 게시를 막고 고객에게 틀린 법적 단정을 준다",
+  "severity": "중",
+  "where": "server/src/engine/licenserisk.ts:66-67·77-80·336-340, tools/gen-sbom-self.mjs:305-318",
+  "why": "CC BY-ND는 **상업적 이용이 허용**된다(원본 그대로면 상업적 배포 가능, 변경본 배포만 금지). 그런데 상용금지패턴이 `CC[\\s-]?BY[\\s-]?(NC|ND)`로 ND까지 잡고, 근거 문장은 「사용 자체가 허락되지 않는 경우이니 대체 부품을 찾거나 상용 이용 허락을 받아야 합니다」라고 단정한다. 관문은 이 판정 하나로 process.exit(1)을 하므로, CC-BY-ND 자산을 동봉하는 순간 정당한 게시가 막히고 담당자는 실재하지 않는 라이선스 협상을 하러 간다. 더구나 같은 ND인 「공공누리 제3유형」은 `[24]`에 없어 안 걸리므로, 한 판정기가 같은 조건에 두 답을 낸다. (요청하신 반례는 확인함 — CC-BY-4.0·OFL-1.1·SIL OFL-1.1·공공누리 제1유형·Font Awesome 실제 표기는 모두 안 걸린다. 삼킴은 없다.)",
+  "evidence": "licenserisk.ts:66-67 `const 상용금지패턴 = /(^|[^a-z])CC[\\s-]?BY[\\s-]?(NC|ND)|non[\\s-]?commercial|비영리|상업적?\\s*이용\\s*금지|공공누리\\s*제?\\s*[24]\\s*유형/i;` / 78-80 근거 문장 「**사용 자체가 허락되지 않는**」 / gen-sbom-self.mjs:308-311 `★ **상용 제품에 실을 수 없는** 부품 … 소스를 공개해도 풀리지 않습니다` + 318 `if (상용불가.length || 막을것.length) process.exit(1);`. 축자 대조: `CC-BY-ND-4.0`=적중, `공공누리 제3유형`(=변경금지)=미적중."
+ },
+ {
+  "title": "「못 읽으면 시끄럽게 군다」는 게시를 막지 않는다 — 원장 파일 자체가 없으면 그마저 조용하다",
+  "severity": "중",
+  "where": "tools/gen-sbom-self.mjs:162-191 (특히 164, 186-189)",
+  "why": "이번에 고친 사고의 본체가 「조용한 0」인데, 새 처방은 stderr 경고 두 줄뿐이고 종료코드를 바꾸지 않는다. 형식이 다시 어긋나면 경고는 나지만 THIRD-PARTY-NOTICES.md는 vendor 4종이 빠진 채 **덮어써지고**(268-292) 관문은 exit 0으로 통과해 electron-builder가 그대로 굽는다 — 고지 의무 위반본이 다시 나간다. 게다가 `if (!fs.existsSync(vend)) return [];`(164)은 경고조차 없이 빈 배열을 준다: 파일이 없어지는 쪽이 가장 조용하다. 이 원장은 client/smartmd/가 git 미추적이고 게시 직전 **외부 저장소(gijo-smart-md-studio)에서 받아오는** 파일이라(fetch-smartmd.mjs), 형식 결정권이 우리에게 없다 — 재발 조건이 우리 손 밖에 있다.",
+  "evidence": "gen-sbom-self.mjs:164 `if (!fs.existsSync(vend)) return [];` / 186-189 `if (!모음.length) { console.error(…부품을 하나도 못 찾았습니다.…) }` — process.exit 없음. 관문 종료는 318행 `if (상용불가.length || 막을것.length) process.exit(1);` 뿐. client/.gitignore:39 `smartmd/`, `git ls-files client/smartmd` = 0건. client/package.json:13 `dist`: … build-server-dist && license-gate && electron-builder."
+ },
+ {
+  "title": "새 감시(vendornotice.test)는 도구가 아니라 자기 파서 사본을 재고, git 미추적 산출물에 매여 다른 기계에서 5~6건 실패한다",
+  "severity": "중",
+  "where": "server/test/vendornotice.test.ts:26-34·39-51·54-62·100-106",
+  "why": "표읽기(39-51)는 gen-sbom-self.mjs의 smartmd동봉(162-191)을 손으로 옮겨 적은 사본이다. 그래서 ★★ 「하나 이상 읽는다」 시험은 **사본이 읽히는지**만 재고, 정작 게시에 물린 도구의 파싱이 깨져도 초록이다. 두 벌의 어긋남을 잡을 유일한 대조(100-106)는 gitignore된 빌드 산출물 THIRD-PARTY-NOTICES.md가 있을 때만 돌고, 그 산출물은 게시(license-gate) 때만 갱신되므로 **깨진 뒤에야** 빨개진다. 반대로 원문()은 파일이 없으면 throw이므로, fetch-smartmd를 돌린 적 없는 기계(새 클론·max·gb10 — 그 스크립트는 비공개 GitHub 저장소 SSH가 필요하다)에서는 5~6건이 빨간불이 되고, 화면에 뜨는 안내는 「wsl-test.sh 동기화를 보라」라서 진짜 원인(원장 자체가 미추적)과 다른 곳을 가리킨다.",
+  "evidence": "vendornotice.test.ts:37-38 주석 스스로 `⚠ 여기 사본을 두는 것이 마음에 걸리지만, 그 파일은 .mjs 도구라 vitest에서 못 부른다` / 94·101 `if (!fs.existsSync(고지)) return;` (조용한 건너뜀) / 27-31 원문() throw + 안내 문구. THIRD-PARTY-NOTICES.md는 .gitignore:75에 등재, client/smartmd/는 client/.gitignore:39에 등재(추적 0건). wsl-test.sh:52는 원본 트리에 그 폴더가 있을 때만 나른다."
+ },
+ {
+  "title": "자가치유 UPDATE의 version 키가 저장 실태(NULL)와 안 맞아 0행을 고친다 — 「수렴 연산」 주석이 사실이 아니다",
+  "severity": "중",
+  "where": "server/src/engine/sbomreview.ts:62·71-76·135·186-203",
+  "why": "부품을 넣을 때 판이 비면 `version: c.판 || null`로 **NULL**이 들어간다(135). 그런데 검수상세는 읽을 때 `String(c.version ?? \"\")`로 빈 문자열을 만들어 `WHERE … AND version=@version`에 넘긴다(190) — SQLite에서 `version = ''`는 NULL 행에 절대 안 맞는다. 판이 없는 부품(SPDX versionInfo 미기재·CycloneDX version 누락)은 규칙이 바뀌어도 저장 등급이 **영원히 안 고쳐지고**, 고칠것은 매번 비지 않으므로 상세를 열 때마다 쓰기 트랜잭션이 반복된다(GET 요청이 매번 DB에 쓴다). 화면은 재계산값을 쓰니 틀리지 않지만, 주석이 약속한 「어긋난 것이 있을 때만 돌고 두 번 돌려도 같은 값」이 성립하지 않고, tier 컬럼(전용 인덱스 idx_sbom_rc_tier까지 있는)은 조용히 낡은 값을 계속 들고 있다 — 나중에 tier로 조회하는 코드가 생기면 그때 틀린 답이 나온다.",
+  "evidence": "sbomreview.ts:62 `UPDATE … WHERE reviewId=@reviewId AND name=@name AND version=@version` / 135 `version: c.판 || null` / 190 `version: String(c.version ?? \"\")` / 72 주석 `어긋난 것이 있을 때만 돌고, 두 번 돌려도 같은 값이 된다`. 판의 출처는 sbomimport.ts:117 `판: String(o.version ?? \"\").trim()` · 161 `판: String(o.versionInfo ?? \"\").trim()` — 미기재면 빈 문자열."
+ },
+ {
+  "title": "같은 이름·판이 두 줄이면 UPDATE가 두 줄을 함께 덮어 한 줄이 남의 등급으로 오염된다",
+  "severity": "낮음",
+  "where": "server/src/engine/sbomreview.ts:62·186-197, server/src/db.ts:670-681",
+  "why": "sbom_review_components에는 유일 제약이 없고(db.ts:670-681) 반입 단계에서 이름·판 중복을 접지 않는다. 같은 name·version이 두 줄인데 license 원문이 다르면(도구가 같은 꾸러미를 두 자리에서 잡아 선언 라이선스가 다른 경우) 고칠것에 서로 다른 tier를 가진 두 항목이 들어가고, 각 UPDATE가 **두 줄 모두**를 덮으므로 마지막 값이 두 줄에 찍힌다. 그러면 다음 조회에서 다시 어긋남이 검출돼 또 쓰고 — 수렴하지 않고 진동한다. 화면 표시는 줄마다 재계산하므로 안 틀리지만, 검수 이력이라는 저장본이 조용히 서로의 값으로 오염된다.",
+  "evidence": "db.ts:670-681 — PRIMARY KEY/UNIQUE 없이 reviewId·name·version 컬럼만, 인덱스는 idx_sbom_rc_review·idx_sbom_rc_tier뿐. sbomreview.ts:134-142 반입 부품을 그대로 전부 INSERT(중복 제거 없음). 62행 UPDATE의 WHERE가 reviewId+name+version이라 다중 행 매칭."
+ },
+ {
+  "title": "CC를 안 붙인 NC 표기·영문 KOGL 표기는 관문을 그대로 통과한다(미탐)",
+  "severity": "낮음",
+  "where": "server/src/engine/licenserisk.ts:66-67",
+  "why": "패턴이 잡는 NC 어형은 ⓐ`CC`가 앞에 붙은 것 ⓑ`noncommercial` 철자뿐이다. 실제 SBOM·모델 카드에 흔한 「Creative Commons BY-NC 4.0」·「BY-NC-SA-4.0」(약칭만)·「KOGL Type 2」는 셋 다 안 걸리고, 판정도 「아는 라이선스가 아닙니다」(판정불가)로 떨어지는데 관문은 판정불가를 막지 않으므로 exit 0으로 나간다. 즉 이번에 세운 유일한 상용금지 방벽에 흔한 표기 구멍이 남아 있다. 우리가 실제로 걸린 표기(CC BY-NC-ND 2.0 KR·cc-by-nc-4.0·공공누리 제4유형)는 잡히므로 방벽 자체는 선다.",
+  "evidence": "licenserisk.ts:66-67 정규식 축자 확인 결과 — 적중: `CC BY-NC-ND 2.0 KR`·`cc-by-nc-4.0`·`공공누리 제4유형` / 미적중: `Creative Commons BY-NC 4.0`·`BY-NC-SA-4.0`·`KOGL Type 2`. gen-sbom-self.mjs:297-299 주석 「「판정 불가」는 막지 않는다」."
+ },
+ {
+  "title": "조회(GET)가 검수 이력을 조용히 고쳐 써, 검수 때 남긴 감사 기록과 저장본이 어긋나도 흔적이 없다",
+  "severity": "낮음",
+  "where": "server/src/engine/sbomreview.ts:194-203·146-152·256-259",
+  "why": "sbom검수는 만들 때 recordAudit에 「소스공개요구 N건」이라는 숫자를 박아 남긴다(149-151). 그런데 이제 상세를 여는 것만으로 summary가 새 규칙 값으로 덮여 쓰이고, 그 사실은 어디에도 안 남는다(감사 기록·notes·reviewedAt 모두 그대로). 납품 심사용 근거로 내밀 기록인데, 감사 로그의 N과 기록의 숫자가 달라져도 「누가 언제 왜 바뀌었나」를 말할 수 없다. 라우트도 GET에 authMiddleware만 있어 읽기만 하는 사용자의 조회가 쓰기를 유발한다(256-259, /:id/meta의 존재 확인 호출 272도 같다).",
+  "evidence": "sbomreview.ts:149-151 `detail: \\`타사 SBOM 검수: … 소스공개요구 ${…}건)\\`` / 194-203 `if (고칠것.length) { … 낡은등급고치기(id, 고칠것, JSON.stringify(새요약)); … }` — recordAudit 호출 없음 / 256-259 `app.get(\"/api/sbom-review/:id\", authMiddleware, …)`."
+ },
+ {
+  "title": "등급 되돌리기 UPDATE가 「판 없는 부품」에는 조용히 0행 — 「수렴 연산」이라는 주석이 사실이 아니다",
+  "severity": "중",
+  "where": "server/src/engine/sbomreview.ts:62, 190 (짝: 135)",
+  "why": "저장할 때는 `version: c.판 || null`이라 판이 없는 부품이 **NULL**로 들어간다(135행). 그런데 이번에 새로 만든 되돌리기 문장은 `WHERE ... AND version=@version`인데(62행) 넘기는 값은 `String(c.version ?? \"\")` → **빈 문자열**이다(190행). SQLite에서 `NULL = ''`는 참이 아니므로 **UPDATE가 0행을 고치고 오류도 안 난다.** `run()`의 changes를 안 보므로 실패가 삼켜진다. 결과 ①`sbom_review_components.tier`는 영영 낡은 채로 남고 ②그래도 `요약고치기`는 돌아 `sbom_reviews.summary`만 새 값이 되어 **부모 요약과 자식 행이 서로 다른 말**을 하는 DB가 된다(`idx_sbom_rc_tier` 색인도 낡은 값을 가리킨다) ③드리프트가 매번 다시 잡혀 **상세를 열 때마다 트랜잭션 쓰기가 반복**된다(GET 경로에서). 71~72행 주석의 「두 번 돌려도 같은 값이 된다」가 이 부류에서는 성립하지 않는다. 하필 이 커밋이 판정 규칙을 셋(NC/ND·OFL 자유표기·LicenseRef) 바꿔 드리프트를 확실히 만든다.",
+  "evidence": "sbomreview.ts:62 `UPDATE sbom_review_components SET tier=@tier, needsCheck=@needsCheck WHERE reviewId=@reviewId AND name=@name AND version=@version` / :135 `version: c.판 || null` / :190 `version: String(c.version ?? \"\")`. db.ts:673 `version TEXT`(NOT NULL 아님). sbomimport.ts:117 `판: String(o.version ?? \"\").trim()` → 판 없으면 \"\" → `|| null`로 NULL 저장. 시험은 이 경우를 안 탄다 — sbomreview.test.ts:18 부품표 헬퍼가 `version: c.version ?? \"1.0\"`으로 **항상 판을 넣는다**."
+ },
+ {
+  "title": "등급 다시 판정은 상세 화면에만 붙어, 대화 카드·목록·요약문은 낡은 저장본을 계속 쓴다 — 「한 화면이 두 말」이 「화면과 대화가 두 말」로 옮겨갔다",
+  "severity": "중",
+  "where": "server/src/engine/sbomreview.ts:171-203 · 217-222 / server/src/engine/datacard.ts:631-651",
+  "why": "`검수상세`만 `등급판정`을 다시 돌리고 저장본을 고친다. 반면 ①대화 카드(`supplychainStatusAnswer`)는 `검수목록()`의 **저장된 summary를 그대로 더하고**, 주석에 「등급을 여기서 다시 세지 않는다」라고 못 박혀 있으며 ②강제도구 `sbom_review_status` → `검수요약문()`도 `검수목록()`의 저장본을 쓴다 ③목록 화면 배지(supplychain.html:162-166)도 같다. 이 커밋이 판정 규칙을 바꿨으므로, **이미 저장된 검수 이력은 사람이 그 건의 상세를 한 번 열기 전까지** 대화창·카드·목록에서 옛 숫자를 계속 말한다. 담당자가 대화창에 물으면 「소스 공개 요구 0」인데 화면을 열면 숫자가 달라지는 식이다. 커밋 메시지 ⑤의 「알려진 한계였던 것을 닫음」은 상세 화면 한 곳에만 해당한다.",
+  "evidence": "sbomreview.ts:184-185 주석이 스스로 「목록 화면과 KPI는 저장된 summary를 쓰므로」라고 적고 있으나, 고치는 계기가 `검수상세` 호출뿐이다. datacard.ts:631 `⚠ 등급을 여기서 다시 세지 않는다 — 서버가 검수 때 센 값(summary)을 그대로 더한다.` · :647-651 `const s = it.summary || {}; 서비스 += s.서비스도공개 ?? 0; ...`. registry.ts:1151-1152 `const { 검수요약문 } = await import(\"../sbomreview.js\"); return 검수요약문();` → sbomreview.ts:217 `const 목록 = 검수목록(5);`"
+ },
+ {
+  "title": "OCR 한글 오류 문구 인식을 파이썬에만 넣고, 같은 신호를 가르는 TS 판정기(능력사유요약)는 영문 전용 그대로",
+  "severity": "낮음",
+  "where": "server/src/engine/dataset.ts:499-500 (짝: server/scripts/extract_doc.py:163-168)",
+  "why": "이 커밋은 「한국어 윈도우가 한글 오류 문구를 돌려줘 「안 깔림」으로 오안내한다」를 근거로 `_ocr_실패문구`에 `지정된 모듈을 찾을 수 없습니다`·`지정된 프로시저를 찾을 수 없습니다`를 더했다. 그런데 **같은 판단을 하는 두 번째 자리**인 `능력사유요약`은 `/ModuleNotFoundError|No module named/` → 「설치돼 있지 않습니다」, `/DLL load failed|specified module could not be found/` → 「있으나 뜨지 못했습니다」로 **영문만** 본다. 이 값은 `/api/extract/capability`의 `ocr사유`로 **화면에 그대로 나가는 안내문**이다. 파이썬 예외 원문에 영문 「DLL load failed」가 함께 오는 흔한 경우는 지금도 맞게 갈리지만, WinError 127 계열처럼 한글만 오는 갈래에서는 갈래별 안내 대신 뭉뚱그린 「OCR 구성요소를 쓸 수 없습니다」로 떨어진다. 잣대가 두 벌인데 한 벌만 고친 모양이라, 다음 개정 때 또 어긋난다. (한글만 오는 경우가 실제로 얼마나 잦은지는 **확인 필요** — 코드 비대칭 자체는 확정.)",
+  "evidence": "extract_doc.py:163-168 `낮춤 = 본문.lower(); 깨짐 = (\"dll load failed\" in 낮춤 ... or \"지정된 모듈을 찾을 수 없습니다\" in 본문 or \"지정된 프로시저를 찾을 수 없습니다\" in 본문)` ↔ dataset.ts:500 `if (/DLL load failed|specified module could not be found/i.test(t)) return \"OCR 구성요소는 있으나 실행 라이브러리가 없어 뜨지 못했습니다.\";` (한글 대응 없음). dataset.ts:525 `ocr사유: c.ocr ? \"\" : 능력사유요약(c.사유)` — 화면이 쓰는 값이다."
+ },
+ {
+  "title": "라이선스 감사가 지식 번들의 나머지 절반(온톨로지 시드 고지)을 건너뛰었다 — 고지문 스스로 「확인 전까지 싣지 말 것」이라고 적혀 있는데 여전히 실려 나간다",
+  "severity": "중",
+  "where": "server/src/engine/knowledgebundle.ts:45-55 (BUNDLE_ATTRIBUTIONS·52-54행 주석) · server/src/engine/ontology-seed.ts:20",
+  "why": "이 커밋의 제목은 「라이선스 잔여 4건 수리」이고 앞 커밋(70eedf88)은 「라이선스 전수 감사」를 표방했는데, 감사 대상은 **문서 7종뿐**이었다. 지식 번들은 자기 머리말(knowledgebundle.ts:5-8)에 「①온톨로지 표준 시드 ②제품 문서 코퍼스」 둘을 담는다고 적어 두었고, 그 ①의 출처가 `KISA AI 보안 위협 대응 매뉴얼(2026.7)`(ontology-seed.ts:20)이다. 그 고지는 지금도 「**공공누리 유형 확인 중(판권면 대조 필요)**」이고, 바로 위 주석(52-54)이 「유형2·4는 상업적 이용을 금지하므로 **확인 전까지 유상 배포 번들에 싣지 않는 것이 안전**(법무 검토 대상 1순위)」이라고 못 박아 두었다. 그런데 이 트리플은 부팅마다 시드로 적재되고 getBundleStatus()의 attributions로 고객 화면·폐쇄망 반입 매니페스트에도 그대로 나간다. 문서 7종을 걷어낸 사유(공공누리 4유형=상업이용 금지)와 **같은 유형의 위험이 같은 번들 안에 그대로 남아 있다** — 「고쳤다」가 절반인 상태다. ※ 이 커밋이 만든 결함은 아니고, 이번 묶음이 표방한 범위에서 빠진 것이다(확인 필요: 실제 판권면 대조는 우리가 안 했다).",
+  "evidence": "knowledgebundle.ts:52-54 「⚠ 공공누리 유형이 미확인이다. 유형2·4는 **상업적 이용을 금지**하므로, 확인 전까지 유상 배포 번들에 싣지 않는 것이 안전하다(법무 검토 대상 1순위).」 / :54 「KISA 「AI 보안 위협 대응 매뉴얼」(2026.7) — 한국인터넷진흥원. 공공누리 유형 확인 중(판권면 대조 필요).」 ontology-seed.ts:20 SEED_SOURCE = \"KISA AI 보안 위협 대응 매뉴얼(2026.7)\", :2 「실제 도메인 지식(compliance.ts의 KISA AI 보안 위협 카탈로그)을 트리플로 변환한다」. getBundleStatus():133이 이 문자열들을 API로 내보내고 tools/knowledge-bundle-manifest.mjs:47-48이 「원출처 고지(재배포 조건)」로 인쇄한다. 이번 커밋과 앞 커밋 어느 쪽도 이 파일을 건드리지 않았다(git show --stat 확인)."
+ },
+ {
+  "title": "제로트러스트·공급망·침해사고 세 주제가 기존 문서와 두 벌이 됐다 — 값 충돌은 없으나 검색 경쟁은 실측이 필요하다",
+  "severity": "낮음",
+  "where": "knowledge/GIJO_지식_제로트러스트.md:59-80,278-291 vs knowledge/GIJO_지식_보안아키텍처_기본개념.md:9-33 · SW_공급망_보안.md vs 보안아키텍처_기본개념.md:92-99 · 침해사고_대응절차.md vs 보안아키텍처_기본개념.md:112-119",
+  "why": "새 문서는 머리말에서 「§1에 이미 있으니 겹쳐 쓰지 않고 가리킨다」(제로트러스트:16-18)고 선언했지만, 실제로는 §3에서 PDP/PEP를 다시 정의하고 §6에서 망분리 오해를, 📖 용어 풀이에서 측면이동·망분리·MFA를 또 정의한다. 침해사고 초동 순서는 이제 **세 곳**에 있다(보안아키텍처 §8 6단계 · incidentsteps.ts 7단계 · 침해사고 문서 §0/§9). 내용을 대조한 결과 **서로 어긋나는 값은 없었고** 순서도 같아 지금 당장 오답이 나는 자리는 못 찾았다 — 다만 origin 부스트(hybridsearch.ts:219-225)는 builtin 문서를 모두 같은 세기로 올리므로, 「제로트러스트가 뭐야」 한 질문에 같은 등급의 두 문서가 top-k 조각을 나눠 갖는다. 근거 표시가 흔들리는지는 라이브 랭킹으로만 알 수 있다(오프라인 코사인 모형으로는 못 잰다 — 이 저장소의 기존 실측 교훈). **확인 필요**로 남긴다. 참고로 함께 훑은 연쇄는 전부 계약을 지키고 있었다: deploy-prod.ps1:60-69(하위 폴더 살려 복사)·client/scripts/build-server-dist.mjs:87-90(dest에 dirname mkdir)·tools/docs-drift.mjs:63,109(경로 그대로 대조·basename으로 조각 조회)가 knowledge/ 하위 경로를 그대로 받고, docbox.ts:75가 knowledge/를 문서함에서 제외하며, docScopeMatch는 builtin을 애초에 제외해(hybridsearch.ts:243-246) 새 문서가 파일명으로 질문을 가로챌 길은 없다. 라이트 에디션은 **별도 문서 목록을 갖지 않는다**(server/src/lite/index.ts가 ../index를 그대로 부르고 build-server-dist.mjs에 lite 분기가 없다) — 반영할 자리가 없는 것이 맞다.",
+  "evidence": "보안아키텍처:25-29가 PDP/PEP를 「판단하는 곳/막는 곳」으로 정의하고, 제로트러스트:63-69가 같은 것을 다시 정의한다(경비 상황실/출입문 비유 추가). 보안아키텍처:41 「망분리는 제로트러스트와 대체 관계가 아니다」 ↔ 제로트러스트:178-180 같은 취지 — 값 충돌 없음. 보안아키텍처:112-119 6단계 ↔ incidentsteps.ts:157-163 7단계 ↔ 침해사고:249 인용 7단계, 순서 일치(재발 감시 유무만 다름). 새 문서가 인용한 .md 파일명 30여 건은 전부 knowledge/에 실재한다(전수 grep). hybridsearch.ts:219 ORIGIN_BOOST=0.012는 문서별 차등이 없다."
+ },
+ {
+  "title": "관문은 「vendor 원장 0개」를 막지 않는다 — 커밋이 닫았다는 「조용한 0」이 게시 층에서는 그대로 열려 있다",
+  "severity": "중",
+  "where": "tools/gen-sbom-self.mjs:164, 186-189, 305-318",
+  "why": "커밋 메시지 ②는 「이제 못 읽으면 시끄럽게 군다(조용한 0이 사고의 본체였다)」라고 적었지만, smartmd동봉()이 0개를 읽어도 하는 일은 console.error 두 줄뿐이고 종료코드는 0이다. 관문의 exit 조건(318행)은 상용불가·카피레프트만 본다. 실패 시나리오: VERSIONS.md 표 형식이 바뀌거나(이번에 실제로 겪은 그 사고) fetch-smartmd가 vendor를 다른 이름으로 넣으면, `npm run dist`는 electron-builder까지 그대로 진행되고 Font Awesome의 CC-BY-4.0·SIL OFL-1.1 고지가 빠진 THIRD-PARTY-NOTICES.md가 다시 고객 설치본에 실린다. 게시 로그 수백 줄 사이의 stderr 두 줄은 사람이 못 본다. 더 나쁜 쪽은 164행 — VERSIONS.md 자체가 없으면 `return []`으로 **메시지조차 없다**(dist는 `fetch-smartmd --keep`이라 낡은 사본이 남아 있으면 이 경로가 실제로 열린다). 남는 방어는 vendornotice.test.ts뿐인데 그 시험은 아래 항목대로 win에서만 돈다.",
+  "evidence": "gen-sbom-self.mjs:164 `if (!fs.existsSync(vend)) return [];` / 186-189 `if (!모음.length) { console.error(...); console.error(...); }` (exit 없음) / 305-318 `const 상용불가 = ...; const 막을것 = ...; if (상용불가.length || 막을것.length) process.exit(1);` — 0개 조건은 어디에도 없다. client/package.json:13 `\"dist\": \"... && npm run license-gate && electron-builder\"`이므로 exit 0이면 그대로 굽는다."
+ },
+ {
+  "title": "vendornotice.test.ts가 git이 추적하지 않는 산출물에 하드 의존 — win 밖의 기계에서는 무조건 5건 빨간불",
+  "severity": "중",
+  "where": "server/test/vendornotice.test.ts:21, 26-32, 45-47 (+ client/.gitignore:39)",
+  "why": "시험이 읽는 client/smartmd/vendor/VERSIONS.md는 저장소에 없다 — client/.gitignore:39가 `smartmd/`를 통째로 막고, fetch-smartmd.mjs가 게시 직전에 **비공개 GitHub 저장소(git@github.com:gijotour/gijo-smart-md-studio.git)**에서 받아 넣는 물건이다. 따라서 새로 클론한 곳·`npm run dist`를 안 돌린 max·push만 받는 gb10·외부 협업자(제임스)에서 `npm test`를 돌리면 첫 시험은 `expect(existsSync).toBe(true)` 실패, 나머지 4건은 원문()이 throw해 전부 실패한다. 실패 안내마저 「WSL 시험 사본이라면 wsl-test.sh를 보세요」라 진짜 원인(fetch-smartmd 미실행·SSH 접근 없음)에서 사람을 멀어지게 한다. 결과: 인계 규칙의 「서버 변경 시 테스트」가 그 기계들에서 원리상 초록이 안 되고, 상시 빨간불은 곧 「원래 실패하는 것」으로 취급돼 진짜 실패를 묻는다 — wsl-test.sh:82-84가 기록한 바로 그 사고(corpusleak 실패가 상시 실패 둘에 묻힐 뻔함)와 같은 모양이다. (참고: wsl-test.sh:52의 rsync include 문법 자체는 맞다 — `--include='smartmd/'`가 상위 디렉터리를 먼저 허용하고 `smartmd/vendor/***`가 그 폴더와 하위를 함께 잡는다. win/WSL 경로는 문제없고, 문제는 win 밖이다.)",
+  "evidence": "vendornotice.test.ts:21 `const VEND = path.join(저장소, \"client\", \"smartmd\", \"vendor\", \"VERSIONS.md\");` · 26-32 원문()이 없으면 throw · 45-47 `expect(fs.existsSync(VEND)).toBe(true)`. `git ls-files client/smartmd` = 빈 결과, `git check-ignore -v` → `client/.gitignore:39:smartmd/`. client/scripts/fetch-smartmd.mjs 머리말: 「게시 직전에 원본에서 받아 client/smartmd/에 넣고, 그 폴더는 git이 추적하지 않는다」, 저장소 기본값 `git@github.com:gijotour/gijo-smart-md-studio.git`."
+ },
+ {
+  "title": "새로 만든 `상용사용금지()`가 정작 사고가 난 창구(문서)에는 등록되지 않았다 — 공공누리 제4유형 문서는 여전히 통과한다",
+  "severity": "중",
+  "where": "server/src/engine/licenserisk.ts:66·336 ↔ server/test/docslicense.test.ts:77-81 (+ knowledge/_라이선스보류/README.md:38)",
+  "why": "이번에 만든 상용금지 잣대는 `공공누리 제[24]유형`·`비영리`·`상업적 이용 금지`까지 잡는데, 부품 창구(gen-sbom 관문)에만 연결됐다. 정작 2026-08-22 사고는 **문서**에서 났고(ISMS-P 안내서 = 공공누리 제4유형), 문서 창구를 지키는 docslicense.test.ts는 `제\\s*[0-4]\\s*유형`이 머리말에 있기만 하면 「근거 있음」으로 통과시킨다 — 제2·제4유형(상업 이용 금지)도 근거로 인정된다는 뜻이다. 실패 시나리오: 다음에 「공공누리 제4유형」이라고 **정직하게** 적힌 가이드를 knowledge/에 넣고 매니페스트에 등재하면, 부품이었다면 게시가 막혔을 조건인데 문서라서 시험 전부 초록으로 고객 설치본에 실려 나간다. 보류 폴더 README:38도 「공공누리 유형(제0~4)을 그대로 적으세요」라고만 안내해 같은 길을 다시 낸다(어느 유형이 못 쓰는 것인지 말하지 않는다).",
+  "evidence": "licenserisk.ts:66 `const 상용금지패턴 = /(^|[^a-z])CC[\\s-]?BY[\\s-]?(NC|ND)|non[\\s-]?commercial|비영리|상업적?\\s*이용\\s*금지|공공누리\\s*제?\\s*[24]\\s*유형/i;` · 336 `export function 상용사용금지(...)`. 이 함수를 부르는 곳은 tools/gen-sbom-self.mjs:305와 server/test/vendornotice.test.ts뿐이다(grep). docslicense.test.ts:78 `/공공누리|KOGL|제\\s*[0-4]\\s*유형|자유이용/.test(머리)` — 유형 번호를 가리지 않는다. knowledge/_라이선스보류/README.md:38 「공공누리 유형(제0~4) 또는 CC 식별자를 그대로 머리말에 적습니다」."
+ },
+ {
+  "title": "새 상용금지 관문 분기를 못 박는 계약 시험이 없다 — 지워도 초록",
+  "severity": "낮음",
+  "where": "server/test/licenserisk.test.ts:265-276 ↔ tools/gen-sbom-self.mjs:305-318",
+  "why": "이 저장소는 「배선을 시험으로 못 박는다」를 같은 파일에 적어 두고 dist 사슬 순서·고지 실림까지 시험으로 고정해 놨는데, 이번에 새로 넣은 분기(상용불가 → exit 1)만 계약이 없다. 기존 시험은 gen-sbom 소스에 문자열 `licenserisk`가 있는지와 등급 이름 복사 여부만 본다. 실패 시나리오: 나중에 누가 관문을 손보다 `상용불가` 필터를 지우거나 exit 조건에서 빼도 시험 4,000여 개가 전부 초록이고, NC/ND 부품이 다시 조용히 게시된다 — 이 커밋이 막으려던 그 상황 그대로다.",
+  "evidence": "licenserisk.test.ts:265 `it(\"관문 도구가 판정기를 **가져다 쓴다** ...\")` 본문은 `expect(src).toMatch(/licenserisk/)`와 `서비스도공개` 등장 횟수만 검사한다. 이번 커밋이 추가한 licenserisk.test.ts 시험 3묶음은 전부 판정 함수 단위 시험이고(상용사용금지 반례 포함), gen-sbom-self.mjs:305-318의 호출·차단 자체를 보는 시험은 없다."
+ },
+ {
+  "title": "고지 파일 시험 2건이 조용히 건너뛴다 — 스스로 약속한 「두 벌 대조」가 그 skip 뒤에 있다",
+  "severity": "낮음",
+  "where": "server/test/vendornotice.test.ts:94, 101 (+ .gitignore:75)",
+  "why": "두 시험 모두 `if (!fs.existsSync(고지)) return;`으로 조용히 통과한다. THIRD-PARTY-NOTICES.md는 .gitignore:75로 추적하지 않는 빌드 산출물이라, 한 번도 license-gate를 돌린 적 없는 기계에서는 이 둘이 **초록인데 아무것도 안 본 상태**가 된다(vitest는 skip이 아니라 pass로 센다). 하필 이 시험이, 시험 안에 사본으로 둔 표읽기 파서와 생성기 파서가 어긋나는 것을 잡겠다고 파일 스스로 약속한 유일한 대조다(36-38행 주석). 게다가 돌더라도 「지금 디스크에 있는 옛 고지 파일」과 대조하는 사후 검사라, 생성기가 방금 깨진 경우는 다음 빌드 뒤에야 드러난다. 저장소 전체에서 이 `existsSync ... return;` 패턴을 쓰는 시험은 이 파일뿐이다.",
+  "evidence": "vendornotice.test.ts:94 `if (!fs.existsSync(고지)) return;   // 아직 안 만든 기계에서는 건너뛴다(빌드 산출물이다)` · 101 같은 줄 · 36-38 주석 「여기 사본을 두는 것이 마음에 걸리지만 … 대신 결과를 대조한다 — 아래 「고지에 그 이름이 있나」 시험이 두 벌이 어긋나는 것을 잡는다」. `git check-ignore -v THIRD-PARTY-NOTICES.md` → `.gitignore:75`. `grep -rn \"existsSync(.*)) return;\" server/test/*.ts` → vendornotice.test.ts 두 줄만."
+ }
+]

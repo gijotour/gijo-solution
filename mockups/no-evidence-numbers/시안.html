@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>시안 — 근거 없음 답의 숫자 옅게</title>
+<style>
+  /* ── 토큰: client/src/renderer/pages/app.html:10-11 그대로 ───────────────── */
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;
+    --border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --teal:#1eb980;--red:#e2483d;--amber:#f0a020;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+       font-size:13px;line-height:1.7;padding:22px 26px 80px;}
+  h1{font-size:19px;font-weight:800;letter-spacing:-.3px;margin-bottom:4px;}
+  h2{font-size:14px;font-weight:800;color:#fff;margin:26px 0 9px;padding-top:14px;border-top:1px solid var(--border);}
+  h3{font-size:12.75px;font-weight:800;color:var(--text);margin:14px 0 5px;}
+  p{margin:0 0 8px;color:var(--muted);}
+  b,strong{color:#fff;font-weight:800;}
+  code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11.75px;color:var(--blue-light);font-family:Consolas,monospace;}
+  ul,ol{margin:4px 0 10px 18px;color:var(--muted);}
+  li{margin:3px 0;}
+  a{color:var(--blue-light);}
+  .lede{color:var(--muted-2);font-size:12.5px;margin-bottom:16px;}
+  .tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:1px 7px;margin-right:5px;vertical-align:2px;}
+  .tag.plan{background:rgba(59,130,246,.16);color:var(--blue-light);}
+  .tag.new{background:rgba(30,185,128,.14);color:var(--teal);}
+  .tag.warn{background:rgba(240,160,32,.14);color:var(--amber);}
+  .box{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin:10px 0;color:var(--muted);font-size:12.5px;}
+  .box.warn{border-left:3px solid var(--amber);}
+  .box.ok{border-left:3px solid var(--teal);}
+  .box.bad{border-left:3px solid var(--red);}
+  table.t{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:12px;display:block;overflow-x:auto;}
+  table.t th,table.t td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top;}
+  table.t th{background:var(--panel-2);color:var(--muted);font-weight:800;white-space:nowrap;}
+  table.t td code{white-space:nowrap;}
+  .num{font-variant-numeric:tabular-nums;}
+
+  /* ── 대화창 실물 밀도 재현 ────────────────────────────────────────────────
+     출처(글자 그대로 옮김): client/src/renderer/pages/console.js:72-80, 173-188
+     .cs-row{padding:7px 0;gap:9px}  .cm{font-size:12.5px;line-height:1.62}
+     .ci{22x22}  .cn{12px/800}  .ct{500}  ── 여기 숫자를 바꾸면 시안이 거짓말이 된다. */
+  /* ⚠ 폭을 **못 박는다.** 창 폭에 따라 줄바꿈이 달라져 밀도 숫자가 흔들리면 그 숫자는 증거가 아니다.
+     380px = 프로 셸 도킹 대화창 기본 폭(app.html:316 `--console-w, 380px`). 760px = 대화 홈(전폭)에 가까운 값. */
+  .stage{background:var(--bg);border:1px solid var(--border-strong);border-radius:10px;padding:8px 14px;margin:10px 0 6px;
+         width:380px;max-width:100%;}
+  .stage.wide{width:760px;}
+  .stage-h{font-size:11px;color:var(--muted-2);border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:2px;}
+  .cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+  .cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}
+  .cs-row.instr .ci{background:rgba(30,185,128,.16);}
+  .cs-row .cb{flex:1;min-width:0;}
+  .cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+  .cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px;}
+  .cs-row .cm{font-size:12.5px;color:var(--text);word-break:break-word;line-height:1.62;}
+  .cs-row .cm p{margin:0 0 6px;color:var(--text);}
+  .cs-row .cm p:last-child{margin-bottom:0;}
+  .cs-row .cm strong{color:#fff;font-weight:800;}
+  .cs-row .cm ul,.cs-row .cm ol{margin:4px 0 7px 17px;}
+  .cs-row .cm li{margin:2px 0;}
+  .cs-row .cm code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:0 4px;font-size:11.75px;color:var(--text);}
+  .cs-row .cm pre{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:7px 9px;margin:6px 0;overflow-x:auto;}
+  .cs-row .cm pre code{background:none;border:none;padding:0;color:var(--text);}
+  .cs-row .cm table{border-collapse:collapse;width:100%;margin:6px 0;font-size:12.5px;display:block;overflow-x:auto;}
+  .cs-row .cm th{background:var(--panel-2);color:var(--muted);text-align:left;font-weight:700;}
+  .cs-row .cm th,.cs-row .cm td{border:1px solid var(--border);padding:5px 8px;white-space:nowrap;}
+  /* 근거 배지 — chatparts.js:55,58 그대로 */
+  .gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--teal);}
+  .gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--amber);}
+  .gcp-doclink{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
+
+  /* ── ★ 이 시안이 새로 더하는 것: 딱 두 가지 ────────────────────────────
+     ① .nv  — 근거 없는 답 안의 숫자. 회색으로 죽이고 점선만 깐다.
+              취소선·배경·테두리·굵기·글자크기 **아무것도 안 바꾼다** →
+              줄바꿈이 안 흔들리고 세로 총합 증감이 0px가 된다(아래 실측).
+     ② .nv-why — 배너 끝 ⓘ. **추천안에는 안 쓴다**(측정판 「대안 A·B」로만 값을 보여 준다) —
+              380px 도킹 폭에서 배너를 한 줄 늘리는 경우가 있어서다. 화면 설명은 챗봇 ⓘ가 맡는다. */
+  .cm .nv{color:var(--muted-2);text-decoration:underline dotted rgba(240,160,32,.6);
+          text-underline-offset:2px;text-decoration-thickness:1px;cursor:help;}
+  .cm strong .nv{color:var(--muted-2);}          /* 굵은 글씨 안에서도 옅게 — 굵기는 그대로 */
+  .cm th .nv,.cm td .nv{color:var(--muted-2);}
+  .nv-why{display:inline;font-size:11.5px;font-weight:700;color:var(--muted-2);
+          border:none;background:none;cursor:pointer;padding:0;margin-left:5px;
+          text-decoration:underline dotted rgba(255,255,255,.25);text-underline-offset:2px;font-family:inherit;}
+  .nv-why:hover{color:var(--blue-light);}
+  .nv-tip{position:fixed;z-index:99;background:var(--panel);border:1px solid var(--border-strong);
+          border-radius:7px;padding:5px 9px;font-size:11.5px;color:var(--text);
+          box-shadow:0 6px 20px rgba(0,0,0,.45);pointer-events:none;display:none;max-width:280px;line-height:1.5;}
+  .nv-tip b{color:var(--amber);}
+
+  /* 조작 줄 */
+  .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 4px;}
+  .btn{font-size:12px;font-weight:700;color:var(--text);background:var(--panel);border:1px solid var(--border-strong);
+       border-radius:7px;padding:5px 11px;cursor:pointer;font-family:inherit;}
+  .btn:hover{border-color:var(--blue);color:#fff;}
+  .btn.on{background:rgba(59,130,246,.18);border-color:var(--blue);color:#fff;}
+  .hint{font-size:11.5px;color:var(--muted-2);}
+
+  /* 측정판 */
+  .meter{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:0;overflow:hidden;margin:10px 0 14px;}
+  .meter .mh{background:rgba(59,130,246,.10);padding:6px 12px;font-size:12px;font-weight:800;color:#fff;border-bottom:1px solid var(--border);}
+  .meter table{border-collapse:collapse;width:100%;font-size:12px;}
+  .meter td{border-bottom:1px solid var(--border);padding:5px 12px;color:var(--muted);}
+  .meter td:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--text);font-weight:700;white-space:nowrap;}
+  .meter tr:last-child td{border-bottom:none;}
+  .zero{color:var(--teal)!important;}
+  .plus{color:var(--amber)!important;}
+
+  .k{color:var(--blue-light);font-weight:700;}
+  .x{color:var(--red);font-weight:700;}
+  .o{color:var(--teal);font-weight:700;}
+  .file{font-family:Consolas,monospace;font-size:11.75px;color:var(--blue-light);}
+</style>
+</head>
+<body>
+
+<h1>시안 — 「근거 없음」 배너가 붙은 답의 숫자를 옅게</h1>
+<p class="lede">
+  <span class="tag plan">계획서 전-4 (근거·정직)</span>
+  <span class="tag new">추천안 1개</span>
+  <span class="tag warn">제품 코드 미수정 · 승인 후 구현</span><br>
+  배너를 지나쳐 <b>숫자만 읽는 사고</b>를 화면에서 막는다. 숫자를 지우지 않고 <b>「이건 근거 없는 값이다」를 글자 자체가 말하게</b> 한다.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>0. 먼저 정정 — 실측한 배너는 「근거 없음」이 아니다</h2>
+<div class="box bad">
+  지시문에 적힌 <code>⚠ 근거 없음 — 질문에 딱 맞는 사내 자료는 없습니다</code>라는 문구는 <b>코드에 없다.</b>
+  실제로 붙은 것은 <span class="file">server/src/engine/llm.ts:1191</span>의
+  <b>「⚠ <u>근거 약함</u> — 질문에 딱 맞는 사내 자료는 없습니다.」</b>다(<code>약한근거만</code> 경로).<br><br>
+  이 구분이 구현을 가른다. 배너는 <b>네 종류</b>고 뜻이 서로 다르다:
+  <table class="t" style="margin-bottom:0">
+    <tr><th>배너</th><th>줄</th><th>뜻</th><th>이 시안 적용</th></tr>
+    <tr><td><code>약한근거만</code> ⚠ 근거 약함</td><td class="file">llm.ts:1190-1192</td><td>조각은 잡혔는데 전부 멀다</td><td class="o">적용 — <b>실측된 그 자리</b></td></tr>
+    <tr><td><code>자료없음배너</code></td><td class="file">llm.ts:118 / 1181-1188</td><td>검색 성공, 조각 0건 → 일반지식 답</td><td class="o">적용</td></tr>
+    <tr><td><code>자료요청배너</code></td><td class="file">llm.ts:130</td><td>사내 특정 대상인데 근거 0</td><td class="o">적용</td></tr>
+    <tr><td><code>지정범위배너</code></td><td class="file">llm.ts:123</td><td>☑ 지정 문서 범위에서만 0건</td><td class="o">적용</td></tr>
+    <tr><td>(배너 없음)</td><td>—</td><td>근거로 답함 / RAG 미실행</td><td class="x">미적용 — 그대로 둔다</td></tr>
+  </table>
+  <b>「배너 4종 = 하나의 사실(가리킬 사내 근거가 없다)」</b>로 묶어 한 잣대로 다룬다. 문구가 넷이라고 규칙을 넷 만들면 이 저장소가 반복해 겪은 「같은 것을 여러 곳에 적으면 어긋난다」가 그대로 재발한다.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>1. 장면 ① — 근거 없는 답 (실측 재현: 「카페테리아 만족도」)</h2>
+<div class="ctl">
+  <button class="btn on" id="btnOn">숫자 옅게 <b>켬</b></button>
+  <button class="btn" id="btnOff">끔 (지금 제품)</button>
+  <span class="hint">|</span>
+  <button class="btn on" id="btnW380">폭 380px (도킹 기본)</button>
+  <button class="btn" id="btnW760">폭 760px (대화 홈)</button>
+</div>
+<p class="hint" style="margin:2px 0 0">↑ 눌러 가며 보세요. 아래 측정판이 <b>같은 화면의 세로 총합</b>을 그때그때 다시 잽니다. 옅어진 숫자에 <b>마우스를 올리면</b> 풀이가 뜹니다.</p>
+<div class="stage" id="stage1">
+  <div class="stage-h">대화창 (프로 셸 · 도킹 380px) — console.js 밀도 그대로</div>
+  <div class="cs-row instr"><div class="ci">🙂</div><div class="cb">
+    <div class="cn">나<span class="ct">14:22:05</span></div>
+    <div class="cm">사내 카페테리아 만족도 어때?</div>
+  </div></div>
+  <div class="cs-row" id="scene1"><div class="ci">◆</div><div class="cb">
+    <div class="cn">GIJO Agent<span class="ct">14:22:11</span></div>
+    <div class="cm" id="cm1"></div>
+  </div></div>
+</div>
+
+<div class="meter">
+  <div class="mh">📐 밀도 — 이 페이지가 방금 스스로 잰 값</div>
+  <table><tbody id="meterBody"></tbody></table>
+</div>
+<div class="box">
+  <b>왜 0px인가.</b> 처리가 더하는 것은 <code>&lt;span class="nv"&gt;</code>뿐이고, 그 span은 <b>색과 점선만</b> 바꾼다.
+  글자 크기·굵기·자간·padding·border를 하나도 안 건드리므로 <b>글자 폭이 안 변하고 → 줄바꿈이 안 변하고 → 높이가 안 변한다.</b>
+  「취소선을 긋자」·「배경을 깔자」는 여기서 탈락한다 — 취소선은 폭은 안 늘리지만 <span style="text-decoration:line-through">숫자를 지운 것처럼 읽혀</span>
+  담당자가 「이 값은 틀렸다」로 오독한다. 지어낸 값이지 틀린 값이 아니다.
+</div>
+<div class="box warn">
+  <b>ⓘ를 말풍선에 안 넣는다 — 그리고 그 이유는 내가 처음 쓴 것과 달랐다.</b><br>
+  지시문은 「hover<b>/</b>ⓘ로 풀이가 뜨는 모습」을 요구했다. 초안에는 <b>「ⓘ를 붙이면 좁은 폭에서 배너가 한 줄 늘어난다」</b>고 적었는데,
+  <b>재 보니 반대였다</b> — 위 폭 단추를 눌러 보시면 나온다:
+  <table class="t" style="margin:8px 0">
+    <tr><th>폭</th><th>추천안(hover만)</th><th>대안 A·B(배너에 ⓘ)</th></tr>
+    <tr><td>380px (도킹 기본)</td><td class="o">+0.0px</td><td class="o">+0.0px — <b>공짜다</b></td></tr>
+    <tr><td>760px (대화 홈)</td><td class="o">+0.0px</td><td class="plus" style="color:var(--amber)">+20.3px — <b>정확히 한 줄</b>(20.25px)</td></tr>
+  </table>
+  좁은 폭에선 마지막 줄에 자리가 남아 공짜고, 넓은 폭에선 배너가 한 줄에 딱 맞아떨어져 ⓘ가 <b>새 줄을 만든다.</b>
+  <b>「좁으면 빡빡하다」는 직관이 여기서는 틀렸다</b> — 실측 없이 썼으면 그대로 승인을 받아 갔을 문장이다.<br><br>
+  → 그래서 결론은 <b>밀도가 아니라 원칙</b>으로 낸다. <b>화면에는 hover 풀이 한 줄만</b> 두고, 「왜·한계·어떻게 없애나」는 이미 있는 통로로 보낸다:
+  대화창 칩 줄의 <b>ⓘ 칩</b>(console.js의 「첫 칩은 항상 ⓘ」)과 <b>"옅은 숫자"라고 묻기</b> — §9의 screenguide 문구가 그 답이 된다.
+  제품 원칙(「설명은 전부 챗봇으로, 화면엔 정체성 한 줄과 ⚠만」)이 그것이고, <b>덤으로</b> 넓은 폭의 +20.3px도 안 낸다.<br>
+  <span class="hint">대안 A(ⓘ 한 글자)를 원하시면 그것도 성립한다 — 값이 얼마인지는 위 표 그대로다.</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>2. 장면 ② — 대조군: 같은 답인데 근거가 있을 때</h2>
+<p>배너가 없으면 <b>아무것도 하지 않는다.</b> 판정 근거는 새 계산이 아니라 <b>배너가 붙었나</b> 하나뿐이다.</p>
+<div class="stage">
+  <div class="stage-h">대화창 — 근거 있음 (배너 없음 · 📄 근거 배지)</div>
+  <div class="cs-row instr"><div class="ci">🙂</div><div class="cb">
+    <div class="cn">나<span class="ct">14:31:40</span></div>
+    <div class="cm">2분기 구내식당 만족도 조사 결과 알려줘</div>
+  </div></div>
+  <div class="cs-row" id="scene2"><div class="ci">◆</div><div class="cb">
+    <div class="cn">GIJO Agent<span class="ct">14:31:46</span></div>
+    <div class="cm" id="cm2"></div>
+    <div class="gcp-src">📄 근거: <span class="gcp-doclink">2026Q2_사내복지_만족도조사.pdf</span> · <span class="gcp-doclink">총무팀_구내식당_운영보고.docx</span></div>
+  </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>3. 장면 ③ — 숫자가 0개인 근거 없는 답</h2>
+<p><b>아무 표시도 안 난다.</b> 배너만 남는다. 「처리했다」는 흔적(칩·꼬리말·개수)을 안 남긴다 — 없는 것을 세어 보여 주면 그 자체가 소음이다.</p>
+<div class="stage">
+  <div class="stage-h">대화창 — 근거 없음 · 숫자 0개</div>
+  <div class="cs-row instr"><div class="ci">🙂</div><div class="cb">
+    <div class="cn">나<span class="ct">14:40:02</span></div>
+    <div class="cm">우리 회사 카페테리아 운영 방침이 뭐야?</div>
+  </div></div>
+  <div class="cs-row" id="scene3"><div class="ci">◆</div><div class="cb">
+    <div class="cn">GIJO Agent<span class="ct">14:40:08</span></div>
+    <div class="cm" id="cm3"></div>
+  </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>4. 무엇을 옅게 하나 — 정규식 후보 (승인 대상)</h2>
+<p>두 단계다. <b>①후보를 잡고 ②제외를 뺀다.</b> 둘을 한 정규식에 욱여넣으면 나중에 못 고친다.</p>
+
+<h3>① 후보 — 단위가 붙은 수, 또는 두 자리 이상 맨수</h3>
+<div class="box">
+<code style="display:block;white-space:pre-wrap;line-height:1.9">const 추정치후보_RE = /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(%|퍼센트|점|건|개|명|원|만원|억원|달러|배|위|회|시간|분|초|일|주|개월|년|GB|MB|TB)?/g;</code>
+<div style="margin-top:8px">
+· <b>단위가 없으면 두 자리 이상만</b> 잡는다 — 「3가지 방법」의 <code>3</code>까지 옅게 하면 글이 누더기가 된다.<br>
+· 자리수 쉼표(<code>3,200</code>)를 한 덩어리로 본다 — 안 하면 <code>3</code>과 <code>200</code>이 따로 걸려 쉼표만 진하게 남는 우스운 꼴이 된다.
+</div>
+</div>
+
+<h3>② 제외 — 지어낸 값이 아닌 것</h3>
+<div class="box">
+<code style="display:block;white-space:pre-wrap;line-height:1.9">const 제외_RE = /CVE-\d{4}-\d{3,7}|CWE-\d+|CVSS\s*[\d.]+|\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{4}\s*년(\s*\d{1,2}\s*월)?|\bv?\d+\.\d+\.\d+\b|\[\d+\]|\bISO\s?\d+\b/gi;</code>
+</div>
+<table class="t">
+  <tr><th>구간</th><th>처리</th><th>왜</th></tr>
+  <tr><td>코드블록 <code>```…```</code> · 인라인 <code>`…`</code></td><td class="x">제외</td><td>담당자가 <b>일부러 요청한 원문</b>(설정·SBOM·명령). citeguard.ts가 같은 판단을 이미 하고 있다 — 잣대를 갈라 두지 않는다</td></tr>
+  <tr><td><b>표(</b><code>table</code><b>) 안 숫자</b></td><td class="o">포함</td><td><b>지어낸 숫자가 가장 많이 사는 자리다.</b> 실측 사고가 정확히 표였다(75/80/70/65점). 표를 빼면 이 시안이 막으려던 그 사고를 못 막는다</td></tr>
+  <tr><td>배너 문단 자체</td><td class="x">제외</td><td>배너에 숫자가 들어가면(지정범위배너 확장 등) 경고문이 스스로 옅어진다</td></tr>
+  <tr><td>CVE·CWE·CVSS·KEV·버전·날짜</td><td class="x">제외</td><td>식별자는 추정치가 아니다. 옅어지면 <b>진짜 근거</b>가 근거 아닌 것처럼 보인다</td></tr>
+  <tr><td>인용 번호 <code>[1]</code></td><td class="x">제외</td><td>citeguard가 이미 범위를 검사해 관리하는 표지다. 두 코드가 같은 글자를 서로 다르게 만지면 안 된다</td></tr>
+  <tr><td><code>&lt;a&gt;</code> 안 (링크 글자)</td><td class="x">제외</td><td>클릭 대상의 색을 바꾸면 링크인지 아닌지 흔들린다</td></tr>
+  <tr><td>목록 번호(<code>1.</code> <code>2.</code>)</td><td class="x">제외</td><td>마크다운 렌더가 <code>&lt;ol&gt;</code> 마커로 뽑아 텍스트 노드에 없다 — <b>공짜로 제외</b>된다</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>5. 왜 이 안인가 — 안 고른 세 길</h2>
+
+<h3 class="x">✗ 길 A. 숫자를 지운다 (citeguard처럼 떼기)</h3>
+<p>
+  <b>가장 강력하고, 가장 위험하다.</b> citeguard.ts는 「인용 꼴」이라는 <b>확정 가능한 구조</b>를 떼는데, 숫자는 구조가 아니라 <b>문장의 뼈대</b>다.
+  「만족도는 <span class="k">□□</span>점이며 응답자 <span class="k">□□</span>명 중…」이 되면 문장이 깨져 <b>답 자체를 못 읽는다.</b>
+  게다가 citeguard 파일 머리에 우리가 직접 적어 둔 실패가 이 길이다 — <b>「참인 문장을 지우면 계수기에는 「가드가 일했다」로 남아 더 나쁘다」</b>.
+  근거 약함 답의 숫자에는 <b>정당한 것도 섞인다</b>(일반 지식의 상식적 수치·질문에 담당자가 적어 준 값). 지우면 그것까지 사라진다.
+</p>
+
+<h3 class="x">✗ 길 B. 답 전체를 회색으로</h3>
+<p>
+  읽기 부담이 <b>비용 대비 최악</b>이다. ⓐ 답 전체가 흐리면 담당자는 <b>대비를 잃어</b> 오히려 대충 훑는다 — 배너를 지나치던 문제가 「본문을 지나치는」 문제로 옮겨갈 뿐이다.
+  ⓑ 근거 약함 답도 <b>절반은 쓸모가 있다</b>(우리 원칙: 「답을 버리지 않는다 — 먼 자료도 실마리」, llm.ts:1150). 전체를 죽이면 그 원칙과 정면충돌한다.
+  ⓒ 이미 <code>.cs-stream</code>(흐르는 글자)이 「톤을 반 단계 죽인 회색」을 <b>다른 뜻</b>으로 쓰고 있다 — 같은 색이 한 화면에서 「쓰는 중」과 「근거 없음」 둘을 뜻하게 된다.
+</p>
+
+<h3 class="x">✗ 길 C. 배너만 더 세게 (빨강·큰 글씨·못 넘기는 확인)</h3>
+<p>
+  <b>이미 실패한 길이다.</b> 실측이 말하는 것은 「배너가 약해서 못 봤다」가 아니라 <b>「눈이 숫자로 먼저 간다」</b>다.
+  담당자가 표를 훑을 때 위쪽 문장은 <b>원래 안 읽는다.</b> 배너를 아무리 키워도 시선이 가는 자리(숫자 그 자체)는 그대로 진하다.
+  게다가 배너를 키우면 <b>세로가 늘어난다</b> — 밀도 우선 원칙과 정면충돌한다(이 시안은 +0px다).
+</p>
+
+<h3 class="o">✓ 고른 길. 숫자가 있는 자리에서 숫자가 스스로 말한다</h3>
+<p>
+  <b>경고를 시선이 가는 곳으로 옮긴다.</b> 값은 남기되(길 A 회피), 본문은 살리되(길 B 회피), 경고는 <b>눈이 실제로 닿는 픽셀</b>에 둔다(길 C 회피).
+  세로 증감 0px, 새 화면 0개, 새 판정기 0개.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>6. 무엇을 포기했나 (정직하게)</h2>
+<ul>
+  <li><b>정당한 숫자도 옅어진다.</b> 근거 약함 답에 섞인 상식적 수치(「TLS 1.3」의 버전은 제외되지만 「권고 주기는 90일」 같은 일반 지식)까지 회색이 된다. — 감수한다. <b>「근거 없음」은 값의 참·거짓이 아니라 <u>가리킬 사내 출처가 없다</u>는 뜻</b>이고 그건 저 값들에도 참이다. 풀이 문구도 「틀렸습니다」가 아니라 <b>「사내 근거 없음 — 모델 추정치」</b>다.</li>
+  <li><b>인쇄·복사하면 사라진다.</b> 답을 긁어 보고서에 붙이면 색은 안 따라간다. — 이 시안 범위 밖이다. 복사 방어는 <b>내보내기(PDF/Word) 쪽에서</b> 별도로 다뤄야 한다(조치 요청서 흐름과 같은 자리). <b>여기서 해결한 척하지 않는다.</b></li>
+  <li><b>색만으로 뜻을 나른다.</b> 색각 이상·고대비 모드에서 회색이 안 갈릴 수 있다. — 그래서 <b>점선 밑줄을 함께</b> 깐다(색이 안 보여도 점선은 보인다). 다만 그 점선이 「링크 아니냐」로 읽힐 위험은 남는다.</li>
+  <li><b>정규식은 언어를 모른다.</b> 「몇 백 명」처럼 <b>한글로 쓴 수</b>는 못 잡는다. 반대로 「2층 회의실」의 <code>2층</code>은 단위가 목록에 없어 안 잡히지만, 목록을 넓히면 이런 오탐이 생긴다. — 단위 목록은 <b>좁게 시작</b>하고 실측으로 넓힌다.</li>
+  <li><b>스트리밍 중에는 안 걸린다.</b> <code>.cs-stream</code>은 마크다운 렌더를 안 거치는 <code>white-space:pre-wrap</code> 생글자다. 흐르는 동안에는 숫자가 진하게 보이고, <b>완성본으로 갈아끼는 순간</b> 옅어진다. — 감수한다(스트림에도 걸면 판정 코드가 두 벌이 된다).</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>7. 제품 원칙 자가점검</h2>
+<table class="t">
+  <tr><th>원칙</th><th>판정</th><th>근거</th></tr>
+  <tr><td>화면은 보기용 — 새 입력칸 금지</td><td class="o">지킴</td><td>입력 요소 0개. 표시만 바뀐다</td></tr>
+  <tr><td>설명은 ⓘ·screenguide로</td><td class="o">지킴</td><td>화면엔 hover 한 줄(「사내 근거 없음 — 모델 추정치」)뿐. 왜·한계·해결법은 §9 screenguide가 맡는다 — <b>그래서 말풍선에 ⓘ를 안 넣었다</b></td></tr>
+  <tr><td>밀도 우선</td><td class="o">지킴</td><td><b>세로 증감 0px</b>(§1 측정판이 실측). 새 줄·새 칩·새 카드 0개. ⓘ를 넣으면 0px이 깨져서 뺐다</td></tr>
+  <tr><td>없으면 없다고 코드가 먼저 말한다</td><td class="o">강화</td><td>배너(문장)에 이어 <b>숫자 자체</b>가 말한다. 모델 프롬프트가 아니라 코드다</td></tr>
+  <tr><td>단일 출처 — 잣대를 새로 안 짓는다</td><td class="warn">조건부</td><td>새 판정기는 안 만든다(§8 ⓐ를 고르면 <code>근거세기</code>·<code>internalMiss</code> 재사용). <b>다만 배너 문구를 클라가 정규식으로 다시 적으면 그 순간 이 줄은 깨진다</b> — §8이 그 답이다</td></tr>
+  <tr><td>한글 · 쉬운 말</td><td class="o">지킴</td><td>「모델 추정치」 — 「할루시네이션」·「그라운딩」 안 쓴다</td></tr>
+  <tr><td>가짜 UI 금지</td><td class="warn">주의</td><td>이 시안의 배너·본문은 <b>실측 재현</b>이고 정규식은 실제로 돈다. 다만 <b>서버 필드는 아직 없다</b> — §8 ⓐ가 그것을 만드는 일이다</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>8. 구현 때 만질 파일:줄 — <span class="warn">여기가 설계관에 물어야 할 자리</span></h2>
+
+<div class="box bad">
+  <b>핵심 난점 하나.</b> <span class="file">llm.ts:780</span> <code>export async function chat(args): Promise&lt;string&gt;</code> —
+  <b>chat()은 문자열만 돌려준다.</b> 배너를 붙인 사실을 아는 유일한 자리(1181·1190)가 그 사실을 <b>밖으로 낼 통로가 없다.</b>
+  그래서 「서버가 표식을 싣는다」는 말이 곧바로 <b>세 갈래 선택</b>이 된다.
+</div>
+
+<h3>ⓐ <span class="o">추천</span> — 이미 있는 필드를 넓힌다 (새 필드 0개에 가깝다)</h3>
+<table class="t">
+  <tr><th>파일</th><th>줄</th><th>지금 무엇이 있나 (읽어서 확인함)</th><th>할 일</th></tr>
+  <tr><td class="file">server/src/engine/dispatcher.ts</td><td>136</td><td><code>근거세기?: "강함" | "약함"</code> — <b>이미 응답에 실려 클라까지 간다</b></td><td>값에 <code>"없음"</code>을 더한다</td></tr>
+  <tr><td class="file">server/src/engine/dispatcher.ts</td><td>945·954</td><td><code>internalMiss = relevant.length === 0</code> / <code>근거세기 = graded.약한근거만 ? "약함" : "강함"</code> — <b>0건일 때는 근거세기를 아예 안 넣는다</b>(<code>relevant.length &gt; 0</code> 안에 있다)</td><td>0건 가지에서 <code>근거세기 = "없음"</code></td></tr>
+  <tr><td class="file">server/src/engine/dispatcher.ts</td><td>910·979</td><td>반환 타입과 스프레드</td><td>타입에 <code>"없음"</code> 추가</td></tr>
+  <tr><td class="file">client/src/renderer/pages/console.js</td><td><b>1873</b></td><td><code>P.quotes(replyEl, r.quotes, r.output, r.sources, r.근거세기)</code> — <b>이미 근거세기를 받아 쓰고 있다</b></td><td>같은 자리에서 <code>P.dimEstimates(replyEl, r.근거세기)</code> 한 줄 추가</td></tr>
+  <tr><td class="file">client/src/renderer/pages/chatwidget.js</td><td>280</td><td>화면 안 위젯도 같은 인자로 P.quotes를 부른다</td><td>같은 한 줄 (안 하면 <b>대화창과 위젯이 딴말</b>)</td></tr>
+  <tr><td class="file">client/src/renderer/pages/chatparts.js</td><td>55-109 / 175 뒤</td><td>공용 부품 + CSS 주입(<code>ensureCss</code>) — <code>.gcp-src2</code>(호박색 「근거 아님」)가 <b>이미 이 톤을 쓴다</b></td><td><code>.nv</code> CSS + <code>dimEstimates()</code> 신설. <b>console.js에 안 적는다</b> — 위젯과 두 벌이 된다</td></tr>
+</table>
+<div class="box ok">
+  <b>왜 ⓐ인가.</b> ⓑ·ⓒ와 달리 <b>배너 문구를 클라가 다시 적지 않는다.</b> 클라가 보는 것은 <code>"없음"</code>이라는 값 하나다.
+  문구가 바뀌어도(4종 중 무엇이 붙든) 클라는 안 고쳐도 된다. <b>단일 출처가 서버 한 곳으로 남는다.</b>
+</div>
+<div class="box warn">
+  <b>⚠ ⓐ가 다 덮지 못하는 구멍 — 설계관이 먼저 답할 것.</b><br>
+  <span class="file">dispatcher.ts:833 근거재검색대상인가()</span>가 <code>false</code>면 <code>근거세기</code>가 <b>아예 안 만들어진다</b>(도구로 집계해 답한 경우 등).
+  그런데 <span class="file">llm.ts:1181</span>의 배너는 <b>그것과 무관하게</b> 붙는다 — 즉 <b>「배너는 붙었는데 근거세기는 undefined」인 답이 존재할 수 있다.</b>
+  두 곳이 「근거 0」을 <b>따로 판정</b>하고 있다(<code>ragResult.자료없음</code> vs <code>relevant.length===0</code>).
+  <b>착수 전 물을 것: 이 둘이 실제로 얼마나 어긋나나. 어긋나면 ⓐ 대신 chat() 반환형을 넓히는 편이 옳은가.</b>
+  <span class="hint">— 이 저장소가 반복해 덴 「같은 것을 두 곳에서 세면 어긋난다」의 전형이라, 숫자로 재기 전에는 구현하지 않는 편이 낫다.</span>
+</div>
+
+<h3>ⓑ 차선 — 클라가 배너 문구를 정규식으로 읽는다</h3>
+<p>
+  가능은 하다. 이 저장소에 <b>선례도 있다</b> — citeguard.ts 머리주석: 「꼬리표 정규식 두 개는 관문(gates.mjs)의 것과 <b>글자 그대로</b> 같다 — 짝 시험이 두 소스를 대조한다」.
+  <span class="file">console.js:914</span>의 <code>attachCaseChip</code>도 서버가 적은 문구(<code>📚 비슷한 사례 N건</code>)를 읽어 칩을 단다 — <b>후처리 선례가 이미 있다.</b><br>
+  <b>그래도 차선이다.</b> 배너가 4종이라 정규식이 4개가 되고, 문구를 고칠 때마다 <b>두 파일을 같이</b> 고쳐야 한다. 값 하나(ⓐ)면 안 겪을 일이다.
+</p>
+
+<h3>ⓒ 기각 — 서버가 본문 숫자를 직접 감싼다</h3>
+<p>
+  마크다운에 없는 표기(<code>⟦75점⟧</code> 등)를 본문에 심는 길. <b>기각.</b> 그 문자열이 <code>histories</code>(llm.ts:1235)·학습 수집(<code>chatLogListeners</code>, llm.ts:1218)·
+  <b>증류 학습 데이터</b>까지 그대로 흘러들어가 <b>모델이 그 표기를 따라 쓰게 된다.</b> 표시 문제를 데이터에 새기지 않는다.
+</p>
+
+<h3>마크다운 렌더 후처리 위치</h3>
+<table class="t">
+  <tr><th>파일:줄</th><th>무엇</th></tr>
+  <tr><td class="file">client/src/renderer/pages/gijomd.js:41-110</td><td><code>renderMd()</code> — 코드블록·표·목록을 HTML로. <b>여기는 안 건드린다</b>(문서함도 같이 쓰는 공용 렌더러라, 여기 넣으면 문서함 문서의 숫자까지 옅어진다)</td></tr>
+  <tr><td class="file">client/src/renderer/pages/console.js:954-957</td><td><code>fmt()</code> → <code>window.gijoMd.render(msg)</code>. <b>문자열 단계라 코드블록 구분이 사라진 뒤다</b> — 여기서 정규식을 돌리면 <code>&lt;pre&gt;</code> 안 숫자를 못 가른다</td></tr>
+  <tr><td class="file">client/src/renderer/pages/console.js:1239·1250</td><td><code>el.innerHTML = …</code> 직후 <code>return el</code>. <b>★ 여기가 맞는 자리</b> — DOM이 서 있어 <code>closest('pre, code, a')</code>로 정확히 가를 수 있다. 실제 호출은 §ⓐ표의 1873(quotes 옆)</td></tr>
+</table>
+<div class="box">
+  <b>DOM에서 거른다</b>(문자열 아님): <code>TreeWalker(NodeFilter.SHOW_TEXT)</code>로 <code>.cm</code>을 훑고, 각 텍스트 노드마다
+  <code>node.parentElement.closest('pre, code, a, .nv-skip')</code>가 있으면 건너뛴다. 배너 문단에는 <code>.nv-skip</code>을 단다.
+  <b>이 시안 페이지가 그 코드를 실제로 돌리고 있다</b> — 위 장면 ①의 코드블록 안 <code>75</code>·<code>30</code>이 안 옅어진 것이 그 증거다.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>9. screenguide ⓘ 문구 초안</h2>
+<p>
+  자리: <span class="file">server/src/engine/screenguide.ts:1112</span> <code>OVERVIEW.panels</code>에 항목 신설 + <span class="file">:151</span> <code>CONSOLE_PANEL_ALIASES</code>에 별명.
+  (같은 파일 주석: 「⚠ 새 기능은 반드시 여기 싣는다 — 만들고 안내에 안 실으면 있는 줄도 모른다」)
+</p>
+<div class="box ok">
+<b>구역 이름</b> <code>"옅은 숫자"</code><br><br>
+<b>본문(한 줄 초안)</b><br>
+「<b>답에 <span class="nv" style="cursor:default">숫자</span>가 옅게 보이면, 그 값은 사내 자료에 근거가 없는 <u>모델 추정치</u>입니다</b> — 답 맨 위 ⚠ 배너가 붙은 답에서만 그렇게 표시합니다.
+· <b>틀렸다는 뜻이 아니라 「가리킬 사내 문서가 없다」는 뜻</b>입니다. 보고서·결재에 그대로 옮기지 마세요.
+· 관련 문서를 <b>대화창 ＋</b>로 넣으면 다음 질문부터 근거를 들어 답하고, 숫자도 진하게 나옵니다.
+· CVE 번호·날짜·버전·코드블록 안 값은 <b>옅게 하지 않습니다</b>(추정치가 아니라 식별자라서요).
+· 마우스를 올리면 「사내 근거 없음 — 모델 추정치」라고 뜹니다.」<br><br>
+<b>별명</b>(사람이 부르는 말): <code>"옅은 숫자"</code> <code>"흐린 숫자"</code> <code>"회색 숫자"</code> <code>"숫자가 흐려"</code> <code>"추정치"</code> → 모두 <code>"옅은 숫자"</code>로 잇는다.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2>10. 짝 시험 제안</h2>
+<table class="t">
+  <tr><th>시험</th><th>파일(신설)</th><th>무엇을 못 박나</th></tr>
+  <tr><td><b>① 서버 표식이 실린다</b></td><td class="file">server/test/noevidence-mark.test.ts</td><td>RAG 조각 0건 → <code>근거세기 === "없음"</code>이 응답에 실린다. <b>그리고 배너가 붙은 답은 반드시 표식도 붙는다</b>(§8 ⚠의 그 어긋남을 시험이 붙잡는다 — 사람이 안 세면 아무도 모른다)</td></tr>
+  <tr><td><b>② 클라 후처리 소스 감시</b></td><td class="file">server/test/dimestimates-source.test.ts</td><td>ⓐ <code>chatparts.js</code>에 <code>dimEstimates</code>가 있다 ⓑ <b><code>console.js</code>와 <code>chatwidget.js</code> <u>둘 다</u>가 그것을 부른다</b>(한쪽만 배선돼 「대화창은 옅은데 위젯은 진한」 상태를 막는다 — <code>wiringcontract.test.ts</code>·<code>navwiring.test.ts</code>와 같은 방식) ⓒ <code>gijomd.js</code>에는 <b>안 들어갔다</b>(공용 렌더러 오염 금지)</td></tr>
+  <tr><td><b>③ 코드블록·식별자 제외</b></td><td class="file">server/test/dimestimates-scope.test.ts</td><td>고정 표본(fixture) 답 1개를 정규식에 통과시켜 <b>옅어진 것과 안 된 것을 글자로 대조</b>. 포함: 표 안 <code>75점</code>·<code>3,200만원</code>·<code>120명</code> / 제외: <code>CVE-2024-21762</code>·<code>2026-09-05</code>·<code>5.83.0</code>·<code>[1]</code>·코드블록 안 <code>max_items = 75</code></td></tr>
+  <tr><td><b>④ 안내가 실렸나</b></td><td class="file">server/test/guidance-check(기존)</td><td><code>OVERVIEW.panels["옅은 숫자"]</code> 존재. 「만들고 안내에 안 실으면 있는 줄도 모른다」</td></tr>
+</table>
+<div class="box warn">
+  <b>⚠ 시험이 원리상 못 잡는 것</b> — ①~④가 전부 초록이어도 <b>「실제로 눈에 띄나」</b>는 못 잰다.
+  회색이 너무 옅어 안 보이거나 너무 진해 안 갈리는 것은 <b>실화면(9227 관문)에서 사람이 봐야</b> 한다. 게시 전 관문에 한 줄 추가 필요.
+</div>
+
+<div class="nv-tip" id="tip"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ── 시안 안에서 실제로 도는 판정기 (구현 제안과 같은 코드) ─────────────── */
+  var 추정치후보_RE = /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(%|퍼센트|점|건|개|명|원|만원|억원|달러|배|위|회|시간|분|초|일|주|개월|년|GB|MB|TB)?/g;
+  var 제외_RE = /CVE-\d{4}-\d{3,7}|CWE-\d+|CVSS\s*[\d.]+|\d{4}[-.\/]\d{1,2}[-.\/]\d{1,2}|\d{4}\s*년(?:\s*\d{1,2}\s*월)?|\bv?\d+\.\d+\.\d+\b|\[\d+\]|\bISO\s?\d+\b/gi;
+
+  var 풀이 = "사내 근거 없음 — 모델 추정치";
+
+  function 제외구간(text){
+    var out = [], m; 제외_RE.lastIndex = 0;
+    while ((m = 제외_RE.exec(text))) { out.push([m.index, m.index + m[0].length]); if (m.index === 제외_RE.lastIndex) 제외_RE.lastIndex++; }
+    return out;
+  }
+  function 겹치나(a, b, ranges){
+    for (var i = 0; i < ranges.length; i++) if (a < ranges[i][1] && b > ranges[i][0]) return true;
+    return false;
+  }
+
+  /* 이 함수가 chatparts.js에 들어갈 dimEstimates()의 몸통이다. */
+  function dimEstimates(root){
+    if (!root) return 0;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var 대상 = [], n;
+    while ((n = walker.nextNode())) {
+      var p = n.parentElement;
+      if (!p) continue;
+      if (p.closest("pre, code, a, .nv-skip, .nv")) continue;   // ← 코드·링크·배너 제외
+      if (!/\d/.test(n.nodeValue)) continue;
+      대상.push(n);
+    }
+    var 센다 = 0;
+    대상.forEach(function(node){
+      var text = node.nodeValue, ex = 제외구간(text), frag = document.createDocumentFragment();
+      var last = 0, m; 추정치후보_RE.lastIndex = 0;
+      while ((m = 추정치후보_RE.exec(text))) {
+        var s = m.index, e = s + m[0].length;
+        if (m.index === 추정치후보_RE.lastIndex) 추정치후보_RE.lastIndex++;
+        if (겹치나(s, e, ex)) continue;
+        if (!m[2] && m[1].replace(/[^0-9]/g, "").length < 2) continue;  // 단위 없으면 두 자리 이상만
+        if (s > last) frag.appendChild(document.createTextNode(text.slice(last, s)));
+        var span = document.createElement("span");
+        span.className = "nv";
+        span.setAttribute("aria-label", 풀이);
+        span.textContent = m[0];
+        frag.appendChild(span);
+        last = e; 센다++;
+      }
+      if (!센다 || last === 0) return;
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    });
+    return 센다;
+  }
+
+  /* ── 아주 작은 마크다운 렌더 — gijomd.js의 규칙만 흉내(표·코드·굵게·문단) ── */
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function inline(t){ return esc(t).replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>"); }
+  function render(src){
+    var lines = String(src||"").split(/\r?\n/), out=[], i=0;
+    while (i < lines.length) {
+      var L = lines[i];
+      if (/^```/.test(L)) { var buf=[]; i++; while(i<lines.length && !/^```/.test(lines[i])){buf.push(lines[i]);i++;} i++;
+        out.push("<pre><code>"+esc(buf.join("\n"))+"</code></pre>"); continue; }
+      if (/\|/.test(L) && i+1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i+1])) {
+        var cells=function(r){return r.replace(/^\s*\|/,"").replace(/\|\s*$/,"").split("|").map(function(c){return c.trim();});};
+        var head=cells(L); i+=2; var rows=[];
+        while(i<lines.length && /\|/.test(lines[i]) && lines[i].trim()){rows.push(cells(lines[i]));i++;}
+        out.push("<table><thead><tr>"+head.map(function(h){return "<th>"+inline(h)+"</th>";}).join("")+"</tr></thead><tbody>"+
+          rows.map(function(r){return "<tr>"+r.map(function(c){return "<td>"+inline(c)+"</td>";}).join("")+"</tr>";}).join("")+"</tbody></table>");
+        continue; }
+      if (/^\s*([-*·]|\d+\.)\s+/.test(L)) { var ord=/^\s*\d+\./.test(L), items=[];
+        while(i<lines.length && /^\s*([-*·]|\d+\.)\s+/.test(lines[i])){items.push(lines[i].replace(/^\s*([-*·]|\d+\.)\s+/,""));i++;}
+        var tg=ord?"ol":"ul"; out.push("<"+tg+">"+items.map(function(t){return "<li>"+inline(t)+"</li>";}).join("")+"</"+tg+">"); continue; }
+      if (!L.trim()) { i++; continue; }
+      var para=[L]; i++;
+      while(i<lines.length && lines[i].trim() && !/^(```|\s*([-*·]|\d+\.)\s)/.test(lines[i]) && !/\|/.test(lines[i])){para.push(lines[i]);i++;}
+      out.push("<p>"+para.map(inline).join(" ")+"</p>");
+    }
+    return out.join("\n");
+  }
+
+  /* ── 답 원문 (실측 재현) ────────────────────────────────────────────────── */
+  var 배너 = "⚠ **근거 약함 — 질문에 딱 맞는 사내 자료는 없습니다.** 아래는 **주변 자료로 유추한 것**이니 그대로 쓰기 전에 확인해 주세요.";
+
+  var 본문 = [
+    "사내 카페테리아 만족도는 일반적인 사무공간 기준으로 다음 수준에서 형성됩니다.",
+    "",
+    "| 항목 | 만족도 | 응답 |",
+    "|---|---|---|",
+    "| 메뉴 다양성 | 75점 | 120명 |",
+    "| 위생 상태 | 80점 | 118명 |",
+    "| 대기 시간 | 70점 | 121명 |",
+    "| 가격 | 65점 | 119명 |",
+    "",
+    "종합하면 **평균 72.5점** 수준이고, 불만 접수는 14건으로 보입니다. 개선 예산은 약 3,200만원이 필요합니다.",
+    "",
+    "설정으로 다루는 값이라면 아래처럼 잡습니다.",
+    "```",
+    "survey.max_items = 75",
+    "survey.timeout_sec = 30",
+    "```",
+    "",
+    "이 수치는 보안 취약점(CVE-2024-21762, CVSS 9.8)이나 자산 대장과는 무관하며, 2026-09-05 기준 제품 5.83.0에서 조회한 것이 아닙니다. 근거 표기 [1]도 붙이지 않았습니다."
+  ].join("\n");
+
+  var 본문2 = [
+    "2026년 2분기 구내식당 만족도 조사 결과입니다.",
+    "",
+    "| 항목 | 만족도 | 응답 |",
+    "|---|---|---|",
+    "| 메뉴 다양성 | 75점 | 120명 |",
+    "| 위생 상태 | 80점 | 118명 |",
+    "| 대기 시간 | 70점 | 121명 |",
+    "| 가격 | 65점 | 119명 |",
+    "",
+    "종합하면 **평균 72.5점** 수준이고, 불만 접수는 14건입니다. 총무팀은 개선 예산 3,200만원을 요청했습니다."
+  ].join("\n");
+
+  var 배너3 = "⚠ **이 PC의 사내 자료에는 이 내용이 없습니다** — 아래는 **일반 지식 기준**의 답이니, 회사 규정·내부 데이터가 걸린 판단에는 그대로 쓰지 마세요.";
+  var 본문3 = [
+    "카페테리아 운영 방침은 회사마다 총무·복지 규정에 따로 정해 두는 항목이라, 일반 지식으로는 「누가 운영하고, 어디까지 회사가 부담하는가」 정도만 말할 수 있습니다.",
+    "",
+    "· 운영 주체(직영/위탁), 이용 대상, 비용 부담 범위, 잔반·위생 관리 책임을 규정에 적어 둡니다.",
+    "· 방침 문서를 대화창 ＋로 넣어 주시면 그 문서를 근거로 답해 드립니다."
+  ].join("\n");
+
+  /* ── 그리기 ───────────────────────────────────────────────────────────── */
+  var cm1 = document.getElementById("cm1");
+  var cm2 = document.getElementById("cm2");
+  var cm3 = document.getElementById("cm3");
+
+  // ⓘ모드 0=없음(추천) · 1=ⓘ 글자만 · 2=ⓘ 문구까지
+  var 아이글 = ["", '<button class="nv-why" type="button">ⓘ</button>', '<button class="nv-why" type="button">ⓘ 왜 옅게 보이나요</button>'];
+  function 배너붙이기(html, 배너글, 모드){
+    var i = 아이글[모드 || 0];
+    return '<p class="nv-skip">' + inline(배너글) + (i ? " " + i : "") + "</p>" + html;
+  }
+
+  function draw1(dim, 모드){
+    cm1.innerHTML = 배너붙이기(render(본문), 배너, 모드 || 0);
+    return dim ? dimEstimates(cm1) : 0;
+  }
+  cm2.innerHTML = render(본문2);                       // 근거 있음 — 손 안 댐
+  cm3.innerHTML = 배너붙이기(render(본문3), 배너3, 0);
+  dimEstimates(cm3);                                   // 숫자 0개 → 아무 일도 안 일어난다
+
+  /* ── 밀도 측정 — 페이지가 스스로 잰다 ─────────────────────────────────── */
+  var row1 = document.getElementById("scene1");
+  var stage1 = document.getElementById("stage1");
+  var 켬상태 = true;
+
+  function 잰다(dim, 모드){ draw1(dim, 모드); return row1.getBoundingClientRect().height; }
+
+  function 재기(){
+    var w = stage1.getBoundingClientRect().width;
+    if (w < 50) {                                       // 뷰포트 폭 0인 환경(정적 스냅숏) — 잰 척하지 않는다
+      document.getElementById("meterBody").innerHTML =
+        "<tr><td colspan='2' style='color:var(--amber)'>⚠ 이 환경은 창 폭이 0이라 <b>재지 않았습니다</b>. 브라우저에서 파일을 직접 열면 실제 값이 나옵니다.</td></tr>";
+      return;
+    }
+    var cs = getComputedStyle(cm1);
+    var lh = parseFloat(cs.lineHeight), fs = parseFloat(cs.fontSize);
+
+    var h제품 = 잰다(false, 0);                          // 오늘 제품: 배너만, 숫자 진함
+    var h옅게 = 잰다(true, 0);                           // 이 시안(추천): 숫자 옅게 + hover 풀이
+    var n     = document.querySelectorAll("#cm1 .nv").length;
+    var h아이글  = 잰다(true, 1);                           // 대안: 배너에 ⓘ 한 글자
+    var h아이문  = 잰다(true, 2);                           // 대안: 배너에 ⓘ + 문구
+    draw1(켬상태, 0);                                     // 화면은 추천안으로 되돌린다
+
+    function d(a, b){ return (a - b >= 0 ? "+" : "") + (a - b).toFixed(1) + "px"; }
+    function c(a, b){ return Math.abs(a - b) < 0.5 ? "zero" : "plus"; }
+
+    var rows = [
+      ["잰 폭 (못 박은 값)", "<b>" + Math.round(w) + "px</b>", ""],
+      ["말풍선 본문 줄 높이 (<code>.cm</code> line-height)", fs.toFixed(2) + "px × 1.62 = <b>" + lh.toFixed(2) + "px</b>", ""],
+      ["대화 줄 세로 여백 (<code>.cs-row</code> padding)", "위 7px + 아래 7px = <b>14px</b>", ""],
+      ["장면 ① 세로 총합 — <b>지금 제품</b>", h제품.toFixed(1) + "px", ""],
+      ["장면 ① 세로 총합 — <b>이 시안(추천: 옅게 + hover)</b>", h옅게.toFixed(1) + "px", ""],
+      ["<b>★ 기존 대비 증감 (추천안)</b>", d(h옅게, h제품), c(h옅게, h제품)],
+      ["└ 대안 A: 배너에 <b>ⓘ 한 글자</b>를 더하면", d(h아이글, h제품), c(h아이글, h제품)],
+      ["└ 대안 B: 배너에 <b>ⓘ 왜 옅게 보이나요</b>를 더하면", d(h아이문, h제품), c(h아이문, h제품)],
+      ["옅게 처리된 숫자 개수 (장면 ①)", "<b>" + n + "개</b>", ""],
+      ["새로 생긴 줄 · 칩 · 카드", "<b>0개</b>", "zero"],
+      ["장면 ②(근거 있음)에서 바뀐 픽셀", "<b>0px</b>", "zero"],
+      ["장면 ③(숫자 0개)에서 바뀐 픽셀", "<b>0px</b>", "zero"]
+    ];
+    document.getElementById("meterBody").innerHTML = rows.map(function(r){
+      return "<tr><td>" + r[0] + "</td><td class='" + (r[2]||"") + "'>" + r[1] + "</td></tr>";
+    }).join("");
+  }
+
+  /* ── 토글 ─────────────────────────────────────────────────────────────── */
+  var bOn = document.getElementById("btnOn"), bOff = document.getElementById("btnOff");
+  var w380 = document.getElementById("btnW380"), w760 = document.getElementById("btnW760");
+  function setToggle(on){ 켬상태 = on; bOn.classList.toggle("on", on); bOff.classList.toggle("on", !on); }
+  bOn.addEventListener("click", function(){ setToggle(true); draw1(true, 0); });
+  bOff.addEventListener("click", function(){ setToggle(false); draw1(false, 0); });
+  w380.addEventListener("click", function(){ stage1.classList.remove("wide"); w380.classList.add("on"); w760.classList.remove("on"); 재기(); draw1(켬상태, 0); });
+  w760.addEventListener("click", function(){ stage1.classList.add("wide"); w760.classList.add("on"); w380.classList.remove("on"); 재기(); draw1(켬상태, 0); });
+
+  /* ── 풀이 말풍선 (position:fixed — 레이아웃 0 영향) ───────────────────── */
+  var tip = document.getElementById("tip");
+  document.addEventListener("mouseover", function(e){
+    var t = e.target.closest ? e.target.closest(".nv") : null;
+    if (!t) return;
+    tip.innerHTML = "<b>⚠ " + 풀이 + "</b>";
+    tip.style.display = "block";
+    var r = t.getBoundingClientRect();
+    tip.style.left = Math.min(r.left, window.innerWidth - 300) + "px";
+    tip.style.top = (r.top - tip.offsetHeight - 7) + "px";
+  });
+  document.addEventListener("mouseout", function(e){
+    if (e.target.closest && e.target.closest(".nv")) tip.style.display = "none";
+  });
+  document.addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest(".nv-why, .nv") : null;
+    if (!b) return;
+    alert("ⓘ 화면 안내(챗봇)로 열립니다.\n\n실제 제품에서는 대화창 칩 줄의 ⓘ 칩을 누르거나\n\"옅은 숫자\"라고 물으면 안내가 뜹니다 —\n§9의 screenguide 문구가 그 내용입니다.\n\n(시안이라 여기서는 알림창으로 대신합니다.)");
+  });
+
+  재기();
+  draw1(true, 0);
+  var t; window.addEventListener("resize", function(){ clearTimeout(t); t = setTimeout(function(){ 재기(); draw1(켬상태, 0); }, 150); });
+})();
+</script>
+
+</body>
+</html>

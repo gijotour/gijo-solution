@@ -1,0 +1,13 @@
+[
+  {
+    "id": "qwen3-14b+r2-v2-ep3",
+    "path": "/home/gijohn_llm/gijo-as/server/models/qwen3-14b/qwen3-14b.gguf",
+    "license": "Apache-2.0",
+    "thinking": true,
+    "note": "증류 사다리 회전 — 베이스 qwen3-14b + 이 회전의 어댑터",
+    "extra": [
+      "--lora",
+      "/home/gijohn_llm/gijo-as/tools/team-bench/results-ladder/day2/r2-v2/adapter-ep3.gguf"
+    ]
+  }
+]

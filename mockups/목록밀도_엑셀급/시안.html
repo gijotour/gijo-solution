@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「엑셀급 촘촘 목록」 전역 규격 시안 (추천 1개)
+  작성: gijo-mockup, 2026-08-19 / 자체완결 HTML — 더블클릭으로 바로 열림, 외부 CDN·폰트·이미지 없음.
+  이 파일 자체가 mockups/ 산출물이며 제품 코드는 전혀 건드리지 않았다(client/server 읽기만).
+
+  ════════════════════════ 근거(설계 전 조사) ════════════════════════
+  □ 내부 실측 — 목록밀도_실측견적_2026-08-19.md(gijo-scout):
+    · 공용 시트(gijo-ui.css) 18/18 화면 주입, 그러나 .g-table 표 컴포넌트 소비 0곳
+    · 행높이 계산값 31.3~67.9px, 중앙값 ≈44px / 24~26px 0·홀짝 0·고정헤더 1(threat, embed 한정)
+      ·숫자 우측정렬 2/18(kpi .num·sessions 일부)
+    · body.g-ui{line-height:1.7}(2026-08-01 가독성 조치)이 th/td/배지/버튼 등 "예외 목록"에
+      없는 div형 행(카드행)을 부풀리는 주범
+    · 폰트는 이미 하한(--g-t-xs=11px) 근처 — 축소 여지 0, padding·line-height로만 줄인다
+  □ 소스 정독(이 시안 작성 중 직접 확인, client/src/renderer/pages/):
+    · nav.js 목록양식CSS()(2026-08-02)가 이미 표 8종에 ".main table td{padding:5px 10px;
+      line-height:1.35}"를 적용해 둔 상태 — 즉 표는 "출발선 0"이 아니라 "1차 조임 이후"다.
+      실측 견적서의 범위 최솟값(31.3px)이 바로 이 표들의 현재값과 맞아떨어진다(계산 근거는
+      본문 ⓐ 참조). 반면 카드행 8종은 이 손길을 못 받아 그대로 44~69px에 머문다 — 견적서의
+      중앙값(44)과 최댓값(67.9)은 이쪽에서 나온다.
+    · loganalysis.html의 .frow에는 "/* 파일 대장 — 줄 26px 밀도 */"라는 주석이 이미 있는데
+      실제 계산값은 ≈32px다 — 만든 사람의 의도(26px)가 line-height:1.7 상속 때문에 어긋난
+      실물 증거. 이번 시안의 "line-height만 1.45로" 처방이 옳다는 근거로 그대로 쓴다.
+    · assets.html의 .pk-row는 이미 line-height:17px(고정 px)을 직접 선언해 1.7 문제를
+      비켜 갔다 — 34px로 이미 규격에 가깝다(변경 불필요, 아래 표 참조).
+  □ 외부 표준·업계 사례(2026-08-19 조사):
+    · Ant Design 표 컴포넌트 "small" 크기 — 셀 패딩 8px 공식 문서(ant.design/components/table).
+      우리 표 규격(패딩 3px)은 이보다 더 빡빡하다 — 근거는 우리 배지가 Ant 기본보다 작기 때문
+      (아래 배지-바닥 계산 참조), Ant를 그대로 베끼면 오히려 헐거워진다.
+    · Material Design 데이터 테이블 — 표준 행 52dp, 컴팩트(dense) 40~44px가 통상 권장 범위,
+      "진짜 촘촘한" 화면은 28~32px까지 내려간다는 사례(setproduct.com data-table 가이드,
+      medium.com 데이터테이블 가이드라인). 우리 26px 목표는 이 "진짜 촘촘" 구간보다도 낮다 —
+      GIJO 배지 높이(≈20px)·폰트 하한(11px)이 만드는 콘텐츠 바닥 때문에 가능한 값이지,
+      임의로 더 조인 게 아니다(아래 배지 간섭 검증).
+    · Excel 자체 기본 행높이 — 12.75pt(96dpi ≈17px), 실무에서 자주 인용되는 15pt(≈20px).
+      "엑셀처럼"이 문자 그대로 기준이라면 우리 배지 없는 텍스트 행(24px)이 오히려 엑셀
+      기본보다 넉넉하다 — "엑셀급"은 은유로 받아들이고 배지·클릭 영역이 있는 UI 표라는
+      우리 제약을 반영해 24~27px로 정했다(exceldemy.com, ablebits.com 등).
+    · 얼룩말 줄무늬(zebra striping) — 옅은 회색조/저채도 오버레이가 정석(다크 테마는 흰색
+      저투명도 오버레이로 대응), 호버·선택 상태와 시각적으로 구분되는 강도 차를 둔다
+      (csswizardry.com "Zebra-striping rows and columns" 등 다수 자료 공통 원칙).
+  ════════════════════════════════════════════════════════════════════
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 목록 밀도 엑셀급 (전역 규격)</title>
+<style>
+/* ── 제품 다크 토큰(client/src/renderer/pages/gijo-ui.css :root 그대로 복사) ── */
+:root{
+  --g-bg:#262624; --g-surface-1:#30302e; --g-surface-2:#1f1e1d; --g-surface-3:#1f1e1d;
+  --g-border:rgba(255,255,255,.08); --g-border-strong:rgba(255,255,255,.16);
+  --g-blue:#3b82f6; --g-blue-light:#5fa1ff; --g-teal:#1eb980; --g-amber:#f0a020;
+  --g-red:#e2483d; --g-purple:#8b7cf0; --g-text:#e9e7e2; --g-muted:#b3ada4; --g-muted-2:#a49d95;
+  --g-s1:4px; --g-s2:8px; --g-s3:12px; --g-s4:16px; --g-s5:24px; --g-s6:32px;
+  --g-r-sm:8px; --g-r:12px; --g-r-lg:16px; --g-r-pill:999px;
+  --g-t-h1:22px; --g-t-h2:16px; --g-t-md:14.5px; --g-t-sm:13px; --g-t-xs:11px;
+  /* ↓ 이번 시안이 새로 제안하는 토큰(기존 --g-* 명명 규칙을 그대로 따름) — 다크 화이트
+     오버레이 계단에서 hover(.02~.07)와 base(0) 사이의 빠진 칸을 채운다. */
+  --g-zebra: rgba(255,255,255,.025);
+  --g-hover: rgba(255,255,255,.055);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--g-bg);color:var(--g-text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13.5px;line-height:1.6;}
+.wrap{max-width:1320px;margin:0 auto;padding:28px 30px 90px;}
+h1{font-size:21px;margin:0 0 4px;color:#fff;}
+h2{font-size:16.5px;margin:44px 0 4px;color:#fff;border-top:1px solid var(--g-border);padding-top:26px;}
+h3{font-size:14px;margin:20px 0 8px;color:#fff;}
+.sub{color:var(--g-muted);font-size:12.5px;margin-bottom:2px;}
+.tag{display:inline-flex;align-items:center;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;background:rgba(59,130,246,.16);color:var(--g-blue-light);margin-right:6px;}
+.tag.warn{background:rgba(240,160,32,.16);color:var(--g-amber);}
+.tag.ok{background:rgba(30,185,128,.16);color:var(--g-teal);}
+.card{background:var(--g-surface-1);border:1px solid var(--g-border);border-radius:var(--g-r);padding:18px 20px;margin-bottom:14px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media (max-width:980px){.grid2,.grid3{grid-template-columns:1fr;}}
+.note{background:var(--g-surface-2);border:1px solid var(--g-border);border-left:3px solid var(--g-blue);border-radius:0 var(--g-r-sm) var(--g-r-sm) 0;padding:11px 14px;font-size:12.5px;color:var(--g-muted);margin:10px 0;}
+.note b{color:var(--g-text);}
+.note.warn{border-left-color:var(--g-amber);}
+.note.danger{border-left-color:var(--g-red);}
+code, pre{font-family:Consolas,"D2Coding",monospace;}
+pre{background:var(--g-surface-2);border:1px solid var(--g-border);border-radius:var(--g-r-sm);padding:14px 16px;font-size:12px;line-height:1.65;overflow-x:auto;color:#d7f0d0;white-space:pre;}
+pre .cm{color:#8a938c;}
+table.spec{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;}
+table.spec th{text-align:left;color:var(--g-muted-2);font-size:11.25px;font-weight:800;padding:7px 10px;border-bottom:1px solid var(--g-border-strong);text-transform:uppercase;letter-spacing:.3px;}
+table.spec td{padding:7px 10px;border-bottom:1px solid var(--g-border);vertical-align:top;}
+table.spec td.num, table.spec th.num{text-align:right;font-variant-numeric:tabular-nums;}
+table.spec tr:nth-child(even) td{background:rgba(255,255,255,.02);}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:800;}
+.pill.down{background:rgba(30,185,128,.16);color:var(--g-teal);}
+.pill.same{background:rgba(255,255,255,.06);color:var(--g-muted-2);}
+.bignum{font-size:26px;font-weight:800;color:#fff;}
+.bignum small{font-size:12px;font-weight:700;color:var(--g-muted);margin-left:4px;}
+.arrow{color:var(--g-muted-2);font-size:13px;margin:0 6px;}
+.foot-checklist{list-style:none;margin:0;padding:0;}
+.foot-checklist li{padding:6px 0 6px 22px;position:relative;font-size:12.5px;color:var(--g-muted);border-bottom:1px solid var(--g-border);}
+.foot-checklist li:last-child{border-bottom:none;}
+.foot-checklist li b{color:var(--g-text);}
+.foot-checklist li:before{content:"✓";position:absolute;left:2px;color:var(--g-teal);font-weight:800;}
+.foot-checklist li.risk:before{content:"⚠";color:var(--g-amber);}
+
+/* ═════════════ 데모 A: vulnscan 호스트 표 — 현재 vs 규격 ═════════════
+   두 표 모두 "실제 렌더"다 — 텍스트로 주장하지 않고 브라우저가 계산한 결과를 그대로 보여준다. */
+.demoA-old table, .demoA-new table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.demoA-old th{text-align:left;font-size:11.75px;font-weight:700;color:var(--g-muted-2);text-transform:uppercase;letter-spacing:.4px;
+  padding:5px 10px; line-height:1.35; border-bottom:1px solid var(--g-border);}
+.demoA-old td{padding:5px 10px; line-height:1.35; border-bottom:1px solid var(--g-border); vertical-align:middle;}
+/* ↑ 이게 "현재"다 — 2026-08-02 nav.js 목록양식CSS()가 실제로 주는 값(패딩 5px 10px·줄간격
+   1.35). 페이지 자체 CSS(예 vulnscan.html의 td{padding:13px 10px})는 특이도에서 진다. */
+.demoA-new th{text-align:left;font-size:11.75px;font-weight:700;color:var(--g-muted-2);text-transform:uppercase;letter-spacing:.4px;
+  padding:3px 10px; line-height:1.35; border-bottom:1px solid var(--g-border); position:sticky; top:0; background:var(--g-surface-1); box-shadow:0 1px 0 var(--g-border); z-index:2;}
+.demoA-new td{padding:3px 10px; line-height:1.35; border-bottom:1px solid var(--g-border); vertical-align:middle;}
+.demoA-new tbody tr:nth-child(even){background:var(--g-zebra);}
+.demoA-old tbody tr:hover, .demoA-new tbody tr:hover{background:rgba(59,130,246,.07) !important;}
+.sevbadge{display:inline-block;min-width:22px;text-align:center;padding:1px 7px;border-radius:6px;font-size:11.5px;font-weight:800;margin-right:4px;}
+.sev-c{background:rgba(226,72,61,.18);color:#f5928a;} .sev-h{background:rgba(240,120,40,.18);color:#f7a86a;}
+.sev-m{background:rgba(240,160,32,.15);color:var(--g-amber);} .sev-l{background:rgba(139,147,171,.15);color:var(--g-muted);}
+.hostname{font-weight:700;color:#fff;}
+.demoA-wrap{background:var(--g-surface-1);border:1px solid var(--g-border);border-radius:var(--g-r);padding:0 14px 8px;max-height:420px;overflow-y:auto;}
+.demoA-hd{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 4px 6px;position:sticky;top:0;background:var(--g-surface-1);z-index:3;}
+.demoA-hd .t{font-weight:800;color:#fff;font-size:13px;}
+.demoA-hd .h{font-family:Consolas,monospace;font-size:16px;font-weight:800;}
+.demoA-hd .h.old{color:var(--g-amber);} .demoA-hd .h.new{color:var(--g-teal);}
+
+/* ═════════════ 데모 B: approvals .rv-row 카드행 — 현재 vs 규격 ═════════════ */
+.demoB-old .rv-row, .demoB-new .rv-row{display:flex;align-items:center;gap:9px;border-radius:9px;cursor:default;border:1px solid transparent;margin-bottom:3px;}
+.demoB-old .rv-row{padding:10px; line-height:1.7;}
+.demoB-new .rv-row{padding:6px 10px; line-height:1.45;}
+.demoB-new .rv-row:nth-child(even):not(:hover):not(.on){background:var(--g-zebra);}
+.rv-row:hover{background:var(--g-surface-2);} .rv-row.on{background:var(--g-surface-2);border-color:rgba(59,130,246,.4);}
+.rv-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.d-pending{background:var(--g-amber);}.d-in_progress{background:var(--g-blue);}.d-verifying{background:var(--g-purple);}.d-approved{background:var(--g-teal);}.d-rejected{background:var(--g-muted-2);}.d-over{background:var(--g-red);}
+.rv-rmain{flex:1;min-width:0;}
+.rv-rt{font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rv-rs{font-size:12px;color:var(--g-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rv-sev{font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:5px;flex:none;}
+.sev-critical,.sev-high{color:#f5928a;background:rgba(226,72,61,.14);}
+.sev-medium{color:var(--g-amber);background:rgba(240,160,32,.14);}
+.sev-low{color:var(--g-blue-light);background:rgba(59,130,246,.14);}
+.demoB-box{background:var(--g-surface-2);border:1px solid var(--g-border);border-radius:var(--g-r);padding:8px;max-height:460px;overflow-y:auto;}
+.demoB-hd{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;padding:2px 2px 8px;border-bottom:1px dashed var(--g-border);}
+
+/* ═════════════ 데모 C: 홀짝 + 고정 헤더 + .num 통합 ═════════════ */
+.demoC-scroll{max-height:210px;overflow-y:auto;border:1px solid var(--g-border);border-radius:var(--g-r);background:var(--g-surface-1);}
+.demoC-scroll table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.demoC-scroll th{position:sticky;top:0;z-index:2;background:var(--g-surface-1);box-shadow:0 1px 0 var(--g-border);
+  text-align:left;font-size:11.5px;font-weight:700;color:var(--g-muted-2);padding:3px 10px;border-bottom:1px solid var(--g-border);}
+.demoC-scroll td{padding:3px 10px;border-bottom:1px solid var(--g-border);}
+.demoC-scroll tbody tr:nth-child(even){background:var(--g-zebra);}
+.demoC-scroll tbody tr:hover{background:rgba(59,130,246,.07);}
+.demoC-scroll td.num, .demoC-scroll th.num{text-align:right;font-variant-numeric:tabular-nums;}
+.b-blue{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(59,130,246,.16);color:var(--g-blue-light);}
+
+/* ═ 배지-바닥 간섭 검증 눈금자 ═ */
+.ruler{display:flex;align-items:center;gap:14px;margin:12px 0;}
+.ruler-row{width:220px;border:1px dashed var(--g-border-strong);border-radius:6px;display:flex;align-items:center;padding:0 10px;position:relative;}
+.ruler-row .rz{position:absolute;top:-8px;background:var(--g-bg);padding:0 4px;font-size:10.5px;color:var(--g-muted-2);font-weight:800;left:8px;}
+.ruler-legend{font-size:12px;color:var(--g-muted);line-height:1.7;}
+.ruler-legend b{color:var(--g-text);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div>
+    <span class="tag">시안 1개(추천)</span><span class="tag ok">전역 규격 — gijo-ui.css</span><span class="tag warn">2026-08-19</span>
+  </div>
+  <h1>「엑셀급 촘촘 목록」 전역 규격</h1>
+  <div class="sub">시각화(그림띠·카드·KPI)는 그대로 둔다 — <b>목록 행만</b> 조인다. 대상: 표 8화면 + div행 8종(7클래스) · mockups/목록밀도_엑셀급/시안.html</div>
+
+  <div class="card" style="margin-top:18px;">
+    <b style="color:#fff;">핵심 결정 3줄</b>
+    <ol style="margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--g-text);line-height:1.9;">
+      <li>행높이 — 표는 <b>패딩만 5px→3px</b>(폰트·줄간격 그대로)로 배지 있는 행 ≈27px·순수 텍스트 행 24px. div행(카드형)은 <b>패딩 10~11px→6px + 줄간격 1.7→1.45</b>로 44~69px → 29~53px(2줄 유지 항목은 49~53px 하한).</li>
+      <li>홀짝·고정 헤더·<code>.num</code>을 <b>gijo-ui.css 한 곳</b>에 신설/승격한다 — 화면별 CSS 복제 없음. 단 <code>.frow</code>는 loganalysis(목록)와 approvals·hardening(폼 줄)이 <b>이름이 겹쳐</b> loganalysis만 <code>data-screen</code>으로 좁혀야 한다.</li>
+      <li>토글 없이 <b>무조건 적용</b>을 추천한다 — 이 밀도(24~27px)는 업계 "진짜 촘촘"(28~32px) 기준보다도 낮은데, 그건 임의 선택이 아니라 배지 높이(≈20px)·폰트 하한(11px)이 만드는 바닥이라 화면마다 켜고 끌 여지가 별로 없다.</li>
+    </ol>
+  </div>
+
+  <h2>ⓐ vulnscan 호스트 표 — 현재 vs 규격 (같은 데이터 15행, 실제 렌더)</h2>
+  <div class="note warn">
+    <b>과제 지시의 「현재 ≈45px」와 다른 점을 먼저 밝힌다.</b> 소스를 직접 읽어 보니 표는 이미
+    2026-08-02 <code>nav.js 목록양식CSS()</code>가 <code>.main table td{padding:5px 10px;line-height:1.35}</code>를
+    적용해 둔 <b>상태</b>다(vulnscan.html 자체 CSS <code>td{padding:13px 10px}</code>보다 특이도가 높아 이긴다).
+    이 값으로 계산하면 배지(취약점 심각도 뱃지, 실측 ≈20px)가 바닥을 잡아 <b>≈31px</b> — 실측 견적서
+    범위의 최솟값(31.3px)과 거의 정확히 일치한다. 45px는 2026-08-02 이전(주석에 남은 옛 값 "34~48px")에
+    더 가깝다. 아래 「현재」 패널은 <b>지금 실제로 적용 중인 규칙</b>으로 그렸다 — CDP 재접속이 금지된
+    시안 에이전트라 실화면 재측정은 못 했으니, 구현 착수 전 <code>getBoundingClientRect</code>로
+    한 번 더 확인해 달라.
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="demoA-hd"><span class="t">현재</span><span class="h old">≈31px/행</span></div>
+      <div class="demoA-wrap demoA-old" id="tblOldWrap">
+        <table id="tblOld"></table>
+      </div>
+    </div>
+    <div>
+      <div class="demoA-hd"><span class="t">규격(이 시안)</span><span class="h new">≈27px/행</span></div>
+      <div class="demoA-wrap demoA-new" id="tblNewWrap">
+        <table id="tblNew"></table>
+      </div>
+    </div>
+  </div>
+
+  <table class="spec">
+    <tr><th></th><th class="num">현재</th><th class="num">규격</th><th class="num">증감</th><th>계산</th></tr>
+    <tr><td>행높이(배지 열 있음)</td><td class="num">31px</td><td class="num">27px</td><td class="num"><span class="pill down">-13%</span></td>
+        <td>패딩 5+5→3+3, 배지 바닥 ≈20px + 테두리 1px 불변</td></tr>
+    <tr><td>15행 세로 총합</td><td class="num">465px</td><td class="num">405px</td><td class="num"><span class="pill down">-60px</span></td><td>15×행높이</td></tr>
+    <tr><td>640px 기준 보이는 행 수</td><td class="num">20행</td><td class="num">23행</td><td class="num"><span class="pill down">+3행</span></td><td>⌊640÷행높이⌋</td></tr>
+  </table>
+
+  <h3>참고 — 배지 없는 순수 텍스트 표라면 24px까지</h3>
+  <div class="note">
+    호스트 표는 모든 행에 심각도 배지가 있어 27px가 바닥이다. report.html·handover.html처럼
+    배지가 없는 순수 텍스트 표는 같은 패딩(3px 10px)에서 배지 없이 <b>텍스트 줄 자체(12.5px×1.35≈17px)</b>가
+    바닥이 되어 <b>24px</b>까지 내려간다 — 화면마다 다른 CSS를 안 짜도 자동으로 이렇게 갈린다(콘텐츠가
+    스스로 바닥을 정하는 구조라 "26px 하한/24px 허용"을 굳이 두 벌 규칙으로 안 만들어도 된다).
+  </div>
+  <div class="ruler">
+    <div class="ruler-row" style="height:27px;"><span class="rz">27px(배지 행)</span><span class="sevbadge sev-c">3</span><span class="sevbadge sev-h">1</span></div>
+    <div class="ruler-row" style="height:24px;"><span class="rz">24px(순수 텍스트)</span><span style="font-size:12.5px;color:var(--g-text)">2026-08-19 14:02</span></div>
+    <div class="ruler-legend">배지 실측 높이 ≈20px(g-badge: 11px×1.45+상하패딩4px) — 27px 행에 넣으면<br>상하 여백 각 ≈3.5px, 24px 행의 텍스트 줄(≈17px)엔 각 ≈3.5px. <b>맞닿지 않는다.</b></div>
+  </div>
+
+  <h2>ⓑ approvals 카드행(.rv-row) — 현재 vs 규격 (2줄 유지, 정직 계산)</h2>
+  <div class="note">
+    이 행은 표가 아니라 <b>제목 줄 + 부제 줄</b> 두 줄을 쌓은 카드다. 사장님 지시대로 <b>2줄을 유지</b>하며
+    얼마나 줄일 수 있는지가 관건 — 폰트는 손대지 않는다(제목 12.5px·부제 12px, 이미 하한 근처).
+    계산: 패딩 10px→6px(상하 8px 절감) · 줄간격 1.7→1.45(제목 21.25→18.1px, 부제 20.4→17.4px,
+    두 줄 합 6px 절감) · 줄 사이 여백(margin-top)은 2px 그대로 — 폰트를 하나도 안 줄이고
+    <b>64px → 49px</b>(-23%, -15px)까지 정직하게 내려간다. 더 내리려면 폰트를 줄여야 하는데
+    그건 이번 규칙에서 금지했다.
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="demoB-hd"><span style="font-weight:800;color:#fff;">현재</span><span style="font-family:Consolas,monospace;font-weight:800;color:var(--g-amber);">≈64px/행 · 2줄</span></div>
+      <div class="demoB-box demoB-old" id="rvOld"></div>
+    </div>
+    <div>
+      <div class="demoB-hd"><span style="font-weight:800;color:#fff;">규격(이 시안)</span><span style="font-family:Consolas,monospace;font-weight:800;color:var(--g-teal);">≈49px/행 · 2줄 유지</span></div>
+      <div class="demoB-box demoB-new" id="rvNew"></div>
+    </div>
+  </div>
+
+  <table class="spec">
+    <tr><th></th><th class="num">현재</th><th class="num">규격</th><th class="num">증감</th><th>계산</th></tr>
+    <tr><td>행높이(2줄 유지)</td><td class="num">64px</td><td class="num">49px</td><td class="num"><span class="pill down">-23%</span></td>
+        <td>패딩 10→6, 줄간격 1.7→1.45, margin-top 2px 불변, 폰트 불변</td></tr>
+    <tr><td>8행 세로 총합(margin-bottom 3px×7 포함)</td><td class="num">533px</td><td class="num">413px</td><td class="num"><span class="pill down">-120px</span></td><td>8×행높이 + 7×3px 간격</td></tr>
+    <tr><td>640px 기준 보이는 행 수</td><td class="num">10행</td><td class="num">13행</td><td class="num"><span class="pill down">+3행</span></td><td>rv-rows 실제 max-height(640px) 기준</td></tr>
+  </table>
+
+  <h2>ⓒ 홀짝 + 고정 헤더 + <code>.num</code> — 통합 데모(실동작, 스크롤해 보세요)</h2>
+  <div class="note">아래 표는 진짜로 스크롤된다(210px 고정 창). 헤더가 붙어 있는 채로 짙은/옅은 줄이 번갈아 지나가고, 컴포넌트 수는 오른쪽 정렬 고정폭 숫자로 보인다 — sbom.html "컴포넌트 수" 열에 1차로 적용할 모습.</div>
+  <div class="demoC-scroll">
+    <table id="tblC"></table>
+  </div>
+
+  <h2>규격 확정표 — 8종 전체(계산 근거 포함)</h2>
+  <table class="spec">
+    <tr><th>클래스 / 화면</th><th class="num">현재</th><th class="num">규격</th><th class="num">증감</th><th>처리</th></tr>
+    <tr><td>표 8종(vulnscan·sbom·report·threat·inventory·maintenance·kpi·handover)</td><td class="num">≈31px</td><td class="num">27/24px</td><td class="num"><span class="pill down">-13~23%</span></td><td>패딩만 5→3px</td></tr>
+    <tr><td>.rv-row (approvals)</td><td class="num">64px</td><td class="num">49px</td><td class="num"><span class="pill down">-23%</span></td><td>패딩 10→6, 줄간격 1.7→1.45</td></tr>
+    <tr><td>.risk-row (analysis)</td><td class="num">≈69px</td><td class="num">≈53px</td><td class="num"><span class="pill down">-23%</span></td><td>패딩 11→6, 줄간격 1.7→1.45</td></tr>
+    <tr><td>.srow (sessions)</td><td class="num">≈69px</td><td class="num">≈53px</td><td class="num"><span class="pill down">-23%</span></td><td>패딩 11→6, 줄간격 1.7→1.45</td></tr>
+    <tr><td>.aud (audit·syslog)</td><td class="num">≈44px</td><td class="num">≈31px</td><td class="num"><span class="pill down">-30%</span></td><td>패딩 11→6, 줄간격 1.7→1.45</td></tr>
+    <tr><td>.frow (loganalysis, 파일 대장)</td><td class="num">≈32px</td><td class="num">≈29px</td><td class="num"><span class="pill down">-9%</span></td><td>줄간격만 1.7→1.45(패딩 이미 5px)</td></tr>
+    <tr><td>.erow (loganalysis, 이벤트)</td><td class="num">≈34px</td><td class="num">≈31px</td><td class="num"><span class="pill down">-9%</span></td><td>줄간격만 1.7→1.45(패딩 이미 6px)</td></tr>
+    <tr><td>.pk-row (assets)</td><td class="num">34px</td><td class="num">34px</td><td class="num"><span class="pill same">변경없음</span></td><td>이미 line-height:17px 고정 — 손댈 이유 없음</td></tr>
+  </table>
+  <div class="note">전체 중앙값: 현재 ≈44px(견적서와 일치) → 규격 적용 후 ≈31px. 최댓값 69px→53px, 최솟값 31px→24px. 표본 구성(8종 각 1개 대표값)이라 실제 화면 표본이 더 많은 견적서 집계와는 소수점 단위로만 다르다.</div>
+
+  <h3>line-height 1.45 조정의 부작용 검토(요구사항 ⑤)</h3>
+  <div class="note">
+    <b>1.7은 2026-08-01 "가독성" 조치였다</b>(gijo-ui.css 320행 주석: 그 전엔 31개 화면 중 30개가
+    브라우저 기본값(약 1.2)으로 촘촘해 눈이 피로했다). 그런데 <b>같은 조치 안에서 이미</b> 배지·칩·
+    버튼·표 th/td·input/select는 1.45로 "되돌려" 뒀다(같은 파일 324~326행 — "촘촘해야 하는 것은
+    되돌린다"). 즉 1.45는 이번에 새로 발명한 값이 아니라 <b>같은 결정이 이미 UI 컨트롤류에 승인해 둔
+    바닥값</b>이다. div행(카드행)을 여기에 포함하는 건 새 예외가 아니라 <b>기존 예외 목록을 정합하게
+    넓히는 것</b> — "표 안 글자는 1.45가 괜찮은데 표 밖 카드행 글자만 1.7을 유지할 이유"가 없었다.
+    <br><br>
+    남는 위험은 하나: 2026-08-01 조치가 잡은 대비 문제(흐린 글자 #a49d95 = 3.5:1, 읽기 기준
+    4.5 미달)는 <b>색 대비</b>였지 줄간격이 아니었다 — 그건 이미 화면별 :root 색상으로 고쳐져 있어(같은
+    파일 317행) 이번 line-height 조정과 무관하다. 다만 approvals·analysis·sessions의 <b>부제 줄</b>
+    (.rv-rs/.rr-sub/.sr-sub, 흐린 색 var(--muted))은 1.45에서도 여전히 눈이 가늘게 뜨는 텍스트라 —
+    실제 화면에서 "너무 빡빡하다"는 반응이 나오면 이 세 클래스만 1.5~1.55로 살짝 올리는 것을
+    예외로 열어 둔다(다른 5개 클래스는 그럴 이유가 약하다 — 부제가 없거나 이미 1줄이다).
+  </div>
+
+  <h2>왜 이 안인가 — 다른 길을 왜 안 골랐나</h2>
+  <div class="grid2">
+    <div class="card">
+      <b style="color:#fff;">① 폰트 축소 대신 패딩·줄간격만</b>
+      <p style="font-size:12.5px;color:var(--g-muted);line-height:1.75;margin:8px 0 0;">
+      uireadability 시험이 11px 미만을 실패로 잡는데(견적서 §제약) <code>--g-t-xs=11px</code>가 이미 그 문턱이다.
+      폰트를 더 줄이면 시험이 막거나, 통과해도 실제로 안 읽힌다. 남은 손잡이는 패딩·줄간격뿐이라 그것만 썼다.
+      </p>
+    </div>
+    <div class="card">
+      <b style="color:#fff;">② 화면별 CSS 복제 대신 gijo-ui.css 한 곳</b>
+      <p style="font-size:12.5px;color:var(--g-muted);line-height:1.75;margin:8px 0 0;">
+      nav.js가 이미 표 8종에 자체 규칙을 갖고 있는데(2026-08-02) 화면마다 또 손대면 반년 뒤
+      다시 흩어진다(gijo-ui.css 자체 주석의 반복된 경고). 표는 <code>.g-ui.g-ui table td/th</code>
+      (특이도를 확실히 올려 nav.js 규칙을 이긴다), div행은 클래스 나열 — 두 벌이 끝이다.
+      </p>
+    </div>
+    <div class="card">
+      <b style="color:#fff;">③ 토글(body.g-dense) 대신 무조건 적용</b>
+      <p style="font-size:12.5px;color:var(--g-muted);line-height:1.75;margin:8px 0 0;">
+      사장님 지향이 "엑셀처럼"이 기본이고, 이번 목표(24~27px)는 업계 "컴팩트"(40~44px)는 물론
+      "진짜 촘촘"(28~32px)보다도 낮다 — 콘텐츠(배지 20px·폰트 11px)가 정한 바닥이라 화면마다
+      켜고 끌 실익이 적다. 토글을 두면 "이 화면은 켤까"를 또 결정해야 하는 새 분기점만 생긴다.
+      </p>
+    </div>
+    <div class="card">
+      <b style="color:#fff;">④ 표 zebra는 tr에, 카드행 zebra는 :not()으로</b>
+      <p style="font-size:12.5px;color:var(--g-muted);line-height:1.75;margin:8px 0 0;">
+      표는 hover/선택이 td 배경을 따로 칠해 tr 배경(zebra)과 자연히 안 겹친다. 카드행은 hover·
+      .on/.sel이 <b>같은 요소</b>의 배경이라 특이도 싸움이 난다 — :nth-child(even):not(:hover):not(.on)
+      으로 그 상태에서만 얼룩말을 아예 안 먹이는 쪽이 특이도 셈보다 안전하다.
+      </p>
+    </div>
+  </div>
+
+  <h2>무엇을 포기했나</h2>
+  <ul class="foot-checklist">
+    <li><b>hardening(카드그리드)·products(CRUD 카드)</b> — 표 개념이 아니다. 억지로 행 규칙을 씌우면 카드 레이아웃이 깨진다. 견적서 원안 그대로 제외.</li>
+    <li><b>.pk-row(assets) 추가 조임</b> — 이미 34px로 규격 근접. 더 조이면 이 화면만 특별 취급하는 예외가 생겨 "화면별 복제 금지" 원칙과 부딪힌다.</li>
+    <li><b>2줄 카드행을 1줄로 합치는 안</b> — approvals·analysis·sessions 모두 제목+부제가 서로 다른 정보다(예: finding 종류 vs 자산·근거). 합치면 26px는 나오지만 정보가 준다 — 지시("2줄 유지하며 몇 px 가능한지")를 따라 기각.</li>
+    <li><b>표 컴포넌트(.g-table) 재활용</b> — 실제 화면 어디도 안 쓴다(소비 0곳, 견적서 확인). 있지도 않은 걸 고치느니 실제로 쓰이는 bare <code>&lt;table&gt;</code>/nav.js 규칙을 겨눴다.</li>
+  </ul>
+
+  <h2>배지 20px와의 간섭 — 최종 검증</h2>
+  <table class="spec">
+    <tr><th>배지 종류</th><th class="num">실측 높이</th><th>어디</th><th>27px 행에서 여백</th></tr>
+    <tr><td>.g-badge(공용, 11px×1.45+패딩2px×2)</td><td class="num">≈20px</td><td>배지/칩 전반</td><td class="num">상하 각 ≈3.5px</td></tr>
+    <tr><td>.sev(vulnscan 자체, 12.25px×1.35+패딩1px×2)</td><td class="num">≈18.5px</td><td>호스트 표 심각도</td><td class="num">상하 각 ≈4.25px</td></tr>
+    <tr><td>.rv-sev/.pri(카드행 자체, 12.25px×1.45+패딩3px×2)</td><td class="num">≈24px</td><td>approvals·analysis 우선순위</td><td class="num">49px 행에서 여유 12.5px</td></tr>
+  </table>
+  <div class="note ok" style="border-left-color:var(--g-teal);">모든 배지가 목표 행높이보다 작다 — 맞닿거나 잘리는 조합 없음. 가장 타이트한 조합(공용 .g-badge, 27px 행)도 여백 3.5px로 눈에 보이는 여유가 남는다.</div>
+
+  <h2>제품 원칙 자가점검</h2>
+  <table class="spec">
+    <tr><th>원칙</th><th>확인</th></tr>
+    <tr><td>추천 시안 1개(2026-07-25 결정)</td><td>이 파일 하나. 대안 없음.</td></tr>
+    <tr><td>자체완결 HTML(폐쇄망)</td><td>외부 CDN·웹폰트·원격 이미지 없음. 시스템 폰트 폴백만 사용(Pretendard 우선 스택 그대로, woff2 미동봉 — 실제 제품은 gijo-ui.css의 @font-face로 이미 해결됨).</td></tr>
+    <tr><td>설계 전 조사</td><td>Ant Design·Material Design·Excel 행높이·zebra 관례 조사(위 상단 주석·본문에 출처 기재).</td></tr>
+    <tr><td>"왜 이렇게" 설명 블록</td><td>이 섹션 전체 + 각 데모 옆 note.</td></tr>
+    <tr><td>제품 룩앤필(실제 화면에서 가져옴)</td><td>색 토큰·클래스명(.rv-row·.sev·.g-badge 등) 전부 client/src/renderer/pages 실제 코드에서 복사. 새로 지어낸 색 없음(zebra 토큰만 신설, 기존 계단 규칙을 따름).</td></tr>
+    <tr><td>가짜 상호작용 금지</td><td>데모 표·카드행은 정적 그림이다 — 클릭·정렬·필터 동작 없음(스크롤만 실제로 동작).</td></tr>
+  </table>
+
+  <h2>구현 참고 — gijo-ui.css에 그대로 넣을 규칙</h2>
+  <div class="note danger">
+    <b>함정: <code>.frow</code> 이름 충돌.</b> loganalysis.html의 <code>.frow</code>(파일 대장 목록 행)와
+    approvals.html·hardening.html의 <code>.frow</code>(폼 필드 줄, flex/grid 레이아웃)는 <b>같은 이름
+    다른 뜻</b>이다. 전역으로 <code>.frow{padding:…}</code>를 걸면 폼 줄에 없던 패딩이 번진다.
+    loganalysis만 <code>body[data-screen="loganalysis"]</code>로 좁혀야 하고, 그러려면
+    loganalysis.html <code>&lt;body&gt;</code>에 <code>data-screen="loganalysis"</code> 표식을
+    <b>먼저 붙여야 한다</b>(지금은 없음 — settings.html에 이미 있는 선례와 같은 패턴).
+  </div>
+  <div class="note danger">
+    <b>함정: 특이도 동률.</b> nav.js의 기존 <code>.main table td{padding:5px 10px}</code>는 특이도
+    (0,1,2)다. gijo-ui.css에 <code>.g-ui table td{…}</code>(0,1,2)로만 넣으면 <b>동률</b>이 되어
+    나중에 로드되는 쪽이 이기는데, 로드 순서가 항상 gijo-ui.css 나중이라는 보장이 없다(적용 지점이
+    두 곳: 독립 실행 injectCss()/임베드 applyEmbed()). 그래서 아래 규칙은 <code>.g-ui.g-ui</code>로
+    두 번 적어 특이도를 확실히 올린다 — gijo-ui.css 자신도 <code>.kpi-strip.kpi-strip.kpi-strip</code>
+    (192행)·<code>.app.app</code>(167행 주석)에서 이미 쓰는 같은 수법이다.
+  </div>
+  <pre><span class="cm">/* ══ 목록 밀도 — 엑셀급(2026-08-19) ══
+   근거: 목록밀도_실측견적_2026-08-19.md · mockups/목록밀도_엑셀급/시안.html
+   폰트는 안 건드린다(이미 하한 11px 근처) — padding·line-height로만 줄인다. */</span>
+
+<span class="cm">/* ① 표 8종 — vulnscan·sbom·report·threat·inventory·maintenance·kpi·handover.
+     .g-ui.g-ui로 두 번 적어 nav.js의 .main table td(0,1,2)를 특이도로 확실히 이긴다. */</span>
+.g-ui.g-ui table td, .g-ui.g-ui table th { padding: 3px 10px; line-height: 1.35; }
+.g-ui.g-ui table tbody tr:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
+.g-ui.g-ui table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--panel, #30302e);
+  box-shadow: 0 1px 0 var(--border, rgba(255,255,255,.08));
+}
+<span class="cm">/* 스크롤 컨테이너 조건: 위 sticky는 가장 가까운 overflow:auto/scroll 조상을 따른다 —
+   .scroll-list 내부거나(기존 nav.js 특례가 이미 처리), 없으면 페이지 자체 스크롤
+   (독립 실행 .app>*:nth-child(2), 임베드 html,body)이 그 조상이라 전 화면이 이미 해당된다.
+   별도 래퍼가 필요한 화면은 없었다(2026-08-19 소스 확인). */</span>
+
+<span class="cm">/* ② 숫자 우측정렬 — kpi.html 지역규칙(.tsv-table .num)을 전역 관례로 승격.
+     1차 적용(화면별 점진, 렌더 코드에 .num 부여): sbom.html "컴포넌트 수" 열,
+     vulnscan.html 취약점 상세의 EPSS/VPR 점수(.vd-epss/.vd-vpr은 이미 자체 스타일이 있어
+     text-align만 이 규칙에 편승), kpi.html은 기존 지역 규칙 유지(중복 무해). */</span>
+.g-ui .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+<span class="cm">/* ③ div행 7클래스(화면 8개, .aud가 audit·syslog 공용) — 줄간격만 공통 1.45.
+     패딩은 원래 10~11px였던 4개만 6px로(이미 5~8px로 조여둔 3개는 안 건드림). */</span>
+.g-ui .rv-row, .g-ui .risk-row, .g-ui .srow, .g-ui .aud {
+  padding-top: 6px; padding-bottom: 6px; line-height: 1.45;
+}
+<span class="cm">/* loganalysis .frow는 위 함정 참조 — data-screen으로 반드시 좁힌다. */</span>
+body[data-screen="loganalysis"] .frow, .g-ui .erow { line-height: 1.45; }
+<span class="cm">/* .pk-row(assets)는 넣지 않는다 — 이미 line-height:17px 고정, 변경 불필요. */</span>
+
+<span class="cm">/* ④ div행 홀짝 — 자기 자신이 hover/.on/.sel 배경도 받는 요소라 :not()으로 상태를 뺀다.
+     (표는 hover가 td를 칠해 tr 배경과 안 겹치므로 위 ①에서 바로 nth-child를 썼다.) */</span>
+.g-ui .rv-row:nth-child(even):not(:hover):not(.on),
+.g-ui .risk-row:nth-child(even):not(:hover):not(.sel),
+.g-ui .srow:nth-child(even):not(:hover):not(.on),
+.g-ui .aud:nth-child(even) { background: var(--g-zebra, rgba(255,255,255,.025)); }
+
+<span class="cm">/* :root에 신설 토큰(기존 계단 0 → .025(zebra) → .055(hover) → .10(선택)에 맞춤) */</span>
+:root { --g-zebra: rgba(255,255,255,.025); }</pre>
+
+  <h3>마크업 수정 지점(2건)</h3>
+  <table class="spec">
+    <tr><th>파일</th><th>지금</th><th>바꿀 것</th><th>비고</th></tr>
+    <tr><td>loganalysis.html <code>&lt;body&gt;</code></td><td><code>data-screen</code> 없음</td>
+        <td><code>&lt;body data-screen="loganalysis"&gt;</code> 추가</td>
+        <td>위 <code>.frow</code> 충돌 회피에 필수 — settings.html 선례와 동일 패턴</td></tr>
+    <tr><td>compliance.html <code>threatRow()</code>(약 164행)</td>
+        <td>인라인 style, 클래스 없음</td>
+        <td>바깥 div에 <code>class="cpl-row"</code> 추가(인라인 style은 유지해도 무방)</td>
+        <td>행 안에 select·input·AI초안 버튼이 있어 밀도 이득은 작다(g-input-h 36px가 바닥이라
+            실측 감소는 ≈4px뿐) — 지금은 <b>타겟팅 가능하게 클래스만</b> 붙여 둔다는 의미가 크다.</td></tr>
+  </table>
+
+  <h3>uireadability(11px 폰트 하한 시험)와의 무충돌 확인</h3>
+  <div class="note ok" style="border-left-color:var(--g-teal);">
+    이번 규칙은 <code>font-size</code>를 <b>단 한 곳도</b> 바꾸지 않는다(패딩·line-height·배경·position만).
+    uireadability는 견적서 §제약에 따르면 font-size만 검사하므로 이 시안은 그 시험과 근본적으로
+    겹치는 속성이 없다 — 통과/실패 여부에 영향을 줄 수 없다. 유일하게 남는 변수는 sticky
+    헤더(<code>position:sticky</code>)가 레이아웃 시험(있다면)과 부딪히는지인데, 그런 시험은
+    이 저장소에서 못 찾았다 — 구현 시 한 번 확인 권장.
+  </div>
+
+</div>
+
+<script>
+(function () {
+  // ── ⓐ vulnscan 데모 데이터 (15행, 가짜 표본 — 클릭 동작 없음) ──
+  var hosts = [
+    ["web-prod-01","10.20.1.11",[["c",2],["h",1]],"08-18 03:00"],
+    ["web-prod-02","10.20.1.12",[["h",1],["m",3]],"08-18 03:01"],
+    ["db-main-01","10.20.2.5",[["c",1]],"08-17 22:14"],
+    ["api-gw-01","10.20.1.30",[["m",2],["l",4]],"08-18 03:02"],
+    ["batch-worker-03","10.20.3.9",[["h",2]],"08-16 11:40"],
+    ["cache-redis-01","10.20.2.20",[["l",1]],"08-18 03:03"],
+    ["file-nas-01","10.20.4.2",[["c",1],["m",1]],"08-15 09:12"],
+    ["vpn-gw-edge","10.20.0.1",[["h",1],["l",2]],"08-18 03:03"],
+    ["adweb-legacy","10.20.5.7",[["c",3],["h",2]],"08-14 20:05"],
+    ["mail-relay-01","10.20.2.40",[["m",1]],"08-18 03:04"],
+    ["ci-runner-02","10.20.6.14",[["l",3]],"08-18 03:04"],
+    ["monitor-graf-01","10.20.2.60",[["m",1],["l",1]],"08-18 03:05"],
+    ["log-collector","10.20.3.22",[["h",1]],"08-17 06:30"],
+    ["dns-internal","10.20.0.5",[["l",1]],"08-18 03:05"],
+    ["backup-svr-01","10.20.4.9",[["m",2]],"08-13 18:00"]
+  ];
+  var SEVC = {c:"sev-c",h:"sev-h",m:"sev-m",l:"sev-l"};
+  var thead = "<thead><tr><th>호스트 / IP</th><th>출처</th><th>취약점(심각도별)</th><th>최근 스캔</th></tr></thead>";
+  function rowsHtml() {
+    return hosts.map(function (h) {
+      var badges = h[2].map(function (b) { return '<span class="sevbadge ' + SEVC[b[0]] + '">' + b[1] + '</span>'; }).join("");
+      return "<tr><td><span class=\"hostname\">" + h[0] + "</span> <span style=\"color:var(--g-muted-2);font-size:11.5px;\">" + h[1] + "</span></td>" +
+        "<td style=\"color:var(--g-muted);\">Nessus</td><td>" + badges + "</td>" +
+        "<td style=\"color:var(--g-muted);\">" + h[3] + "</td></tr>";
+    }).join("");
+  }
+  document.getElementById("tblOld").innerHTML = thead + "<tbody>" + rowsHtml() + "</tbody>";
+  document.getElementById("tblNew").innerHTML = thead + "<tbody>" + rowsHtml() + "</tbody>";
+
+  // ── ⓑ approvals 카드행 데모 데이터 (8행) ──
+  var findings = [
+    ["CVE-2026-31442 원격 코드 실행","web-prod-01 · Apache 2.4.58","d-over","critical"],
+    ["약한 TLS 암호군 허용","vpn-gw-edge · 확인 중","d-verifying","high"],
+    ["기본 관리자 계정 잔존","adweb-legacy · 담당 배정됨","d-in_progress","critical"],
+    ["오래된 OpenSSL 라이브러리","batch-worker-03 · 대기","d-pending","high"],
+    ["불필요 포트 개방(23/tcp)","file-nas-01 · 승인 완료","d-approved","medium"],
+    ["세션 쿠키 Secure 미설정","api-gw-01 · 반려됨","d-rejected","medium"],
+    ["로그 수집 지연 임계 초과","log-collector · 대기","d-pending","low"],
+    ["백업 암호화 미적용","backup-svr-01 · 확인 중","d-verifying","high"]
+  ];
+  function cardsHtml() {
+    return findings.map(function (f) {
+      return '<div class="rv-row"><span class="rv-dot ' + f[2] + '"></span>' +
+        '<div class="rv-rmain"><div class="rv-rt">' + f[0] + '</div><div class="rv-rs">' + f[1] + '</div></div>' +
+        '<span class="rv-sev sev-' + f[3] + '">' + f[3] + '</span></div>';
+    }).join("");
+  }
+  document.getElementById("rvOld").innerHTML = cardsHtml();
+  document.getElementById("rvNew").innerHTML = cardsHtml();
+
+  // ── ⓒ 통합 데모(zebra+sticky+.num) — sbom "컴포넌트 수" 형태 ──
+  var sboms = [
+    ["결제-게이트웨이","보안팀",112],["추천-엔진","AI팀",340],["사용자-포털","프론트팀",58],
+    ["배치-스케줄러","인프라팀",27],["알림-서비스","백엔드팀",73],["문서-변환기","AI팀",191],
+    ["로그-파이프라인","인프라팀",64],["관리자-콘솔","프론트팀",39],["모바일-BFF","백엔드팀",88],
+    ["ML-서빙","AI팀",256]
+  ];
+  var cthead = "<thead><tr><th>자산명</th><th>소유부서</th><th class=\"num\">컴포넌트 수</th></tr></thead>";
+  var crows = sboms.map(function (s) {
+    return "<tr><td>" + s[0] + "</td><td style=\"color:var(--g-muted);\">" + s[1] + "</td><td class=\"num\">" + s[2] + "</td></tr>";
+  }).join("");
+  document.getElementById("tblC").innerHTML = cthead + "<tbody>" + crows + "</tbody>";
+})();
+</script>
+</body>
+</html>

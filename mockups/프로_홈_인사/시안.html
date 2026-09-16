@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 프로 셸 「대화 홈 첫 화면(빈 상태)」 개정 · 인사+칩</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  시안: GIJO AS 프로 셸 「대화 홈 첫 화면(빈 상태)」 개정 — 인사말 + 큰 입력창 + 하단 메뉴 칩
+  작성: gijo-mockup · 2026-08-19 · 산출물: mockups/프로_홈_인사/시안.html (자체완결, 제품 코드 무변경)
+
+  ── 이 시안은 무엇의 개정판인가 ───────────────────────────────────────────
+  mockups/프로_대화창메인/시안.html(2026-08-17~18, 셸 골격 승인)의 "④ 왜 이 안인가"가 정의한
+  idle(=tabs.length 0, "대화 홈") 상태의 **속을 다시 그린 것**이다. 그 시안은 "대화만 있는 화면"을
+  만들자는 골격만 정했고, 그 안의 내용은 오늘까지 console.js의 옛 3줄 정적 문구
+  (build():271-275, 2026-08-19 오전 "외부조사 4원칙 보강"분)가 채우고 있었다. 이 시안은 그 문구를
+  사장님이 오늘 오후 보여준 참고 화면(Claude Desktop 홈 — 가운데 인사말 + 큰 입력창 + 하단 아이콘 칩)
+  형태로 다시 그리되, **③에서 밝히듯 입력창은 중복해서 만들지 않는다**(이유는 본문 ①).
+  mockups/프로_도킹패널/시안.html(2026-08-19, 오늘 승인·이미 구현됨 — app.html:497-523·964-1042
+  확인)과는 겹치지 않는다: 그 시안은 "화면을 열 때" 도킹/팝업을 가르는 규칙이고, 이 시안은
+  "화면을 아직 하나도 안 열었을 때"(chat-home)의 속 내용이다 — 후자가 성립하는 동안에는
+  전자의 규칙이 아직 작동할 계기(화면 열기)조차 없다.
+
+  ── 설계 전 조사 근거 ─────────────────────────────────────────────────────
+  1) Eleken·Setproduct·Mobbin 조사 종합(WebSearch, 2026-08-19) — Gemini류의 "Hello, {name}.
+     How can I help you today?" 개인화 인사 + 제안 카드(무엇을 할 수 있는지 미리 보여줌) +
+     "구체적인 다음 수"(빈 커서보다 제안 문장이 전환율이 높다)가 반복 언급되는 패턴이다.
+     이 시안의 질문 칩(②)이 정확히 이 "구체적인 다음 수" 역할이다.
+  2) Nielsen Norman Group, "Designing Empty States in Complex Applications: 3 Guidelines"
+     (nngroup.com/articles/empty-state-interface-design) — 빈 화면은 침묵하면 신뢰를 깎고,
+     "왜 비었는지 + 무엇을 할 수 있는지 + 다음 동작으로 가는 직접 경로"를 주면 온보딩 순간이
+     된다. "주 자원(primary resource)은 교육적으로, 부 자원은 기본형으로" — 이 시안이
+     서랍(무엇을 할 수 있나, 부 자원)은 그대로 접어 두고 새 히어로(주 자원)만 두드러지게 하는
+     근거다(본문 ②).
+  3) 내부 근거(실제 코드, 읽고 인용 — 손대지 않음):
+     · client/src/renderer/pages/console.js:271-275 — 지금의 정적 빈 상태 문구(오늘 오전분).
+     · client/src/renderer/pages/console.js:985-988·957-958·1265-1266 — `append()`·`갈래카드()`·
+       `guideAsk()` 세 곳이 전부 `body.querySelector(".cs-empty")`로 찾아 지운다. 이 시안은
+       새 히어로도 **같은 클래스(.cs-empty)를 그대로 쓴다** — 첫 지시가 오면 세 호출부 중
+       무엇이 불려도 자동으로 사라진다(⑨에서 그대로 씀을 코드로 보인다 — 제거 지점을 새로
+       만들지 않는다).
+     · client/src/renderer/pages/console.js:768-776 CAN[0] "지금 급한 것" — 질문 칩 문구를
+       여기서 그대로 가져왔다(새 문구를 짓지 않았다, 아래 ②).
+     · client/src/renderer/pages/console.js:1590-1595 `ask(text)` — 질문 칩이 부를 함수(기존
+       cs-chip·서랍이 쓰는 것과 동일 함수, 새 경로 없음).
+     · client/src/renderer/pages/nav.js:104-129 GROUPS ⓪~⑤ — 메뉴 칩의 라벨·페이지 단일 출처.
+     · client/src/renderer/pages/app.html:497-523 `open()`, :964-1042 `대화홈갱신()`·`프로레일()` —
+       메뉴 칩이 실제로 부를 `window.gijoTabs.open(page,label)`의 안쪽 도킹/팝업 규칙(이미 구현).
+     · client/src/renderer/pages/app.html:46·73-79 `.cs-body>*:first-child{margin-top:auto}` —
+       지금 빈 상태는 **위가 아니라 입력창 바로 위(아래 붙임)**로 그려진다(2026-08-02 시안).
+       이 시안은 chat-home일 때만 이 규칙을 지우고 세로 중앙 정렬로 바꾼다(⑨).
+     · client/src/renderer/pages/dashboard.html:332-341 `loadHello()`, titlebar.js:385-394 —
+       `window.gijo.me().displayName` 을 이미 쓰고 있다(새 API 아님, 재사용).
+     · client/src/main.ts:336-345 `mainWindowBounds()` — minHeight 하한(대개 620, 극단만 480),
+       minWidth 하한(대개 900, 극단만 600) — 아래 밀도 표의 "최악 폭·높이" 근거.
+  4) mockups/프로_도킹패널/시안.html §5·§7 — 가로 1920×1080·세로 1080×1920 두 실측 시나리오와
+     축소 스케마 표기 관행(devtools 실측이 아니라 CSS 상수 계산값)을 그대로 이어받았다.
+
+  ── 이 파일의 상호작용 범위(정직 고지) ──────────────────────────────────────
+  아래 "① 실제로 눌러보기"의 모든 동작은 "(시연)"이며 실제 LLM·서버를 부르지 않는다.
+  각본대로만 움직인다(정직한 구현 원칙 — 가짜 동작을 진짜처럼 꾸미지 않는다).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    line-height:1.62;font-size:14px;}
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 26px 90px;}
+  h1{font-size:22px;margin:0 0 6px;}
+  h2{font-size:16.5px;margin:40px 0 12px;padding-top:14px;border-top:1px solid var(--border);color:#fff;}
+  h2 .no{color:var(--blue-light);margin-right:6px;}
+  h3{font-size:13.75px;margin:18px 0 8px;color:var(--muted);}
+  p{margin:0 0 10px;color:var(--text);}
+  .lead{color:var(--muted);font-size:13px;}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;
+    background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);margin-right:6px;}
+  .tag.ok{background:rgba(30,185,128,.16);border-color:rgba(30,185,128,.4);color:var(--teal);}
+  .tag.rev{background:rgba(240,160,32,.16);border-color:rgba(240,160,32,.45);color:var(--amber);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin:12px 0;}
+  .card.warn{border-color:rgba(240,160,32,.45);background:rgba(240,160,32,.07);}
+  .card.good{border-color:rgba(30,185,128,.4);background:rgba(30,185,128,.06);}
+  code, .code{font-family:"Consolas","Cascadia Code",monospace;font-size:12.25px;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:#ffd479;}
+  pre{font-family:"Consolas","Cascadia Code",monospace;font-size:12px;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;color:#cfe8ff;line-height:1.55;}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.75px;}
+  th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top;}
+  th{background:var(--panel-2);color:var(--muted);font-weight:700;font-size:12px;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  ul{margin:6px 0 10px;padding-left:20px;} li{margin:3px 0;}
+  .src{color:var(--muted-2);font-size:11.5px;}
+  .toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.25px;color:var(--muted);margin:14px 0 4px;}
+  .toc a{color:var(--blue-light);text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted-2);font-size:11.5px;}
+
+  /* ══════════════════════ 인터랙티브 데모 — 실제 console.js 클래스·색을 그대로 옮김 ══════════════════════ */
+  .demobar{background:var(--panel-2);border:1px dashed var(--amber);border-radius:10px;padding:12px 16px;
+    margin:14px 0 18px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+  .demobar b{color:#fff;}
+  .demobar button{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);
+    border-radius:7px;padding:6px 12px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .demobar button:hover{color:#fff;border-color:var(--blue);}
+  .demobar button.on{background:rgba(59,130,246,.2);border-color:var(--blue);color:#fff;}
+  .demobar .grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .demobar .lbl{color:var(--muted-2);font-size:11.25px;white-space:nowrap;}
+  .demobar .note{width:100%;font-size:11.25px;color:var(--muted-2);}
+
+  .device{width:860px;height:480px;margin:0 auto;background:var(--bg);border:1px solid var(--border-strong);
+    border-radius:8px;overflow:hidden;box-shadow:0 20px 54px rgba(0,0,0,.5);display:flex;flex-direction:column;
+    position:relative;transition:width .22s ease,height .22s ease;}
+  .device.portrait{width:480px;height:860px;}
+  .devicewrap{display:flex;justify-content:center;}
+  .device-caption{max-width:860px;margin:8px auto 0;text-align:center;font-size:11.25px;color:var(--muted-2);}
+
+  .d-top{flex:0 0 auto;height:20px;display:flex;align-items:center;gap:8px;padding:0 10px;
+    background:var(--panel-2);border-bottom:1px solid var(--border);font-size:10px;color:var(--muted-2);}
+  .d-top .sp{flex:1;}
+  .d-grid{flex:1 1 auto;display:flex;min-height:0;overflow:hidden;}
+  .d-rail{flex:0 0 26px;width:26px;background:var(--panel-2);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:4px;}
+  .d-rail button{width:18px;height:18px;border-radius:5px;background:transparent;border:1px solid transparent;
+    color:var(--muted);font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;}
+  .d-rail button:hover{background:rgba(255,255,255,.08);color:#fff;}
+  .d-work{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel-2);position:relative;}
+
+  /* 도킹되면 화면 자리표시자가 왼쪽에, 콘솔이 오른쪽 좁은 칸으로 — app.html .work.console-side 재현 */
+  .d-split{flex:1 1 auto;display:none;min-height:0;overflow:hidden;}
+  .d-split.on{display:flex;}
+  .d-canvas{flex:1 1 auto;background:var(--bg);border-right:1px solid var(--border);padding:10px;font-size:10.5px;color:var(--muted-2);}
+  .d-canvas .hd{font-size:11px;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+  .d-console{flex:0 0 auto;width:230px;display:flex;flex-direction:column;min-height:0;background:var(--panel-2);}
+
+  /* ── console.js 실 클래스 재현(cs-head·cs-chips·cs-drawer는 무변경 요소라 실 마크업 그대로) ── */
+  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:5px 9px;font-size:9.5px;color:var(--muted);
+    border-bottom:1px solid rgba(255,255,255,.05);}
+  .cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);
+    border-radius:12px;padding:1px 7px;font-weight:800;white-space:nowrap;}
+  .cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:9px;}
+  .cs-chips{display:flex;gap:4px;padding:5px 9px;border-bottom:1px solid var(--border);}
+  .cs-chip{font-size:9px;border:1px solid var(--border);border-radius:10px;padding:1px 7px;color:var(--muted);
+    cursor:default;background:transparent;white-space:nowrap;}
+  .cs-drawer{flex:0 0 auto;border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .cs-dh{display:flex;align-items:center;gap:5px;padding:5px 9px;font-size:9.5px;color:var(--muted);cursor:default;}
+  .cs-dh b{color:#fff;font-weight:800;}
+  .cs-dh .n{margin-left:auto;color:var(--muted-2);}
+  .cs-dh .add{font-size:9px;font-weight:800;color:var(--blue-light);border:1px solid rgba(59,130,246,.4);
+    border-radius:6px;padding:1px 6px;}
+
+  .cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;}
+  /* 오늘(무변경) — 짧으면 입력창 바로 위로 붙는다(2026-08-02 시안, app.html:46 재현) */
+  .cs-body>*:first-child{margin-top:auto;}
+  /* ★ 이 시안 — chat-home일 때만 세로 중앙 정렬로 바꾼다(무변경 규칙 위에 조건 하나 추가) */
+  .device.chat-home .cs-body{justify-content:center;}
+  .device.chat-home .cs-body>*:first-child{margin-top:0;}
+
+  /* ── 옛 3줄 정적 문구(무변경 대상 — chat-home이 아니면 이 모양 그대로) ── */
+  .ce-compact{color:var(--muted-2);font-size:9.5px;line-height:1.55;padding:6px 0;}
+  .ce-compact b{color:var(--muted);}
+  .device.chat-home .ce-compact{display:none;}
+  .device:not(.chat-home) .ce-hero{display:none;}
+
+  /* ── ★ 새 히어로 — chat-home 전용, 세로 중앙 ── */
+  .ce-hero{margin:0 auto;max-width:78%;width:100%;text-align:center;padding:16px 6px 14px;}
+  .ce-hero .greet{font-size:15px;font-weight:800;color:#fff;margin-bottom:5px;line-height:1.35;}
+  .ce-hero .honest{font-size:8.75px;color:var(--muted-2);line-height:1.6;margin:0 auto 13px;max-width:92%;}
+  .ce-hero .qrow{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-bottom:11px;}
+  .ce-hero .qchip{font-size:9.25px;border:1px solid var(--border-strong);border-radius:13px;padding:4px 9px;
+    color:var(--text);cursor:pointer;background:var(--panel);font-family:inherit;}
+  .ce-hero .qchip:hover{border-color:var(--teal);color:var(--teal);}
+  .ce-hero .divider{font-size:8px;color:var(--muted-2);margin:0 0 7px;}
+  .ce-hero .mrow{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;}
+  .ce-hero .mchip{font-size:9.5px;font-weight:700;border:1px solid rgba(59,130,246,.4);background:rgba(59,130,246,.10);
+    color:var(--blue-light);border-radius:7px;padding:5px 9px;cursor:pointer;font-family:inherit;}
+  .ce-hero .mchip:hover{background:rgba(59,130,246,.18);border-color:var(--blue);color:#fff;}
+
+  /* 대화 버블(질문 칩·직접 입력을 눌렀을 때 전환) */
+  .cs-row{display:flex;gap:6px;padding:4px 0;font-size:9.5px;}
+  .cs-row .ci{flex:0 0 auto;width:15px;height:15px;border-radius:50%;background:rgba(59,130,246,.16);
+    display:flex;align-items:center;justify-content:center;font-size:8px;}
+  .cs-row.instr .ci{background:rgba(30,185,128,.16);}
+  .cs-row .cn{font-weight:800;color:var(--muted);margin-bottom:1px;font-size:8.5px;}
+  .cs-row .cm{color:var(--text);line-height:1.5;}
+
+  .dockhead{display:none;flex:0 0 auto;align-items:center;gap:5px;padding:3px 8px;font-size:9px;color:var(--muted);
+    background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .dockhead.on{display:flex;}
+  .dockhead b{color:#fff;}
+  .dockhead .sp{flex:1;}
+  .dockhead button{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:5px;
+    padding:1px 6px;font-size:8.5px;cursor:pointer;font-family:inherit;}
+
+  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:6px 8px;border-top:1px solid var(--border);}
+  .cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;
+    color:var(--text);font-size:9.5px;padding:6px 8px;outline:none;font-family:inherit;}
+  .cs-plus{flex:0 0 auto;width:22px;height:22px;border-radius:7px;background:var(--panel);color:var(--muted);
+    border:1px solid var(--border-strong);font-size:11px;cursor:pointer;}
+  .cs-send{background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:9.5px;font-weight:800;
+    padding:6px 10px;cursor:pointer;font-family:inherit;}
+
+  /* 팝업 모드에서 뜨는 별도 창(시연) */
+  .spop{position:absolute;z-index:9;background:var(--panel);border:2px solid var(--blue);border-radius:8px;
+    box-shadow:0 16px 40px rgba(0,0,0,.6);display:none;flex-direction:column;overflow:hidden;
+    right:16px;top:30px;width:180px;height:120px;}
+  .spop.on{display:flex;}
+  .spop .ph{flex:0 0 auto;height:20px;background:var(--panel-2);display:flex;align-items:center;padding:0 7px;
+    font-size:8.5px;font-weight:700;gap:5px;border-bottom:1px solid var(--border);}
+  .spop .ph .x{margin-left:auto;cursor:pointer;color:var(--muted-2);}
+  .spop .pb{flex:1;padding:7px;font-size:8.5px;color:var(--muted-2);}
+
+  .toast{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:20;background:#111;color:#fff;
+    font-size:9.5px;padding:5px 11px;border-radius:14px;box-shadow:0 6px 16px rgba(0,0,0,.5);opacity:0;
+    transition:opacity .25s;pointer-events:none;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis;}
+  .toast.on{opacity:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">시안 · 추천 1개</span><span class="tag ok">mockups/프로_홈_인사/시안.html</span>
+  <span class="tag rev">프로_대화창메인 「빈 상태」 절 개정판</span>
+  <h1>프로 셸 — 「대화 홈 첫 화면(빈 상태)」 개정: 인사말 + 칩</h1>
+  <p class="lead">사장님이 보여준 참고 화면(가운데 인사말 + 큰 입력창 + 하단 아이콘 칩) 형태를, <b>tabs.length===0
+    (chat-home)일 때만</b> console.js의 지금 3줄 정적 문구 대신 채운다. 입력창은 <b>새로 만들지 않는다</b> —
+    바로 아래(.cs-dock)에 이미 있는 실제 입력창 하나를 그대로 쓰고, 히어로는 그 위에서 눈길을 모아
+    자연스럽게 그 입력창으로 이어지게 한다(이유는 ①).</p>
+
+  <div class="toc">
+    <a href="#s1">① 실제로 눌러보기</a>
+    <a href="#s2">② 왜 이 안인가 · 원형에서 무엇을 버렸나</a>
+    <a href="#s3">③ 기존 요소와의 관계 — 서랍·오늘 오전분 문구</a>
+    <a href="#s4">④ 옮기지 않는 것</a>
+    <a href="#s5">⑤ 폭에 따라 히어로가 어떻게 반응하는가</a>
+    <a href="#s6">⑥ 무엇을 포기했나</a>
+    <a href="#s7">⑦ 밀도 숫자</a>
+    <a href="#s8">⑧ 제품 원칙 자가점검</a>
+    <a href="#s9">⑨ 구현 참고</a>
+    <a href="#s10">⑩ 설계 전 조사 근거</a>
+  </div>
+
+  <!-- ══════════════════════ ① 데모 ══════════════════════ -->
+  <h2 id="s1"><span class="no">①</span>실제로 눌러보기 <span class="src">— 모든 동작은 "(시연)"입니다. 실제 LLM·서버를 부르지 않습니다.</span></h2>
+  <p>아래는 콘솔 실제 클래스(<code>.cs-head·.cs-chips·.cs-drawer·.cs-body·.cs-dock</code>)를 그대로 옮긴
+    축소 도식입니다(치수는 devtools 실측이 아니라 ⑦의 코드 상수 계산값 — 이 데모 렌더 크기가 아닙니다,
+    mockups/프로_도킹패널 §5와 같은 관행). <b>회색 옛 문구</b>가 아니라 <b>히어로</b>가 보이는 것 자체가
+    "chat-home" 조건이 걸렸다는 뜻입니다 — 아래 폭 토글로 두 실제 시나리오(가로 단일 모니터 · 사장님의
+    세로 모니터)를 오가며 히어로가 두 경우 모두 성립하는지 확인해 보세요.</p>
+
+  <div class="demobar">
+    <div class="grp">
+      <span class="lbl">화면 폭</span>
+      <button id="btnLand" class="on" onclick="setMode('landscape')">가로 1920×1080(도킹 가능)</button>
+      <button id="btnPort" onclick="setMode('portrait')">세로 1080×1920(팝업만 · 도킹 절대 비활성)</button>
+    </div>
+    <div class="grp">
+      <span class="lbl">시간대</span>
+      <button onclick="setHour(8)">🌅 아침</button>
+      <button onclick="setHour(14)">🌇 오후</button>
+      <button onclick="setHour(22)">🌙 밤</button>
+    </div>
+    <button onclick="resetDemo()">↺ 처음부터</button>
+    <div class="note">폭 규칙(도킹/팝업)은 mockups/프로_도킹패널에서 오늘 승인·구현된 것을 그대로 재현합니다
+      (app.html:497-523) — 이 시안이 새로 만든 규칙이 아닙니다. 이 데모가 새로 보이는 것은 회색 글씨 대신
+      뜨는 <b>히어로 내용</b>뿐입니다.</div>
+  </div>
+
+  <div class="devicewrap">
+    <div class="device chat-home" id="device">
+      <div class="d-top"><span>GIJO AS · 프로</span><span class="sp"></span><span id="d-clock">14:32</span></div>
+      <div class="d-grid">
+        <div class="d-rail">
+          <button title="☰ 전체 메뉴">☰</button>
+          <button title="🕘 작업 내역">🕘</button>
+          <button title="⭐ 즐겨찾기">⭐</button>
+          <button title="💬 대화 홈으로">💬</button>
+        </div>
+        <div class="d-work">
+          <!-- 도킹되면 여기(캔버스+콘솔 분할)로 전환 -->
+          <div class="d-split" id="d-split">
+            <div class="d-canvas"><div class="hd">🖥 <span id="d-canvastitle">발견·수집</span></div>
+              (시연) 실제로는 이 자리에 discover.html 등 실제 화면이 그대로 열립니다 — 새로 그리지 않습니다.</div>
+            <div class="d-console">
+              <div class="dockhead" id="d-dockhead"><b id="d-docklabel"></b><span class="sp"></span>
+                <button onclick="popFromDock()" title="⧉ 창으로 빼기(기억됨)">⧉</button>
+                <button onclick="closeDock()" title="닫기">✕</button></div>
+              <div class="cs-head"><span class="cs-ctx" id="d-ctx2">대시보드</span><span class="cs-hint">보고 있는 화면 기준</span></div>
+              <div class="cs-body" id="d-body2"><div class="ce-compact">지시하면 여기서 실시간으로 흐릅니다.</div></div>
+              <div class="cs-dock"><button class="cs-plus">＋</button><input placeholder="지시를 입력하세요…" disabled><button class="cs-send">전송</button></div>
+            </div>
+          </div>
+          <!-- chat-home(기본) — 콘솔이 전체 폭 -->
+          <div id="d-full" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0;">
+            <div class="cs-head"><span class="cs-ctx">대시보드</span><span class="cs-hint" id="d-hint">보고 있는 화면 기준으로 지시합니다</span></div>
+            <div class="cs-chips"><span class="cs-chip">ⓘ 이 화면 안내</span></div>
+            <div class="cs-drawer"><div class="cs-dh"><span>▶</span><b>무엇을 할 수 있나</b><span class="n">17가지</span><span class="add">＋ 등록</span></div></div>
+            <div class="cs-body" id="d-body">
+              <div class="ce-compact">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.
+                <br>예: <b>"오늘 뭐부터 볼까?"</b> — 조치 우선순위를 근거(KEV·EPSS)와 함께 줍니다.
+                <br><span style="color:var(--muted-2)">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</span></div>
+              <div class="ce-hero" id="d-hero">
+                <div class="greet" id="d-greet">안녕하세요, 김보안님</div>
+                <div class="honest">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</div>
+                <div class="qrow" id="d-qrow"></div>
+                <div class="divider">또는 메뉴에서 바로 가기</div>
+                <div class="mrow" id="d-mrow"></div>
+              </div>
+            </div>
+            <div class="cs-dock"><button class="cs-plus" title="파일 올리기">＋</button>
+              <input id="d-input" placeholder="지시를 입력하세요…">
+              <button class="cs-send" onclick="onSend()">전송</button></div>
+          </div>
+          <div class="spop" id="d-popup">
+            <div class="ph"><span id="d-popname">⧉ 화면</span><span class="x" onclick="closePopup()">✕</span></div>
+            <div class="pb">(시연) 별도 OS 창 자리표시자 — 대화 홈은 그대로 전체 폭입니다(tabs.length는 0인 채입니다).</div>
+          </div>
+          <div class="toast" id="d-toast"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="device-caption">축소 도식(실제 픽셀 비례 아님) — 위 버튼으로 두 실측 시나리오를 바꿔 보세요. 질문 칩·메뉴 칩·입력창 모두 실제로 클릭·입력됩니다.</div>
+
+  <!-- ══════════════════════ ② 왜 이 안 ══════════════════════ -->
+  <h2 id="s2"><span class="no">②</span>왜 이 안인가 · 원형에서 무엇을 버렸나</h2>
+  <div class="card">
+    <p><b>채택안</b> — chat-home(tabs.length===0)일 때만 console.js의 <code>.cs-empty</code> 안쪽 내용을
+      "인사말(시간대별) → 정직 한 줄(유지) → 질문 칩 2~3개 → 구분 라벨 → 메뉴 칩 ⓪~⑤"로 바꾸고,
+      <code>.cs-body</code>를 입력창 바로 위 붙임(오늘 규칙)에서 <b>세로 중앙 정렬</b>로 바꾼다. chat-home이
+      아니면(표준 셸, 또는 프로에서 화면이 도킹된 뒤) <b>지금 문구가 한 글자도 안 바뀐 채</b> 그대로
+      나온다 — 새 문구는 완전히 새 조건(chat-home) 뒤에만 존재한다.</p>
+  </div>
+  <p><b>원형(Claude Desktop 홈, 사장님 스크린샷)에서 버린 것 — 가장 중요한 결정:</b></p>
+  <ul>
+    <li><b>중앙의 큰 입력창을 새로 만들지 않는다.</b> 원형은 입력창이 화면에 <i>하나뿐</i>이라 그것이 곧
+      중앙에 있어도 된다. 우리 콘솔은 <code>.cs-dock</code>(진짜 입력창, ＋·전송 포함)이 <b>이미
+      화면 맨 아래에 상시로 존재</b>한다(app.html:264-267, 표준·프로 공통). 히어로 안에 또 하나의
+      입력처럼 생긴 상자를 두면 "둘 중 어디에 쳐야 하나"가 생긴다 — 사용자 확립 원칙 "지시는
+      대화창에서만"(하나의 창구)을 이 화면 안에서 스스로 어기는 셈이다. 대신 히어로를
+      <code>.cs-body</code> 안에서 세로 중앙에 두면, chat-home에서는 그 아래로 <code>.cs-dock</code>
+      한 칸만 남으므로 <b>시선이 자연히 그 실제 입력창으로 떨어진다</b> — 입력창이 하나라는
+      사실은 그대로 두고 "가운데 있는 것처럼 보이는 효과"만 얻는다.</li>
+    <li><b>모델 선택·마이크·모드 토글을 옮기지 않는다</b> — 근거는 ④.</li>
+    <li><b>제안 카드(원형은 그리드형 큰 카드 4장)를 작은 칩으로 낮췄다.</b> 우리 메뉴 칩은 6개(⓪~⑤)라
+      원형의 4카드보다 많다 — 큰 카드로 그리면 세로 총합이 부풀어(⑦) 세로 모니터(내부폭 1024)에서
+      칩이 두 번 줄바꿈할 위험이 커진다. 칩(pill)은 이미 console.js 전역에서 쓰는 부품
+      (<code>.cs-chip</code> 계열)이라 재사용이기도 하다(새 부품 언어를 만들지 않음).</li>
+  </ul>
+  <p>검토하고 기각한 다른 두 길:</p>
+  <ul>
+    <li><b>대시보드를 chat-home 기본 화면으로 되살린다</b> — 기각. 프로 셸은 2026-08-18 "화면은 부를 때만
+      온다"를 이미 승인했다(대시보드 탭 상시 유지는 그 결정의 정반대다). 되돌리는 게 아니라
+      그 결정 <i>안에서</i> 빈 순간을 채우는 것이 이 시안의 범위다.</li>
+    <li><b>히어로를 항상(도킹 중에도) 보여준다</b> — 기각. ⑤에서 코드로 확인했듯 도킹은 tabs.push를
+      거쳐 chat-home을 끈다. 화면이 이미 옆에 열려 700px 좁은 콘솔에서 22px 큰 인사말+6칩을
+      또 띄우면 그 좁은 칸의 태반을 인사말이 먹는다 — "빈 상태에서만"이라는 지시 문구를
+      글자 그대로 지켰다.</li>
+  </ul>
+
+  <!-- ══════════════════════ ③ 기존 요소와의 관계 ══════════════════════ -->
+  <h2 id="s3"><span class="no">③</span>기존 요소와의 관계 — 서랍·오늘 오전분 문구는 어디로</h2>
+  <table>
+    <tr><th style="width:22%">기존 요소</th><th>이 시안에서</th><th>근거</th></tr>
+    <tr><td><code>.cs-empty</code> 옛 3줄(오늘 오전, 2026-08-19)<br>"지시하면…／예: 오늘 뭐부터…／정직 한 줄"</td>
+      <td><span class="tag ok">흡수(대체 아님)</span> chat-home이 아닐 때(표준 셸·프로 도킹 후)는
+        <b>토씨 하나 안 바꾸고</b> 그대로 남는다. chat-home일 때만 히어로로 바뀐다 — "예:
+        오늘 뭐부터 볼까?"라는 <i>정적 텍스트</i> 예시가 히어로에서는 <i>실제로 눌리는 질문 칩</i>이
+        되어, 오전에 세웠던 "4원칙"(예시 1개+한계 1줄)을 텍스트에서 버튼으로 한 단계 더
+        채웠다 — 원칙을 어긴 게 아니라 같은 원칙을 더 강하게 만족시켰다.</td>
+      <td>console.js:271-275 · 오전 커밋 주석 "빈 상태 4원칙 보강"</td></tr>
+    <tr><td>서랍 "무엇을 할 수 있나" 17가지(<code>.cs-drawer</code>)</td>
+      <td><span class="tag ok">무변경 — 그대로 접힌 채 위에 남는다</span> 히어로는 이 서랍을
+        <b>대체하지 않는다.</b> 서랍은 활동(지금 급한 것·살펴보기·처리하기·정리하기·설정관리)
+        기준 전수 목록(17개 문장, 펼쳐야 보임)이고, 히어로의 6개 메뉴 칩은 절차(⓪~⑤) 기준
+        빠른 진입 6개(항상 보임, 안 펼쳐도 됨)다. 분류 축 자체가 다르다 — 하나로 합치면
+        "하는 일로 묶는다"(2026-07-31 사용자 결정)는 서랍의 존재 이유를 깨게 된다. NN/g의
+        "주 자원은 교육적으로, 부 자원은 기본형으로"(⑩) 원칙대로, chat-home에서는 히어로가
+        주 자원, 서랍은 부 자원(접힌 채 손 닿는 곳)으로 역할을 나눴다.</td>
+      <td>console.js:754-767(세 갈래 결정 배경)·768-803(CAN)</td></tr>
+    <tr><td>화면별 칩(<code>.cs-chips</code>, "ⓘ 이 화면 안내")</td>
+      <td><span class="tag warn">무변경 — 다만 기존의 사소한 낡음 하나를 그대로 노출함</span>
+        chat-home에서는 <code>ctx.screen</code>이 비어 있어 이 줄엔 ⓘ 칩 하나만 뜬다. 위쪽
+        <code>.cs-ctx</code> 칩도 "대시보드"라는 <i>기본 문구</i>를 그대로 보여준다(코드에
+        <code>esc(ctx.label||"대시보드")</code> — console.js:1046). chat-home엔 실제로 열린
+        화면이 없으므로 이 기본값은 정확하지 않다 — <b>이 시안의 범위 밖이라 고치지 않았지만</b>,
+        정직하게 남긴다: 후속으로 chat-home일 때 이 칩 자체를 숨기는 별도 수정이 있으면 더
+        깔끔해진다(작은 개선, 이 시안이 떠맡지 않는다).</td>
+      <td>console.js:1044-1046 · 1193-1213 renderChips()</td></tr>
+  </table>
+
+  <!-- ══════════════════════ ④ 옮기지 않는 것 ══════════════════════ -->
+  <h2 id="s4"><span class="no">④</span>옮기지 않는 것(원칙)</h2>
+  <table>
+    <tr><th style="width:22%">원형 요소</th><th>왜 옮기지 않나</th></tr>
+    <tr><td>모델 선택 드롭다운</td><td>기반 두뇌는 팀 단위로 고정한다는 것이 이미 선 원칙이다
+      (project_llm_location_choice·에이전트 모델 배정 — 화면마다 모델을 고르게 하면 "어느 모델이
+      맞는지"라는 새 의사결정을 사용자에게 떠넘긴다). 프로 셸에 그런 선택지 자체가 없다.</td></tr>
+    <tr><td>마이크(음성 입력)</td><td>구현돼 있지 않다. 목업에 그리면 "정직한 구현" 원칙(동작 안 하는
+      버튼을 동작하는 척 그리지 않는다)을 첫 화면에서부터 어기게 된다.</td></tr>
+    <tr><td>채팅/Cowork 모드 토글</td><td>셸 전환(표준↔프로)은 로그인·설정(settings.html) 몫으로
+      이미 정해져 있다(설정 › 제품 구성). 대화 화면 안에 또 다른 전환 스위치를 두면 "셸을 바꾸는
+      곳이 두 곳"이 되어 다음에 셸이 안 바뀌는 사고가 나면 어느 스위치를 봐야 할지 모르게 된다
+      (project_glossary… 류의 "단일 출처" 반복 교훈과 같은 함정).</td></tr>
+  </table>
+
+  <!-- ══════════════════════ ⑤ 폭 반응 ══════════════════════ -->
+  <h2 id="s5"><span class="no">⑤</span>폭에 따라 히어로가 어떻게 반응하는가 — 코드를 읽다 발견한 비대칭</h2>
+  <div class="card good">
+    <p>app.html의 <code>open()</code>(497-523)을 그대로 읽으면, 메뉴 칩을 눌렀을 때 두 폭에서
+      <b>다른 결과</b>가 난다 — 이 시안이 새로 만든 규칙이 아니라 이미 구현된 규칙을 그대로 따른
+      결과다. 위 ①의 폭 토글로 직접 재현된다:</p>
+    <table>
+      <tr><th>내부 폭</th><th>메뉴 칩을 누르면</th><th>chat-home(히어로)은?</th><th>왜</th></tr>
+      <tr><td>≥1400px(가로 1920)</td><td>도킹 — <code>tabs.push</code>를 타는 표준 탭 경로로 흘러
+        들어간다(open():522 "⑥ 도킹 — return하지 않고 아래 표준 탭 생성 경로")</td>
+        <td><span class="tag warn">사라진다</span> tabs.length가 0→1이 되어 chat-home 클래스가
+        빠진다 — 콘솔은 700px 옆 칸으로 줄고 옛 3줄 문구로 되돌아간다.</td>
+        <td>tabs 배열이 곧 chat-home 판정 기준(대화홈갱신():977)이라, 화면이 실제로 탭에 실리면
+        자동으로 꺼진다 — 새 판정 로직을 만들 필요가 없었다.</td></tr>
+      <tr><td>&lt;1400px(세로 1080)</td><td>팝업 — <code>openShellPopout</code>만 부르고
+        <code>return</code>한다(514·517행), tabs 배열을 건드리지 않는다</td>
+        <td><span class="tag ok">그대로 남는다</span> tabs.length는 여전히 0이라 chat-home이
+        꺼지지 않는다 — 별도 창이 하나 더 뜨는 동안에도 히어로는 화면 가운데 그대로다.</td>
+        <td>팝업은 셸의 tabs 모델 바깥(별도 BrowserWindow)이라 애초에 chat-home 판정에 안 잡힌다.</td></tr>
+    </table>
+    <p class="src">이 비대칭을 몰랐다면 "히어로가 도킹된 뒤에도 남아 있어야 하나?"를 새로 설계해야
+      했을 것이다 — 코드를 먼저 읽어서 답이 이미 정해져 있음을 확인했다(추가 분기 0개).</p>
+  </div>
+
+  <!-- ══════════════════════ ⑥ 포기한 것 ══════════════════════ -->
+  <h2 id="s6"><span class="no">⑥</span>무엇을 포기했나</h2>
+  <ul>
+    <li><b>진짜 실시간 시계 기반 인사말</b> — 데모에서는 버튼으로 시간대를 강제한다(<code>setHour</code>).
+      실제 구현은 <code>new Date().getHours()</code>를 그대로 쓰면 되지만, 자정을 넘겨 대화창을
+      켜 둔 채로 두는 경우까지 갱신되는지(문서 재로드 없이)는 이 시안이 확인하지 못했다 —
+      실측이 필요하면 후속으로 남긴다.</li>
+    <li><b>메뉴 칩에 실시간 배지(긴급 건수 등)</b> — 절차 띠(<code>.cs-flow</code>)가 화면 안에서는
+      이미 그 숫자를 준다(renderFlow():1215-1253, <code>/api/workflow/stages</code>). chat-home
+      에는 활성 화면이 없어 그 API가 참조할 "지금 단계"가 없다 — 억지로 전체 합산을 새로 만들지
+      않고, 숫자 없는 칩으로 남겼다(정직: 잴 수 없는 값은 안 보여준다).</li>
+    <li><b>인사말에 계정 외 개인화(어제 한 일 요약 등)</b> — 원형(Gemini류)도 이 정도는 안 한다는
+      점을 조사에서 확인했고, project_accumulation_is_zero(축적 자산 실질 0건) 메모와도 부딪힌다
+      — 실제로 쌓인 이력이 없는데 "어제 이어서…"라고 쓰면 지어내는 것이 된다.</li>
+    <li><b>질문 칩의 개인화(사용자마다 다른 질문)</b> — CAN[0]의 고정 3개를 그대로 썼다. 서랍의
+      "내가 등록한 지시"(사용자별 즐겨찾기)를 칩으로도 노출하는 안을 검토했지만, 히어로가
+      매번 다른 문구로 보이면 밀도 계산(⑦)이 사람마다 달라져 이 시안의 숫자가 재현 불가능해진다
+      — 안정된 숫자를 위해 고정했다(개인화는 후속 검토 여지로 남긴다).</li>
+  </ul>
+
+  <!-- ══════════════════════ ⑦ 밀도 숫자 ══════════════════════ -->
+  <h2 id="s7"><span class="no">⑦</span>밀도 숫자</h2>
+  <h3>히어로 세로 총합(인사말~메뉴 칩) — CSS 상수 계산값, 두 폭 모두 640px 안에서 줄바꿈 없이 동일</h3>
+  <table>
+    <tr><th>요소</th><th>높이</th><th>근거</th></tr>
+    <tr><td>상단 여백(padding-top)</td><td class="num">26px</td><td>신규 상수</td></tr>
+    <tr><td>인사말(font 22px, line-height 1.35)</td><td class="num">30px</td><td>22×1.35≈29.7</td></tr>
+    <tr><td>인사말 아래 여백</td><td class="num">8px</td><td>신규 상수</td></tr>
+    <tr><td>정직 한 줄(font 12px, 2줄 가정)</td><td class="num">38px</td><td>12×1.6×2줄≈38.4</td></tr>
+    <tr><td>정직 줄 아래 여백</td><td class="num">22px</td><td>신규 상수</td></tr>
+    <tr><td>질문 칩 줄(font 12.5px, 알약)</td><td class="num">31px</td><td>패딩7×2+테두리2+글자15≈31</td></tr>
+    <tr><td>질문 칩 아래 여백</td><td class="num">18px</td><td>신규 상수</td></tr>
+    <tr><td>구분 라벨(font 11px)</td><td class="num">15px</td><td>11×1.4≈15.4 · 11px 미만 금지 준수(정확히 하한)</td></tr>
+    <tr><td>구분 라벨 아래 여백</td><td class="num">8px</td><td>신규 상수</td></tr>
+    <tr><td>메뉴 칩 줄(font 12.75px, 알약)</td><td class="num">33px</td><td>패딩8×2+테두리2+글자15.3≈33.3</td></tr>
+    <tr><td>하단 여백(padding-bottom)</td><td class="num">22px</td><td>신규 상수</td></tr>
+    <tr><td><b>합계</b></td><td class="num"><b>≈251px</b></td><td>—</td></tr>
+  </table>
+
+  <h3>두 실측 시나리오 + 극단값에서 이 251px가 성립하는가(main.ts:336-345 실제 상수로 검증)</h3>
+  <table>
+    <tr><th>시나리오</th><th>창 세로</th><th>topbar 44 제외 가용</th><th>히어로 251px 비중</th><th>비고</th></tr>
+    <tr><td>기본 실행 크기(두 시나리오 공통 — <code>min(900, wa.height-40)</code>)</td>
+      <td class="num">900px</td><td class="num">856px</td><td class="num">29.3%</td>
+      <td>위아래 여백 각 ≈302px — 원형처럼 넉넉히 뜬다</td></tr>
+    <tr><td>가로 1920×1080, 최대화(작업영역 ≈1040)</td><td class="num">1040px</td>
+      <td class="num">996px</td><td class="num">25.2%</td><td>고객 다수(노트북 1대) 실사용 근접값</td></tr>
+    <tr><td>세로 1080×1920, 최대화(작업영역 ≈1880)</td><td class="num">1880px</td>
+      <td class="num">1836px</td><td class="num">13.7%</td><td>사장님 실측 환경 — 여백이 크지만
+        중앙 정렬이라 "휑함"이 아니라 "여유"로 읽힌다(⑧)</td></tr>
+    <tr><td class="src">극단: 최소 높이(main.ts minHeight, 대개 620·화면이 매우 작을 때만 480)</td>
+      <td class="num">620px</td><td class="num">576px</td><td class="num">43.6%</td>
+      <td>가장 좁은 실사용 하한에서도 위아래 각 ≈163px 남아 겹치지 않는다</td></tr>
+    <tr><td class="src">극단: 최소 폭(main.ts minWidth, 대개 900·화면이 매우 좁을 때만 600 → 내부폭 544)</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">칩 줄바꿈 1회</td>
+      <td>640px 기준이 544에서 넘쳐 질문·메뉴 칩이 각 1회 더 줄바꿈 — 재계산 시 합계 ≈251+34+37=322px,
+        그래도 최소 높이 576px 안에 여유 있게 들어간다(아래에서 계산)</td></tr>
+  </table>
+  <p class="src">계산: client/src/main.ts:336-345 <code>mainWindowBounds()</code> 실제 수식을
+    devtools 실측 대신 그대로 대입했다(mockups/프로_대화창메인 §③과 같은 방법론). 작업영역(workArea)
+    근사치는 일반적인 taskbar 40px 관행을 뺀 값이며, 실제 OS·배율에 따라 ±소수 픽셀 오차가 있다.</p>
+
+  <!-- ══════════════════════ ⑧ 원칙 자가점검 ══════════════════════ -->
+  <h2 id="s8"><span class="no">⑧</span>제품 원칙 자가점검</h2>
+  <table>
+    <tr><th style="width:22%">원칙</th><th>점검</th></tr>
+    <tr><td>입력은 대화창에서만(단일 창구)</td><td><span class="tag ok">충족</span> 새 입력칸을 만들지
+      않았다 — 기존 <code>.cs-dock</code> 하나만 실제 입력이다(②).</td></tr>
+    <tr><td>메뉴는 보기용(새 화면에 입력칸 금지)</td><td><span class="tag ok">충족</span> 메뉴 칩은
+      "이 화면 열기" 버튼일 뿐, 클릭 즉시 <code>window.gijoTabs.open()</code>으로 넘어가고 이
+      화면 자체는 아무 값도 입력받지 않는다.</td></tr>
+    <tr><td>단일 출처</td><td><span class="tag ok">충족</span> 메뉴 칩 라벨·페이지는 nav.js GROUPS를
+      그대로 읽는다(하드코딩 이중화 금지, ⑨). 질문 칩 문구는 CAN[0]을 그대로 읽는다.</td></tr>
+    <tr><td>레일 56px·결재판·📌🗂 배관 무변경</td><td><span class="tag ok">충족</span> 레일 아이콘 4개
+      그대로, 결재판(cs-ap)·선택칩(cs-sel)·범위칩(cs-scope)은 이 시안이 건드리는 <code>.cs-empty</code>
+      바깥 요소라 손대지 않았다.</td></tr>
+    <tr><td>정직한 구현(가짜 동작 없음)</td><td><span class="tag ok">충족</span> ①의 모든 상호작용에
+      "(시연)" 고지, 실 LLM 미호출.</td></tr>
+    <tr><td>화면 설명은 챗봇(ⓘ)으로</td><td><span class="tag ok">충족</span> 이 화면에 새 설명 문구를
+      추가하지 않았다 — 정직 한 줄은 기존 문구를 그대로 옮긴 것이고, 그 외 안내는 여전히 ⓘ·서랍
+      몫이다.</td></tr>
+    <tr><td>11px 미만 금지</td><td><span class="tag ok">충족</span> 최소값 11px(구분 라벨) — 하한에
+      정확히 닿았고 그 아래로 내려가지 않았다(⑦).</td></tr>
+    <tr><td>추천 1개 원칙</td><td><span class="tag ok">충족</span> 대안은 ②·⑥에 글로만 남겼다.</td></tr>
+    <tr><td>자체완결 HTML</td><td><span class="tag ok">충족</span> 외부 CDN·웹폰트·원격 이미지 0개.</td></tr>
+  </table>
+
+  <!-- ══════════════════════ ⑨ 구현 참고 ══════════════════════ -->
+  <h2 id="s9"><span class="no">⑨</span>구현 참고(메인 에이전트용 — 승인 후)</h2>
+  <div class="card">
+    <h3 style="margin-top:0;">1) console.js build() — <code>.cs-empty</code> 안쪽만 갈아끼운다(271-275)</h3>
+    <pre>// 기존(무변경 대상 — chat-home 아닐 때 그대로 나온다):
+'&lt;div class="cs-body" id="csBody"&gt;&lt;div class="cs-empty"&gt;지시하면 여기서 실시간으로 흐릅니다 …' +
+'&lt;br&gt;예: &lt;b&gt;"오늘 뭐부터 볼까?"&lt;/b&gt; … &lt;/div&gt;&lt;/div&gt;' +
+
+// 신규 — 같은 .cs-empty 클래스 유지(제거 지점 3곳이 그대로 작동하게, ⑨-3):
+'&lt;div class="cs-body" id="csBody"&gt;&lt;div class="cs-empty"&gt;' +
+  '&lt;div class="ce-compact"&gt;지시하면 여기서 실시간으로 흐릅니다 … (기존 문구 그대로)&lt;/div&gt;' +
+  '&lt;div class="ce-hero" id="ceHero"&gt;' +
+    '&lt;div class="greet" id="ceGreet"&gt;안녕하세요&lt;/div&gt;' +
+    '&lt;div class="honest"&gt;이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, ' +
+      '바꾸는 일은 반드시 승인 창을 거칩니다.&lt;/div&gt;' +
+    '&lt;div class="qrow" id="ceQrow"&gt;&lt;/div&gt;' +
+    '&lt;div class="divider"&gt;또는 메뉴에서 바로 가기&lt;/div&gt;' +
+    '&lt;div class="mrow" id="ceMrow"&gt;&lt;/div&gt;' +
+  '&lt;/div&gt;' +
+'&lt;/div&gt;&lt;/div&gt;'
+// CSS: .ce-hero{display:none} 기본, body.chat-home .ce-hero{display:block},
+//      body.chat-home .ce-compact{display:none} — 순수 CSS 전환, build() 이후 재호출 불필요.</pre>
+
+    <h3>2) 질문 칩·메뉴 칩 채우기 — 기존 함수만 부른다(새 IPC·새 API 없음)</h3>
+    <pre>function renderHero() {
+  // 질문 칩 — CAN[0](지금 급한 것)의 처음 3개를 그대로 쓴다. 새 문구를 짓지 않는다.
+  var qs = fillQs(CAN[0].qs).slice(0, 3);
+  document.getElementById("ceQrow").innerHTML = qs.map(function (x) {
+    return '&lt;span class="qchip" data-q="' + esc(x.q) + '"&gt;' + x.ic + ' ' + esc(x.q) + '&lt;/span&gt;';
+  }).join("");
+  document.querySelectorAll("#ceQrow .qchip").forEach(function (b) {
+    b.addEventListener("click", function () { ask(b.dataset.q); });   // 기존 ask() 재사용(1590행)
+  });
+
+  // 메뉴 칩 — nav.js GROUPS를 단일 출처로 읽는다(라벨·페이지 하드코딩 이중화 금지).
+  var STAGE_IDS = ["assets0", "s1-find", "s2-triage", "s3-fix", "s4-verify", "s5-report"];
+  var groups = (window.gijoNavGroups ? window.gijoNavGroups() : []) // nav.js가 GROUPS를 내주는 접근자 필요(신규, 아래 4)
+    .filter(function (g) { return STAGE_IDS.indexOf(g.id) >= 0; });
+  document.getElementById("ceMrow").innerHTML = groups.map(function (g) {
+    var first = g.items && g.items[0];
+    return '&lt;span class="mchip" data-page="' + esc(first.page) + '" data-label="' + esc(first.label) + '"&gt;'
+      + esc(g.label) + '&lt;/span&gt;';                               // g.label = "⓪ 자산" 등(원문 그대로)
+  }).join("");
+  document.querySelectorAll("#ceMrow .mchip").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label); // 기존 open() 그대로(도킹/팝업 규칙 자동 적용)
+    });
+  });
+}</pre>
+    <p class="src">⚠ <code>window.gijoNavGroups()</code>는 아직 없다 — nav.js가 GROUPS 배열을 지금은
+      비공개 클로저 변수로만 들고 있다(nav.js:90). 접근자 하나를 내주는 작은 변경이 필요하다
+      (nav.js 자체를 프로 전용으로 고치지 않는다 — 표준 셸도 그대로 쓰는 파일이라 접근자 추가는
+      영향 없음, 소스 감시 대상일 수 있으니 추가 후 <code>npm test</code> 확인 필요).</p>
+
+    <h3>3) 인사말 이름·시간대 채우기 — 새 API 없음, 기존 <code>window.gijo.me()</code> 재사용</h3>
+    <pre>function fillGreeting() {
+  var el = document.getElementById("ceGreet");
+  if (!el) return;
+  var h = new Date().getHours();
+  var word = h &lt; 5 ? "늦은 시간까지 고생 많으세요"
+    : h &lt; 12 ? "좋은 아침입니다"
+    : h &lt; 18 ? "안녕하세요"
+    : "늦은 시간까지 고생 많으세요";
+  el.textContent = word;                          // 이름 오기 전 우선 표시(빈 화면 대신)
+  if (!window.gijo || !window.gijo.me) return;
+  window.gijo.me().then(function (u) {
+    var name = (u && (u.displayName || u.username)) || "";
+    if (name) el.textContent = word + ", " + name + "님";
+  }).catch(function () { /* 이름을 못 읽어도 인사말은 남는다 — dashboard.html:340과 같은 방어 */ });
+}
+// build() 끝에서 한 번: renderHero(); fillGreeting();
+// ⚠ 대화홈갱신()이 chat-home을 껐다 켰다 해도 DOM은 그대로다(재생성 없음) — 다시 부를 필요 없다.</pre>
+
+    <h3>4) 제거 지점이 그대로 작동하는지(코드로 확인 — 새로 만들 필요 없음)</h3>
+    <ul>
+      <li><code>append()</code>(985-988) · <code>갈래카드()</code>(957-958) · <code>guideAsk()</code>
+        (1265-1266) 세 곳 전부 <code>body.querySelector(".cs-empty")</code> 뒤 <code>.remove()</code>다.
+        새 히어로도 최상위 클래스가 <code>.cs-empty</code>이므로(위 1번) 첫 지시가 어느 경로로
+        오든(직접 입력·질문 칩·서랍) 자동으로 사라진다 — 새 제거 코드를 추가하지 않는다.</li>
+      <li>메뉴 칩으로 도킹된 경우는 <code>.cs-empty</code>가 안 지워질 수 있다(대화 없이 화면만
+        연 것이므로) — 그래도 <code>body.chat-home</code>이 빠지면 CSS가 <code>.ce-hero</code>를
+        숨기고 <code>.ce-compact</code>를 다시 보여준다(순수 CSS, ⑤ 표와 일치).</li>
+    </ul>
+    <h3>5) 시험(제안)</h3>
+    <ul>
+      <li>소스 감시: <code>.cs-empty</code> 문자열이 build() 안에 정확히 1곳 존재하는지(제거 지점 3곳이
+        의존하는 계약이 안 깨졌는지) — feedback_source_watch_tests 관행대로.</li>
+      <li><code>renderHero()</code>가 CAN[0]·nav.js GROUPS 배열 길이가 바뀌어도(제품이 그룹을 추가/삭제해도)
+        죽지 않는지(빈 배열 방어) 유닛 시험.</li>
+    </ul>
+  </div>
+
+  <!-- ══════════════════════ ⑩ 설계 전 조사 ══════════════════════ -->
+  <h2 id="s10"><span class="no">⑩</span>설계 전 조사 근거</h2>
+  <table>
+    <tr><th>출처</th><th>핵심</th><th>우리 상황 적용</th></tr>
+    <tr><td>Eleken/Setproduct/Mobbin 종합, "AI 어시스턴트 빈 상태" 조사(WebSearch, 2026-08-19) —
+      개인화 인사("Hello, {name}"), 제안 카드, "구체적 다음 수"가 빈 커서보다 전환이 좋다</td>
+      <td>채택. 질문 칩 3개가 "구체적 다음 수"를 그대로 구현한다 — 오늘 오전 정적 예시 문구를
+        실제 클릭 가능한 형태로 승격시킨 근거이기도 하다(③).</td></tr>
+    <tr><td>Nielsen Norman Group, "Designing Empty States in Complex Applications: 3 Guidelines"
+      (nngroup.com/articles/empty-state-interface-design) — 주 자원은 교육적으로, 부 자원은
+      기본형으로. 빈 화면은 시스템 상태·용도·다음 행동 경로 세 가지를 동시에 해결해야 한다</td>
+      <td>채택. 서랍(부 자원·기본형·접힘)과 히어로(주 자원·교육적·펼침)의 역할 분담(③)이 이 지침을
+        그대로 따른다.</td></tr>
+    <tr><td>Hatchworks, "Agent UX Patterns: Chat-First UX Fails"(mockups/프로_대화창메인이 이미
+      인용) — 무한 채팅 로그만으로 진행상황을 대신하면 실패, 액션 영수증·승인 게이트가 대안</td>
+      <td>재확인. 이 시안은 채팅 로그를 늘리지 않는다 — 칩 클릭은 곧바로 결과(대화 답 또는 별도
+        화면)로 이어지고, 결재판(무변경)이 여전히 "무엇이 바뀌는지" 보여주는 자리다.</td></tr>
+    <tr><td>client/src/main.ts:336-345(코드 직접 확인) — 창 크기 실제 수식</td>
+      <td>채택. ⑦의 모든 극단값(최소 높이 620·최소 폭 600)이 이 수식에서 그대로 나왔다 — 임의
+        숫자가 아니다.</td></tr>
+    <tr><td>mockups/프로_도킹패널/시안.html §5·§7(내부 근거, 오늘 승인·구현됨)</td>
+      <td>재사용. 가로 1920/세로 1080 두 시나리오, 축소 도식 표기 관행, "폭 규칙은 이미 있다"는
+        전제를 그대로 이어받았다 — 같은 규칙을 이 시안에서 다시 설계하지 않는다.</td></tr>
+  </table>
+
+  <footer>
+    시안 작성: gijo-mockup · 2026-08-19. 제품 코드는 읽기만 했고 수정하지 않았다(client/src/renderer/pages/
+    console.js·app.html·nav.js·dashboard.html·titlebar.js, client/src/main.ts 열람). 외부 CDN·웹폰트·
+    원격 이미지를 쓰지 않으며 더블클릭으로 오프라인에서 열린다.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var mode = "landscape";     // landscape(도킹 가능) | portrait(팝업만)
+  var hour = 14;
+
+  var QCHIPS = [
+    { ic: "🎯", q: "지금 손댈 일 뭐야?" },
+    { ic: "🔥", q: "오늘 뭐부터 해야 해?" },
+    { ic: "⏰", q: "기한 지난 일 보여줘" }
+  ];
+  // nav.js GROUPS(104-129)를 그대로 옮김 — 실 라벨·페이지·표시 순서(단일 출처를 흉내낸 것,
+  // 실제 구현은 ⑨-2처럼 nav.js에서 직접 읽어야 한다).
+  var MCHIPS = [
+    { label: "⓪ 자산", page: "assets.html", leaf: "자산 고르기" },
+    { label: "① 발견·수집", page: "discover.html", leaf: "발견·수집" },
+    { label: "② 우선순위", page: "triage.html", leaf: "우선순위" },
+    { label: "③ 조치", page: "fix.html", leaf: "조치" },
+    { label: "④ 검증", page: "verify.html", leaf: "검증" },
+    { label: "⑤ 보고", page: "reporting.html", leaf: "보고" }
+  ];
+
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+  function greetWord(h) {
+    if (h < 5) return "늦은 시간까지 고생 많으세요";
+    if (h < 12) return "좋은 아침입니다";
+    if (h < 18) return "안녕하세요";
+    return "늦은 시간까지 고생 많으세요";
+  }
+
+  function renderHero() {
+    $("d-greet").textContent = greetWord(hour) + ", 김보안님";
+    $("d-qrow").innerHTML = QCHIPS.map(function (x) {
+      return '<span class="qchip" data-q="' + esc(x.q) + '">' + x.ic + " " + esc(x.q) + "</span>";
+    }).join("");
+    $("d-qrow").querySelectorAll(".qchip").forEach(function (b) {
+      b.addEventListener("click", function () { onAsk(b.dataset.q); });
+    });
+    $("d-mrow").innerHTML = MCHIPS.map(function (x) {
+      return '<span class="mchip" data-page="' + esc(x.page) + '" data-label="' + esc(x.leaf) + '" data-glabel="' + esc(x.label) + '">' + esc(x.label) + "</span>";
+    }).join("");
+    $("d-mrow").querySelectorAll(".mchip").forEach(function (b) {
+      b.addEventListener("click", function () { onMenu(b.dataset.page, b.dataset.label, b.dataset.glabel); });
+    });
+  }
+
+  function toast(msg) {
+    var t = $("d-toast");
+    t.textContent = msg; t.classList.add("on");
+    clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("on"); }, 2600);
+  }
+
+  function setMode(m) {
+    mode = m;
+    $("btnLand").classList.toggle("on", m === "landscape");
+    $("btnPort").classList.toggle("on", m === "portrait");
+    var dev = $("device");
+    dev.classList.toggle("portrait", m === "portrait");
+    // 폭을 바꾸면 이전 도킹/팝업 상태를 정리한다 — 실제로는 창을 다른 모니터로 옮기는 일이라
+    //   열려 있던 도킹·팝업이 그대로 남는 게 이상하다(이 데모 한정 단순화, 조용히·토스트 없이).
+    if (docked) {
+      docked = null;
+      $("d-split").classList.remove("on");
+      $("d-full").style.display = "flex";
+      $("d-dockhead").classList.remove("on");
+      $("device").classList.add("chat-home");
+    }
+    $("d-popup").classList.remove("on");
+  }
+  window.setMode = setMode;
+
+  function setHour(h) {
+    hour = h;
+    $("d-clock").textContent = (h < 10 ? "0" + h : h) + ":00";
+    // ⚠ 대화가 이미 시작됐으면(asked===true) #d-greet 자체가 사라진 상태다 — 없는 요소를
+    //   부르면 조용히 죽는 버튼이 된다(project_dead_global_calls와 같은 함정). 있을 때만 갱신한다.
+    var g = document.getElementById("d-greet");
+    if (g) g.textContent = greetWord(hour) + ", 김보안님";
+  }
+  window.setHour = setHour;
+
+  // ── 질문 칩·직접 입력 → 대화 전환(빈 상태에서만의 모양 → 전폭 대화 흐름) ──
+  var asked = false;
+  function bubble(who, text) {
+    var body = $("d-body");
+    var row = document.createElement("div");
+    row.className = "cs-row" + (who === "me" ? " instr" : "");
+    row.innerHTML = '<span class="ci">' + (who === "me" ? "🧑" : "🧭") + '</span><div class="cb"><div class="cn">' +
+      (who === "me" ? "나" : "AI 팀") + '</div><div class="cm">' + esc(text) + "</div></div>";
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+  }
+  function onAsk(q) {
+    if (!asked) {
+      asked = true;
+      var hero = $("d-hero"); if (hero) hero.remove();
+      var compact = $("d-body").querySelector(".ce-compact"); if (compact) compact.remove();
+    }
+    bubble("me", q);
+    setTimeout(function () {
+      bubble("ai", "(시연) “" + q + "”에 대한 답 — 근거(KEV·EPSS 등)와 함께 여기 실시간으로 흐릅니다. 실제 모델을 부르지 않았습니다.");
+    }, 260);
+  }
+  window.onAsk = onAsk;
+  function onSend() {
+    var input = $("d-input");
+    var v = (input.value || "").trim();
+    if (!v) return;
+    input.value = "";
+    onAsk(v);
+  }
+  window.onSend = onSend;
+  $("d-input") && $("d-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+  });
+
+  // ── 메뉴 칩 → 도킹(가로) / 팝업(세로), app.html open() 규칙 그대로 재현 ──
+  var docked = null;
+  function onMenu(page, leaf, glabel) {
+    if (mode === "landscape") {
+      docked = { page: page, leaf: leaf };
+      $("d-full").style.display = "none";
+      $("d-split").classList.add("on");
+      $("d-canvastitle").textContent = leaf;
+      $("d-dockhead").classList.add("on");
+      $("d-docklabel").textContent = leaf;
+      // ★ 실제 app.html과 같은 근거로 chat-home을 끈다(대화홈갱신():977 — tabs.length>0이면 꺼짐).
+      //   이 클래스가 빠지면 CSS가 자동으로 히어로→옛 문구, 세로중앙→입력창 바로 위 붙임으로 되돌린다.
+      $("device").classList.remove("chat-home");
+      toast(glabel + " → 도킹했습니다(내부 폭 ≥1400) — 대화 홈은 종료, 콘솔은 700px 옆 칸으로");
+    } else {
+      $("d-popname").textContent = "⧉ " + leaf;
+      $("d-popup").classList.add("on");
+      toast(glabel + " → 팝업으로 열었습니다(내부 폭 <1400) — tabs는 그대로 0개, 히어로는 안 사라집니다");
+    }
+  }
+  window.onMenu = onMenu;
+  function popFromDock() {
+    toast("⧉ 창으로 옮겼습니다(선택 기억됨) — (시연)");
+  }
+  window.popFromDock = popFromDock;
+  function closeDock() {
+    docked = null;
+    $("d-split").classList.remove("on");
+    $("d-full").style.display = "flex";
+    $("d-dockhead").classList.remove("on");
+    $("device").classList.add("chat-home"); // tabs.length가 다시 0 — 대화홈갱신()과 같은 근거로 되돌림
+    toast("💬 대화 홈으로 돌아왔습니다");
+  }
+  window.closeDock = closeDock;
+  function closePopup() { $("d-popup").classList.remove("on"); }
+  window.closePopup = closePopup;
+
+  function resetDemo() {
+    asked = false;
+    docked = null;
+    $("d-split").classList.remove("on");
+    $("d-full").style.display = "flex";
+    $("d-dockhead").classList.remove("on");
+    $("d-popup").classList.remove("on");
+    $("device").classList.add("chat-home");
+    var body = $("d-body");
+    body.innerHTML = '<div class="ce-compact">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.' +
+      '<br>예: <b>"오늘 뭐부터 볼까?"</b> — 조치 우선순위를 근거(KEV·EPSS)와 함께 줍니다.' +
+      '<br><span style="color:var(--muted-2)">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</span></div>' +
+      '<div class="ce-hero" id="d-hero">' +
+      '<div class="greet" id="d-greet"></div>' +
+      '<div class="honest">이 AI는 사내 자료로만 답합니다 — 자료에 없으면 없다고 말하고, 바꾸는 일은 반드시 승인 창을 거칩니다.</div>' +
+      '<div class="qrow" id="d-qrow"></div><div class="divider">또는 메뉴에서 바로 가기</div><div class="mrow" id="d-mrow"></div></div>';
+    setMode("landscape");
+    hour = 14;
+    $("d-clock").textContent = "14:00";
+    renderHero();
+  }
+  window.resetDemo = resetDemo;
+
+  renderHero();
+})();
+</script>
+</body>
+</html>

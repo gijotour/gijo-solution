@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — AI 지식 패널 엑셀형 행 목록</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS — 「AI 지식 패널」을 엑셀형 행 목록으로 (시안, 2026-08-20)
+  자체완결 HTML · mockups/knowledge-rows/시안.html · 제품 코드 미수정(읽기만 함)
+  ════════════════════════════════════════════════════════════════════════
+
+  ■ 요청 배경 — 2026-08-20 사장님 프로 QA 실측 피드백(원문 요지)
+    ① (AI 지식 패널 스크린샷) "아래 내용 등 너무 정신없어. 디자인 없이 엑셀처럼
+       한 줄 한 줄로 세팅하게 디자인 변경하기 어려울까?"
+    ② "이런 식으로 너무 많이 되어 있어. 코드를 한 줄씩 써서 붙이는 형태여서
+       그런가? 메뉴별 코드 모아서 엑셀처럼 간단히 보여주는 게 좋을 듯한데."
+    ③ "표준 모델도 그렇게 됐으면 해" — 프로만이 아니라 표준(다크)에도 같은 형식.
+
+  ■ 현행 확인(읽기만 함 — 아래 세 곳이 실제 "지식" 표시부다)
+    1) client/src/renderer/pages/memory.html
+       · L295-302 "📚 올린 문서 확인 · 관리" — .dm-list/.dm-li
+         CSS는 L216-247. 업무영역별 그룹은 이미 있다(DM_GROUPS, L633-636 JS) —
+         그룹핑 자체는 문제가 아니었다. 문제는 각 행: 아이콘 + 이름 + 등급 알약
+         (.dm-grade, L53-58) + 영역 알약(.dm-catb, L50-51,67-69) + 청크 칩(.ck,
+         L227)이 색깔별로 이어 붙어 있고, 열 이름이 어디에도 없다(L296-302에
+         <th> 류가 전혀 없음) — 처음 보면 알약 색의 뜻을 매번 추측해야 한다.
+       · L402-409 "📋 등록된 관계"(옛 온톨로지, 2026-08-02 통합) — .triple-row
+         CSS는 L118-127. 주어(.chip-s 파랑)-관계(.pred 회색)-목적어(.chip-o
+         청록)-출처(.src-tag 보라 알약)-삭제 버튼이 한 줄에 색색이 이어 붙어
+         "코드 한 줄씩 붙인" 인상에 가장 가깝다. 그룹핑이 전혀 없다(플랫 목록,
+         .list-box L128 max-height:360px에 그대로 쌓임).
+    2) client/src/renderer/pages/dashboard.html
+       · L294-300 "📚 내 지식창고" — .kb-kpi(숫자 3개, L114-117 CSS) +
+         .kb-bars(그라데이션 막대, L118-124 CSS). 분류별 조각수를 막대 "길이"로만
+         보여준다 — 열 이름(문서수/조각수/비중)이 없다. 제품이 넣은 것과 내가
+         넣은 것은 이미 JS로 구분 계산되는데(L573-580 loadKnowledgeBox) 막대에는
+         안 나뉘어 KPI 서브텍스트 한 줄에만 묻혀 있다.
+    3) nav.js / grouppanels.js(L273-290) "📚 지식" 도킹 카드는 요약 KPI 3줄만
+       그린다 — 이미 짧아 이번 시안 범위 밖.
+    라이트 에디션(lite-memory.html 등)은 별도 화면이라 이번 시안 범위 밖 —
+    표준 완성 후 선별 반영 대상(project_lite_edition_on_hold 원칙 그대로).
+
+  ■ 설계 전 조사 — 표준·모범사례 (출처는 하단 "참고한 표준" 패널에도 재기재)
+    · Material Design 데이터 테이블: 기본 행 52dp(패딩 상하 6dp), 밀도 스케일이
+      -1~-3 각 4px씩 줄여 **마우스 전용 최고밀도 40px**까지 정의한다.
+      (Una Kravets, "Using Material Density on the Web", Google Design/Medium)
+    · Ant Design Table size="small": 셀 패딩 8px(공식 CSS 기준) — 실무에서
+      통용되는 값은 약 39px/행(14px 폰트 + 상하 패딩 8px 안팎, GitHub 이슈 다수).
+    · 얼룩(zebra striping): "Zebra Striping: Does It Really Help?"(A List Apart)는
+      단순한 표에서는 속도·정확도 차이가 작다고 봤지만, 후속 실험
+      "Zebra Striping: More Data for the Case"는 **열이 여러 개 섞인 복잡한
+      표일수록** 정확도·속도 개선이 뚜렷하다고 보고한다 — 지금 지식 패널처럼
+      이름·등급·건수·날짜가 한 줄에 섞인 목록에 정확히 들어맞는 근거.
+    · ⚠ 이 제품에는 이미 같은 방향의 부품이 있다 — client/src/renderer/pages/
+      gijo-ui.css L121-124 `.g-table`(패딩 12px, 표준 밀도), L349,365-369의
+      `.g-ui table tbody tr:nth-child(even)` / `.rv-row/.risk-row/.srow/.aud`
+      얼룩(`--g-zebra`, **다크 기본값도 이미 root에 정의돼 있다**: L369
+      `:root{--g-zebra:rgba(255,255,255,.025);}`). 더 빽빽한 전례도 있다 —
+      L348 `.g-ui.g-ui table td{padding:3px 10px;line-height:1.35}`는 계산상
+      약 24px/행으로 아래 제안(30px)보다 더 조밀하다. 즉 "엑셀형"은 새 발명이
+      아니라 **이미 있는 패턴을 지식 패널에도 통일 적용**하는 것이다.
+    · 흰 배경(pro-white.css, 2026-08-20 확정)의 실제 토큰을 그대로 썼다 —
+      L13-49(색), L29 `--zebra: rgba(43,38,33,.035)`(얼룩 전용 토큰이 이미
+      있다!). 이 시안이 새 색을 하나도 만들지 않은 이유.
+
+  ■ 핵심 결정 (3줄)
+    1) memory.html의 문서 목록·관계 목록을 공용 부품 `.g-rows`로 교체 —
+       그룹 헤더 + 열 헤더 + 얼룩만. 카드·알약·색 칩·그림자 전부 뺀다.
+    2) dashboard.html 지식창고는 같은 부품으로 통일하되 막대를 없애고
+       제품/내것 그룹으로 나눈다 — 유일하게 세로가 늘어나는 항목이라
+       **우선순위는 낮춤**(선택 적용으로 제안, 아래 밀도표 참고).
+    3) 다크(표준)는 같은 마크업에 토큰만 바꿔 그대로 성립한다 — 새 CSS
+       구조 없이 `--zebra` 한 줄만 더하면 된다(하단 다크 미리보기 참고).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  /* ── 실제 pro-white.css(L13-49) 토큰 그대로 — 새 색 0개 ── */
+  --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+  --border:rgba(43,38,33,0.12); --border-strong:rgba(43,38,33,0.22);
+  --text:#2b2621; --muted:#6b6259; --muted-2:#726960;
+  --blue:#1d4f91; --blue-light:#1d4f91; --teal:#086b43; --amber:#8f4d02;
+  --red:#b3241a; --purple:#5b21b6; --white:#ffffff;
+  --zebra:rgba(43,38,33,0.035); --fill-contrast:#ffffff; --text-strong:#1f1b14;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;} /* 220px — memory.html L15 실측값 그대로 */
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:100vh;}
+.sb-title{font-size:12px;font-weight:800;color:var(--muted-2);letter-spacing:1px;margin-bottom:10px;}
+.sb-item{padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:2px;}
+.sb-item.on{background:rgba(29,79,145,0.09);color:var(--text-strong);box-shadow:inset 3px 0 0 var(--blue);}
+.sb-note{margin-top:16px;font-size:11.25px;color:var(--muted-2);line-height:1.6;}
+.main{padding:0 0 60px;max-width:1180px;}
+.banner{position:sticky;top:0;z-index:50;background:#1f1b14;color:#fff;padding:9px 20px;font-size:12.5px;font-weight:700;text-align:center;}
+.wrap{padding:24px 32px 0;}
+h1.pt{font-size:20px;font-weight:800;margin-bottom:4px;}
+.sub{font-size:12.5px;color:var(--muted);margin-bottom:18px;}
+.decision{background:var(--panel);border:1px solid var(--border-strong);border-left:4px solid var(--blue);border-radius:10px;padding:14px 18px;margin-bottom:22px;}
+.decision b{font-size:13px;}
+.decision ol{margin:8px 0 0 18px;font-size:12.75px;line-height:1.8;color:var(--text);}
+.sec{margin-bottom:34px;}
+.sec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;}
+.sec-h .t{font-size:15px;font-weight:800;}
+.sec-h .src{font-size:11.5px;color:var(--muted-2);}
+.cmp{display:grid;grid-template-columns:1fr;gap:14px;}
+.block{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.block-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.tag{font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;}
+.tag.old{background:rgba(179,36,26,.10);color:var(--red);}
+.tag.new{background:rgba(8,107,67,.10);color:var(--teal);}
+.block-note{font-size:11.75px;color:var(--muted-2);margin-left:auto;}
+.density{background:#fdf1e2;border:1px solid rgba(143,77,2,.3);border-radius:8px;padding:10px 14px;font-size:12.25px;color:#5c3400;line-height:1.7;margin-top:8px;}
+.density b{color:#3d2400;}
+.density code{background:rgba(143,77,2,.1);padding:0 4px;border-radius:4px;}
+
+/* ══ Before — memory.html/dashboard.html의 실제 CSS를 그대로 복사(패치 없음) ══
+   ⚠ 의도적으로 손대지 않았다: 다크 전용 rgba가 흰 배경에서 어떻게 깨지는지도
+   같이 보여주는 것이 "정신없다"의 원인 중 하나이기 때문이다(아래 밀도 박스 참고). */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.panel-title{font-size:13.5px;font-weight:800;margin-bottom:10px;}
+.dm-wrap{display:block;margin-top:0;}
+.dm-list{border:1px solid var(--border);border-radius:10px;background:var(--panel-2);overflow:hidden;max-height:540px;overflow-y:auto;}
+.dm-li{display:flex;align-items:center;gap:9px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
+.dm-li:last-child{border-bottom:none;}
+.dm-li:hover{background:rgba(255,255,255,0.4);}
+.dm-li .ic{font-size:15px;flex:0 0 auto;}
+.dm-li .nm{flex:1;min-width:0;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dm-li .ck{font-size:11.75px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.14);border-radius:6px;padding:2px 7px;flex:0 0 auto;}
+.dm-gh{display:flex;align-items:center;gap:6px;padding:7px 11px;font-size:12.5px;font-weight:800;color:var(--text);background:rgba(88,166,255,.05);border-bottom:1px solid var(--border);position:sticky;top:0;}
+.dm-gh .tri{color:var(--muted-2);font-size:11.75px;width:10px;}
+.dm-gh .cnt{color:var(--muted-2);font-weight:600;margin-left:auto;font-size:12px;}
+.dm-catb{border:1px solid rgba(45,212,191,.4);color:var(--teal);border-radius:20px;padding:0 7px;font-size:11.75px;white-space:nowrap;}
+.dm-catb.c일반{border-color:var(--border-strong);color:var(--muted);}
+.dm-catb.c위협대응{border-color:rgba(248,81,73,.45);color:#ff9d97;}
+.dm-catb.c사내규정{border-color:rgba(188,140,255,.45);color:#bc8cff;}
+.dm-catb.c취약점{border-color:rgba(251,191,36,.45);color:var(--amber);}
+.dm-catb.c장비운영{border-color:rgba(94,167,255,.45);color:var(--blue-light);}
+.dm-grade{border-radius:5px;padding:0 6px;font-size:11.75px;font-weight:800;white-space:nowrap;letter-spacing:.2px;}
+.dm-grade.gg-C{background:rgba(226,72,61,.18);color:#ff8a80;border:1px solid rgba(226,72,61,.5);}
+.dm-grade.gg-S{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.42);}
+.dm-grade.gg-O{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid rgba(255,255,255,.14);}
+
+.list-box{max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);padding:0 12px;}
+.triple-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+.triple-row:last-child{border-bottom:none;}
+.chip{display:inline-block;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:3px 9px;font-weight:700;color:var(--text);}
+.chip-s{color:var(--blue-light);}
+.chip-o{color:var(--teal);}
+.pred{color:var(--muted);font-size:12.5px;}
+.arrow{color:var(--muted-2);}
+.del-btn{margin-left:auto;background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;}
+.src-tag{font-size:11.75px;color:var(--muted-2);background:rgba(139,124,240,0.12);border-radius:5px;padding:2px 6px;margin-left:6px;}
+
+.kb-kpi{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px}
+.kb-kpi .kv{font-size:20px;font-weight:800;color:var(--text-strong)}
+.kb-kpi .kl{font-size:11.75px;color:var(--muted-2)}
+.kb-kpi .ks{font-size:11.5px;color:var(--muted-2)}
+.kb-bars-h{font-size:11.75px;color:var(--muted-2);margin:4px 0 2px}
+.kb-bar{display:flex;align-items:center;gap:10px;margin:5px 0}
+.kb-bar .lbl{flex:0 0 100px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kb-bar .track{flex:1;height:14px;background:rgba(43,38,33,.06);border-radius:7px;overflow:hidden}
+.kb-bar .fill{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:7px;min-width:2px}
+.kb-bar .num{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
+.kb-bar .num .u{font-size:11px;opacity:.75}
+
+/* ══ After — 공용 부품 .g-rows(신설 제안) ══════════════════════════════════
+   원칙: 카드 없음(패널 테두리 1개뿐) · 알약/칩 없음(색은 글자 색으로만) ·
+   그림자 없음 · 줄무늬(--zebra)만 · 그룹 헤더 + 열 헤더 고정 · 행 높이 고정 30px */
+.g-rows{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel);}
+.g-rows-scroll{max-height:var(--gr-maxh,540px);overflow-y:auto;}
+.g-rows-head{display:grid;align-items:center;height:26px;padding:0 12px;
+  font-size:11px;font-weight:800;color:var(--muted-2);text-transform:uppercase;letter-spacing:.4px;
+  background:var(--panel-2);border-bottom:1px solid var(--border-strong);position:sticky;top:0;z-index:2;}
+.g-rows-gh{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px;font-size:12px;font-weight:800;
+  color:var(--text);background:var(--panel-2);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;
+  position:sticky;top:26px;z-index:1;}
+.g-rows-gh .tri{width:10px;color:var(--muted-2);font-size:11px;}
+.g-rows-gh .cnt{margin-left:auto;color:var(--muted-2);font-weight:700;font-size:11.5px;}
+.g-rows-body.folded{display:none;}
+.g-rows-r{display:grid;align-items:center;height:30px;padding:0 12px;font-size:12.5px;color:var(--text);cursor:pointer;}
+.g-rows-body .g-rows-r:nth-child(even){background:var(--zebra);}
+.g-rows-r:hover{background:rgba(29,79,145,.05);}
+.g-rows-r.sel{background:rgba(29,79,145,.09);box-shadow:inset 3px 0 0 var(--blue);}
+.g-rows--docs .g-rows-head,.g-rows--docs .g-rows-r{grid-template-columns:1fr 74px 64px 90px;}
+.g-rows--rel  .g-rows-head,.g-rows--rel  .g-rows-r{grid-template-columns:1.15fr 96px 1.15fr 1fr;}
+.g-rows--kb   .g-rows-head,.g-rows--kb   .g-rows-r{grid-template-columns:1fr 70px 80px 64px;}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ta-r{text-align:right;font-variant-numeric:tabular-nums;}
+.ta-c{text-align:center;}
+.gm{color:var(--muted);}
+.gm2{color:var(--muted-2);}
+.gtxt-C{color:var(--red);font-weight:800;}
+.gtxt-S{color:var(--amber);font-weight:800;}
+.gtxt-O{color:var(--muted);font-weight:700;}
+
+.selfcheck{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;font-size:12.5px;line-height:1.7;}
+.selfcheck .ok{color:var(--teal);font-weight:800;}
+.densitytbl{width:100%;border-collapse:collapse;font-size:12.25px;margin-top:6px;}
+.densitytbl th{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border-strong);color:var(--muted-2);font-size:11px;text-transform:uppercase;}
+.densitytbl td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+.densitytbl tr:last-child td{border-bottom:none;}
+.foot{padding:20px 32px 40px;font-size:11.5px;color:var(--muted-2);border-top:1px solid var(--border);margin-top:10px;}
+
+/* 다크 미리보기 — 토큰만 덮어써서 같은 마크업이 그대로 성립함을 증명 */
+.dark-demo{background:#262624;border-radius:12px;padding:16px 18px;
+  --panel:#30302e; --panel-2:#1f1e1d; --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.16);
+  --text:#e9e7e2; --muted:#b3ada4; --muted-2:#a49d95; --blue:#3b82f6; --blue-light:#5fa1ff; --teal:#1eb980;
+  --amber:#f0a020; --red:#e2483d; --zebra:rgba(255,255,255,.025); --text-strong:#ffffff;}
+.dark-demo .cap{color:#e9e7e2;font-size:11.75px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="banner">📐 시안 — 정지 화면입니다. 그룹 접기·행 선택만 실제로 동작하고, 그 외(저장·삭제·새로고침)는 동작하지 않습니다.</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sb-title">AI</div>
+    <div class="sb-item">🤖 AI 팀</div>
+    <div class="sb-item on">📚 AI 지식</div>
+    <div class="sb-item">🎓 학습</div>
+    <div class="sb-item">🛡 안전장치</div>
+    <div class="sb-note">※ 참고용 — 이 사이드바는 이번 시안의 대상이 아닙니다(memory.html 실제 구조를 그대로 옮겨 맥락만 보여줍니다).</div>
+  </div>
+
+  <div class="main">
+    <div class="wrap">
+      <h1 class="pt">AI 지식 패널 — 엑셀형 행 목록 시안</h1>
+      <div class="sub">memory.html "올린 문서·등록된 관계" + dashboard.html "내 지식창고" 실물 기준 · 프로 흰 배경(pro-white.css 확정 토큰) · 다크(표준) 성립은 하단 참고</div>
+
+      <div class="decision">
+        <b>핵심 결정 (3줄)</b>
+        <ol>
+          <li>memory.html의 문서 목록·관계 목록을 공용 부품 <code>.g-rows</code>로 교체 — 그룹 헤더 + 열 헤더 + 얼룩만. 카드·알약·색 칩·그림자를 뺀다.</li>
+          <li>dashboard.html 지식창고는 같은 부품으로 통일하되 막대를 없애고 제품/내것 그룹으로 나눈다 — <b>유일하게 세로가 늘어나는 항목</b>이라 우선순위는 낮춤(선택 적용).</li>
+          <li>다크(표준)는 같은 마크업에 토큰만 바꿔 그대로 성립한다 — 새 CSS 구조 없이 <code>--zebra</code> 한 줄만 더하면 된다.</li>
+        </ol>
+      </div>
+
+      <!-- ══════════════ ① 올린 문서 확인·관리 (memory.html L295-302) ══════════════ -->
+      <div class="sec">
+        <div class="sec-h"><span class="t">① 올린 문서 확인 · 관리</span><span class="src">memory.html L217-247(CSS) · L671-710(렌더) — 실제 코드 그대로 복사</span></div>
+
+        <div class="cmp">
+          <div class="block">
+            <div class="block-h"><span class="tag old">기존</span><span class="block-note">.dm-li — 행높이 약 40px · 열 헤더 없음 · 알약 3종(등급·영역·청크) · 표본 11건</span></div>
+            <div class="panel" style="padding:0;border:none;">
+              <div class="dm-wrap">
+                <div class="dm-list" style="max-height:540px;">
+                  <div class="dm-gh"><span class="tri">▾</span>🩹 취약점<span class="cnt">3개</span></div>
+                  <div class="dm-li"><span class="ic">📝</span><span class="nm">CVE-2026-XXXX 분석노트.md</span><span class="dm-grade gg-S">S 민감</span><span class="dm-catb c취약점">취약점</span><span class="ck">24</span></div>
+                  <div class="dm-li"><span class="ic">📕</span><span class="nm">웹취약점_스캐너_리포트_해설.pdf</span><span class="dm-grade gg-O">O 공개</span><span class="dm-catb c취약점">취약점</span><span class="ck">61</span></div>
+                  <div class="dm-li"><span class="ic">📝</span><span class="nm">침투테스트_사례_2026H1.md</span><span class="dm-grade gg-C">C 기밀</span><span class="dm-catb c취약점">취약점</span><span class="ck">37</span></div>
+                  <div class="dm-gh"><span class="tri">▾</span>🔧 장비운영<span class="cnt">2개</span></div>
+                  <div class="dm-li"><span class="ic">📕</span><span class="nm">Tenable_SecurityCenter_운영매뉴얼.pdf</span><span class="dm-grade gg-O">O 공개</span><span class="dm-catb c장비운영">장비운영</span><span class="ck">88</span></div>
+                  <div class="dm-li"><span class="ic">📝</span><span class="nm">방화벽_정책_변경_이력.md</span><span class="dm-grade gg-S">S 민감</span><span class="dm-catb c장비운영">장비운영</span><span class="ck">15</span></div>
+                  <div class="dm-gh"><span class="tri">▾</span>📜 사내규정<span class="cnt">2개</span></div>
+                  <div class="dm-li"><span class="ic">📝</span><span class="nm">GIJO_지식_보안거버넌스_표준.md</span><span class="dm-grade gg-C">C 기밀</span><span class="dm-catb c사내규정">사내규정</span><span class="ck">42</span></div>
+                  <div class="dm-li"><span class="ic">📝</span><span class="nm">ismsp_접근권한_검토.md</span><span class="dm-grade gg-C">C 기밀</span><span class="dm-catb c사내규정">사내규정</span><span class="ck">19</span></div>
+                  <div class="dm-gh"><span class="tri">▾</span>🛡 위협대응<span class="cnt">2개</span></div>
+                  <div class="dm-li"><span class="ic">📝</span><span class="nm">탈옥_위협_대응_절차.md</span><span class="dm-grade gg-S">S 민감</span><span class="dm-catb c위협대응">위협대응</span><span class="ck">12</span></div>
+                  <div class="dm-li"><span class="ic">📄</span><span class="nm">침해사고_대응_보고서_템플릿.md</span><span class="dm-grade gg-O">O 공개</span><span class="dm-catb c위협대응">위협대응</span><span class="ck">9</span></div>
+                  <div class="dm-gh"><span class="tri">▾</span>📄 일반<span class="cnt">2개</span></div>
+                  <div class="dm-li"><span class="ic">📄</span><span class="nm">incident-policy.txt</span><span class="dm-grade gg-O">O 공개</span><span class="dm-catb c일반">일반</span><span class="ck">6</span></div>
+                  <div class="dm-li"><span class="ic">📄</span><span class="nm">장애노트_2026-08-19.md</span><span class="dm-grade gg-O">O 공개</span><span class="dm-catb c일반">일반</span><span class="ck">4</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="density">⚠ 다크 전용 rgba를 손대지 않고 그대로 흰 배경에 올렸다 — <code>gg-C</code> 배지의 <code>rgba(226,72,61,.18)</code>+<code>#ff8a80</code> 글자가 흰 바탕에서 탁하게 뜨고 대비가 무너진다. "정신없다"의 원인 하나가 바로 이거다: 알약을 흰 배경으로 그대로 옮기면 다크용 반투명값이 깨진다.</div>
+          </div>
+
+          <div class="block">
+            <div class="block-h"><span class="tag new">새안(추천)</span><span class="block-note">.g-rows — 행높이 30px 고정 · 열 헤더 4개 신설 · 알약 → 글자색만</span></div>
+            <div class="g-rows g-rows--docs">
+              <div class="g-rows-head"><span>파일명</span><span class="ta-r">등급</span><span class="ta-r">청크</span><span class="ta-r">최근반입</span></div>
+              <div class="g-rows-scroll" style="--gr-maxh:514px;">
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>🩹 취약점<span class="cnt">3개</span></div>
+                <div class="g-rows-body g-rows--docs">
+                  <div class="g-rows-r" data-selectable><span class="trunc">CVE-2026-XXXX 분석노트.md</span><span class="ta-r gtxt-S">민감</span><span class="ta-r gm">24</span><span class="ta-r gm2">08-18</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">웹취약점_스캐너_리포트_해설.pdf</span><span class="ta-r gtxt-O">공개</span><span class="ta-r gm">61</span><span class="ta-r gm2">08-12</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">침투테스트_사례_2026H1.md</span><span class="ta-r gtxt-C">기밀</span><span class="ta-r gm">37</span><span class="ta-r gm2">08-05</span></div>
+                </div>
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>🔧 장비운영<span class="cnt">2개</span></div>
+                <div class="g-rows-body g-rows--docs">
+                  <div class="g-rows-r" data-selectable><span class="trunc">Tenable_SecurityCenter_운영매뉴얼.pdf</span><span class="ta-r gtxt-O">공개</span><span class="ta-r gm">88</span><span class="ta-r gm2">07-30</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">방화벽_정책_변경_이력.md</span><span class="ta-r gtxt-S">민감</span><span class="ta-r gm">15</span><span class="ta-r gm2">08-19</span></div>
+                </div>
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>📜 사내규정<span class="cnt">2개</span></div>
+                <div class="g-rows-body g-rows--docs">
+                  <div class="g-rows-r" data-selectable><span class="trunc">GIJO_지식_보안거버넌스_표준.md</span><span class="ta-r gtxt-C">기밀</span><span class="ta-r gm">42</span><span class="ta-r gm2">07-22</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">ismsp_접근권한_검토.md</span><span class="ta-r gtxt-C">기밀</span><span class="ta-r gm">19</span><span class="ta-r gm2">07-22</span></div>
+                </div>
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>🛡 위협대응<span class="cnt">2개</span></div>
+                <div class="g-rows-body g-rows--docs">
+                  <div class="g-rows-r" data-selectable><span class="trunc">탈옥_위협_대응_절차.md</span><span class="ta-r gtxt-S">민감</span><span class="ta-r gm">12</span><span class="ta-r gm2">08-10</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">침해사고_대응_보고서_템플릿.md</span><span class="ta-r gtxt-O">공개</span><span class="ta-r gm">9</span><span class="ta-r gm2">08-01</span></div>
+                </div>
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>📄 일반<span class="cnt">2개</span></div>
+                <div class="g-rows-body g-rows--docs">
+                  <div class="g-rows-r" data-selectable><span class="trunc">incident-policy.txt</span><span class="ta-r gtxt-O">공개</span><span class="ta-r gm">6</span><span class="ta-r gm2">07-15</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">장애노트_2026-08-19.md</span><span class="ta-r gtxt-O">공개</span><span class="ta-r gm">4</span><span class="ta-r gm2">08-19</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="density"><b>밀도(핵심 개선)</b> — 기존: 그룹헤더 5×28.4≈142px + 행 11×39.7≈437px = <b>약 579px</b>. 540px 컨테이너에 39px 넘쳐 <b>마지막 1건은 스크롤해야 보임</b>.<br>새안: 열헤더 26px + 그룹헤더 5×28=140px + 행 11×30=330px = <b>496px</b>. 같은 540px 안에 <b>11건 전부 + 열 헤더까지 스크롤 없이</b> 다 들어가고 44px 여유.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ ② 등록된 관계 (memory.html L402-409, 지식 관계도) ══════════════ -->
+      <div class="sec">
+        <div class="sec-h"><span class="t">② 등록된 관계 (지식 관계도)</span><span class="src">memory.html L118-127(CSS) · L402-409(마크업) — 그룹 없는 플랫 목록</span></div>
+
+        <div class="cmp">
+          <div class="block">
+            <div class="block-h"><span class="tag old">기존</span><span class="block-note">.triple-row — "코드 한 줄씩 붙인" 인상의 진원지: 색 칩 5종(주어·관계·목적어·출처·삭제), 그룹 없음</span></div>
+            <div class="list-box" style="max-height:360px;">
+              <div class="triple-row"><span class="chip chip-s">관리자API</span><span class="pred">접근권한</span><span class="arrow">→</span><span class="chip chip-o">보안운영팀</span><span class="src-tag">접근제어지침 3.2</span><span class="del-btn">✕</span></div>
+              <div class="triple-row"><span class="chip chip-s">백업서버</span><span class="pred">접근권한</span><span class="arrow">→</span><span class="chip chip-o">인프라팀</span><span class="del-btn">✕</span></div>
+              <div class="triple-row"><span class="chip chip-s">VPN게이트웨이</span><span class="pred">접근권한</span><span class="arrow">→</span><span class="chip chip-o">원격근무자</span><span class="src-tag">원격접속정책 1.1</span><span class="del-btn">✕</span></div>
+              <div class="triple-row"><span class="chip chip-s">탈옥</span><span class="pred">대응방법</span><span class="arrow">→</span><span class="chip chip-o">프롬프트 필터링</span><span class="del-btn">✕</span></div>
+              <div class="triple-row"><span class="chip chip-s">프롬프트인젝션</span><span class="pred">대응방법</span><span class="arrow">→</span><span class="chip chip-o">입력값 검증</span><span class="src-tag">레드팀 가이드</span><span class="del-btn">✕</span></div>
+              <div class="triple-row"><span class="chip chip-s">예약 스캔 멈춤</span><span class="pred">원인</span><span class="arrow">→</span><span class="chip chip-o">에이전트 응답 없음</span><span class="src-tag">현장 장애노트</span><span class="del-btn">✕</span></div>
+              <div class="triple-row"><span class="chip chip-s">임베딩 HTTP500</span><span class="pred">원인</span><span class="arrow">→</span><span class="chip chip-o">ubatch 미설정</span><span class="src-tag">현장 장애노트</span><span class="del-btn">✕</span></div>
+            </div>
+            <div class="density">이 목록은 원래도 넘치지 않는다(7건 × 약 39px ≈ 273px, 360px 컨테이너에 87px 여유) — <b>밀도(스크롤) 문제는 아니다.</b> "정신없다"는 색 칩 5종이 그룹 없이 이어 붙는 데서 온다.</div>
+          </div>
+
+          <div class="block">
+            <div class="block-h"><span class="tag new">새안(추천)</span><span class="block-note">.g-rows — 관계 종류(predicate)로 그룹 신설, 색 칩 전부 제거 → 4열 정렬</span></div>
+            <div class="g-rows g-rows--rel">
+              <div class="g-rows-head"><span>주어</span><span class="ta-c">관계</span><span>목적어</span><span>출처</span></div>
+              <div class="g-rows-scroll" style="--gr-maxh:320px;">
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>접근권한<span class="cnt">3건</span></div>
+                <div class="g-rows-body g-rows--rel">
+                  <div class="g-rows-r" data-selectable><span class="trunc">관리자API</span><span class="ta-c gm2">→</span><span class="trunc">보안운영팀</span><span class="trunc gm2">접근제어지침 3.2</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">백업서버</span><span class="ta-c gm2">→</span><span class="trunc">인프라팀</span><span class="trunc gm2">—</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">VPN게이트웨이</span><span class="ta-c gm2">→</span><span class="trunc">원격근무자</span><span class="trunc gm2">원격접속정책 1.1</span></div>
+                </div>
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>대응방법<span class="cnt">2건</span></div>
+                <div class="g-rows-body g-rows--rel">
+                  <div class="g-rows-r" data-selectable><span class="trunc">탈옥</span><span class="ta-c gm2">→</span><span class="trunc">프롬프트 필터링</span><span class="trunc gm2">—</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">프롬프트인젝션</span><span class="ta-c gm2">→</span><span class="trunc">입력값 검증</span><span class="trunc gm2">레드팀 가이드</span></div>
+                </div>
+                <div class="g-rows-gh" data-fold><span class="tri">▾</span>원인<span class="cnt">2건</span></div>
+                <div class="g-rows-body g-rows--rel">
+                  <div class="g-rows-r" data-selectable><span class="trunc">예약 스캔 멈춤</span><span class="ta-c gm2">→</span><span class="trunc">에이전트 응답 없음</span><span class="trunc gm2">현장 장애노트</span></div>
+                  <div class="g-rows-r" data-selectable><span class="trunc">임베딩 HTTP500</span><span class="ta-c gm2">→</span><span class="trunc">ubatch 미설정</span><span class="trunc gm2">현장 장애노트</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="density"><b>밀도(정직 보고)</b> — 새안이 오히려 <b>47px 더 길다</b>(열헤더26+그룹헤더3×28=84+행7×30=210 = 320px vs 기존 273px). 그래도 360px 안에 여전히 다 들어간다(40px 여유) — <b>이 항목의 개선은 밀도가 아니라 색 칩 제거 + 관계종류 그룹핑</b>이다.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ ③ 내 지식창고 (dashboard.html L294-300) ══════════════ -->
+      <div class="sec">
+        <div class="sec-h"><span class="t">③ 내 지식창고</span><span class="src">dashboard.html L114-124(CSS) · L294-300(마크업) — 유일하게 세로가 늘어나는 항목</span></div>
+
+        <div class="cmp">
+          <div class="block">
+            <div class="block-h"><span class="tag old">기존</span><span class="block-note">.kb-bar — 그라데이션 막대, 열 헤더 없음, 제품/내것 구분은 KPI 서브텍스트 한 줄에만</span></div>
+            <div class="panel" style="padding:16px;">
+              <div class="kb-kpi">
+                <div><div class="kv">20</div><div class="kl">총 문서</div><div class="ks">제품 13 · 내가 넣은 7</div></div>
+                <div><div class="kv">610</div><div class="kl">검색 조각(청크)</div><div class="ks">AI가 찾아보는 단위</div></div>
+                <div><div class="kv">7</div><div class="kl">내가 넣은 문서</div><div class="ks">내 지식</div></div>
+              </div>
+              <div class="kb-bars-h">분류별 조각</div>
+              <div class="kb-bar"><span class="lbl">취약점</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="num">210 <span class="u">조각 · 6문서</span></span></div>
+              <div class="kb-bar"><span class="lbl">사내규정</span><span class="track"><span class="fill" style="width:79%"></span></span><span class="num">165 <span class="u">조각 · 4문서</span></span></div>
+              <div class="kb-bar"><span class="lbl">장비운영</span><span class="track"><span class="fill" style="width:49%"></span></span><span class="num">103 <span class="u">조각 · 5문서</span></span></div>
+              <div class="kb-bar"><span class="lbl">위협대응</span><span class="track"><span class="fill" style="width:47%"></span></span><span class="num">98 <span class="u">조각 · 3문서</span></span></div>
+              <div class="kb-bar"><span class="lbl">일반</span><span class="track"><span class="fill" style="width:16%"></span></span><span class="num">34 <span class="u">조각 · 2문서</span></span></div>
+            </div>
+            <div class="density">5행 × 약 19px 피치(트랙14px+무너진 여백5px) ≈ <b>약 100px</b> — 이 화면에서 <b>가장 컴팩트한 형태</b>다. 막대 길이로 비교는 되지만 열 이름·비중 %·제품/내것 구분은 없다.</div>
+          </div>
+
+          <div class="block">
+            <div class="block-h"><span class="tag new">새안(선택 적용)</span><span class="block-note">.g-rows — 막대 제거·숫자 정렬, 제품/내것 그룹 신설</span></div>
+            <div class="g-rows g-rows--kb">
+              <div class="g-rows-head"><span>업무영역</span><span class="ta-r">문서</span><span class="ta-r">조각</span><span class="ta-r">비중</span></div>
+              <div class="g-rows-gh" data-fold><span class="tri">▾</span>📦 제품 기본 지식<span class="cnt">13문서</span></div>
+              <div class="g-rows-body g-rows--kb">
+                <div class="g-rows-r" data-selectable><span class="trunc">취약점</span><span class="ta-r gm">6</span><span class="ta-r gm">210</span><span class="ta-r gm2">34%</span></div>
+                <div class="g-rows-r" data-selectable><span class="trunc">사내규정</span><span class="ta-r gm">4</span><span class="ta-r gm">165</span><span class="ta-r gm2">27%</span></div>
+                <div class="g-rows-r" data-selectable><span class="trunc">위협대응</span><span class="ta-r gm">3</span><span class="ta-r gm">98</span><span class="ta-r gm2">16%</span></div>
+              </div>
+              <div class="g-rows-gh" data-fold><span class="tri">▾</span>🙋 내가 넣은 지식<span class="cnt">7문서</span></div>
+              <div class="g-rows-body g-rows--kb">
+                <div class="g-rows-r" data-selectable><span class="trunc">장비운영</span><span class="ta-r gm">5</span><span class="ta-r gm">103</span><span class="ta-r gm2">17%</span></div>
+                <div class="g-rows-r" data-selectable><span class="trunc">일반</span><span class="ta-r gm">2</span><span class="ta-r gm">34</span><span class="ta-r gm2">6%</span></div>
+              </div>
+            </div>
+            <div class="density"><b>밀도(정직 보고 — 유일한 역주행)</b> — 열헤더26+그룹헤더2×28=56+행5×30=150 = <b>232px</b>. 기존 약 100px 대비 <b>+132px(+132%)</b>. 막대의 "즉시 비교" 대신 제품/내것 구분과 정확한 %를 얻지만, 이 항목만 놓고 보면 늘어난다 — 그래서 우선순위를 낮춰 <b>선택 적용</b>으로 제안한다(아래 "무엇을 포기했는지" 참고).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════ 설명 패널 ══════════════ -->
+      <div class="sec">
+        <div class="sec-h"><span class="t">왜 이 안인지</span></div>
+        <div class="panel" style="font-size:12.75px;line-height:1.85;">
+          사장님 지적 두 가지("정신없다"·"코드 한 줄씩 붙인 것 같다")는 정확히 같은 원인을 가리킨다 —
+          <b>행마다 색이 다른 알약·칩이 여러 개 이어 붙고, 그 뜻을 알려주는 열 이름이 없다.</b>
+          다른 대안(예: 카드형을 유지하고 색만 줄이기, 또는 표는 그대로 두고 행간만 좁히기)은
+          "디자인 없이 엑셀처럼"이라는 사장님의 직접 표현과 어긋나 고르지 않았다 — 카드·알약이
+          하나라도 남으면 다시 "디자인이 있는" 상태다. 그래서 <b>카드·알약·색 칩·그림자를 전부
+          빼고 열/그룹/얼룩만 남기는 안 하나만</b> 추천한다(3종 시안 비교는 하지 않음 — 2026-07-25
+          "추천 1개" 원칙).<br><br>
+          그룹핑 자체(업무영역별 묶음)는 이미 memory.html 문서 목록에 있었다 — 그건 유지한다.
+          "메뉴별 코드 모아서"의 "메뉴"는 이 제품에서 화면 이름이 아니라 <b>업무영역 분류
+          (취약점/장비운영/사내규정/위협대응/일반)</b>로 이미 구현돼 있어, 그 분류를 그대로
+          그룹 헤더로 쓰는 것이 가장 근거 있는 해석이다. 관계 목록은 이 분류가 없어 대신
+          관계 종류(predicate)로 그룹을 새로 만들었다 — "같은 종류의 코드 줄을 모은다"는
+          취지에 맞는 자연스러운 대응.
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="t">무엇을 포기했는지 (카드형이 주던 것)</span></div>
+        <div class="panel" style="font-size:12.75px;line-height:1.9;">
+          <b>1)</b> 알약(배지)의 "색으로 즉시 분류"하는 즉시성 — 등급·영역을 글자색으로만 표시하므로
+          목록을 흘낏 볼 때의 "색 덩어리" 인식은 약해진다. 대신 색에만 의존하지 않는다는 점은
+          접근성 측면(WCAG 1.4.1, 색만으로 정보를 구분하지 말 것)에서는 오히려 개선이다.<br>
+          <b>2)</b> 지식창고 그라데이션 막대의 "길이 비교" 직관성 — 숫자·%는 정확하지만 한눈에
+          비교하는 속도는 막대보다 느리다. 그래서 이 항목만 <b>선택 적용</b>으로 낮췄다(위 밀도표).<br>
+          <b>3)</b> 관계 목록 칩의 "주어-관계-목적어 구조를 색으로 강조"하던 것 — 열 위치(1열=주어,
+          3열=목적어)로 구조를 대신 읽게 된다. 처음에는 색보다 학습 비용이 있지만, 열 헤더가
+          한 번 학습되면 그 다음부터는 더 빠르다(표는 학습되면 스캔이 빨라진다는 것이 zebra
+          striping 후속 연구의 핵심 논지).<br>
+          <b>4)</b> 카드의 여백감(호흡) — 정보 밀도가 올라가면 "빽빽하다"는 인상을 줄 수 있다.
+          그룹 헤더 사이 여백과 sticky 헤더로 완화했지만 카드형만큼 여유롭지는 않다.
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="t">밀도 숫자 (요약표)</span></div>
+        <div class="panel">
+          <table class="densitytbl">
+            <thead><tr><th>대상</th><th>기존 행높이</th><th>새안 행높이</th><th>표본 컨테이너</th><th>기존 총높이</th><th>새안 총높이</th><th>증감</th></tr></thead>
+            <tbody>
+              <tr><td>① 올린 문서(11건·5그룹)</td><td>≈40px</td><td>30px(−25%)</td><td>540px</td><td>≈579px(<span style="color:var(--red);font-weight:800">초과 39px·스크롤 필요</span>)</td><td>496px(<span style="color:var(--teal);font-weight:800">여유 44px</span>)</td><td style="color:var(--teal);font-weight:800">핵심 개선</td></tr>
+              <tr><td>② 등록된 관계(7건·3그룹)</td><td>≈39px</td><td>30px</td><td>360px</td><td>≈273px(여유 87px)</td><td>320px(여유 40px)</td><td style="color:var(--amber);font-weight:800">+47px, 그래도 여유 안에</td></tr>
+              <tr><td>③ 지식창고(5행·2그룹)</td><td>≈19px 피치</td><td>30px</td><td>자연 흐름(스크롤 없음)</td><td>≈100px</td><td>232px</td><td style="color:var(--red);font-weight:800">+132px(+132%) — 유일한 역주행</td></tr>
+              <tr><td>일반화(항목 20개 기준, 그룹 무시 단순 비교)</td><td>40px</td><td>30px</td><td>—</td><td>800px</td><td>600px</td><td style="color:var(--teal);font-weight:800">−200px(−25%)</td></tr>
+            </tbody>
+          </table>
+          <div style="font-size:11.5px;color:var(--muted-2);margin-top:8px;">
+            열 헤더(신설 4개 라벨)는 위 수치에 포함돼 있다(26px). 그룹 헤더 높이는 기존(.dm-gh≈28.4px)과
+            새안(.g-rows-gh=28px)이 거의 같아 그룹 오버헤드는 상쇄되고, 순수 행 높이(40→30px)가
+            ①의 개선을 대표하는 숫자다. ②·③은 정직하게 늘어나거나 이득이 작다 — 우선순위를
+            "① 필수 → ② 필수(밀도보다 정리 목적) → ③ 선택"으로 제안하는 근거.
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="t">다크(표준)에서도 같은 구조가 성립한다</span></div>
+        <div class="panel">
+          <div style="font-size:12.5px;line-height:1.8;margin-bottom:12px;">
+            <code>.g-rows</code>는 색을 하드코딩하지 않고 <code>var(--panel)</code>·<code>var(--border)</code>·
+            <code>var(--zebra)</code> 등 토큰만 쓴다. 다크(표준)는 memory.html 자체 <code>:root</code>(L8-12)에
+            이미 <code>--panel:#30302e</code>·<code>--border:rgba(255,255,255,.08)</code> 등을 정의해 두고 있어,
+            <b><code>--zebra: rgba(255,255,255,.03)</code> 한 줄만 그 옆에 추가</b>하면(또는 이미 root에 있는
+            gijo-ui.css의 <code>--g-zebra:rgba(255,255,255,.025)</code>를 그대로 참조하면) 새 CSS 구조 없이
+            아래처럼 그대로 성립한다 — 아래는 같은 <code>.g-rows</code> 마크업에 다크 토큰만 덮어씌운 것이다(글자 하나
+            안 고침).
+          </div>
+          <div class="dark-demo">
+            <div class="cap">다크 미리보기 — 토큰만 교체, 마크업·클래스 동일</div>
+            <div class="g-rows g-rows--docs">
+              <div class="g-rows-head"><span>파일명</span><span class="ta-r">등급</span><span class="ta-r">청크</span><span class="ta-r">최근반입</span></div>
+              <div class="g-rows-gh" data-fold><span class="tri">▾</span>🩹 취약점<span class="cnt">3개</span></div>
+              <div class="g-rows-body g-rows--docs">
+                <div class="g-rows-r" data-selectable><span class="trunc">CVE-2026-XXXX 분석노트.md</span><span class="ta-r gtxt-S">민감</span><span class="ta-r gm">24</span><span class="ta-r gm2">08-18</span></div>
+                <div class="g-rows-r" data-selectable><span class="trunc">웹취약점_스캐너_리포트_해설.pdf</span><span class="ta-r gtxt-O">공개</span><span class="ta-r gm">61</span><span class="ta-r gm2">08-12</span></div>
+                <div class="g-rows-r" data-selectable><span class="trunc">침투테스트_사례_2026H1.md</span><span class="ta-r gtxt-C">기밀</span><span class="ta-r gm">37</span><span class="ta-r gm2">08-05</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="t">제품 원칙 자가점검</span></div>
+        <div class="panel">
+          <div class="selfcheck">
+            <div><span class="ok">✓</span> 자체완결 HTML — 외부 CDN·웹폰트·원격 이미지 0개(전부 시스템 폰트·이모지 텍스트)</div>
+            <div><span class="ok">✓</span> 룩앤필 — 색 토큰은 실제 pro-white.css(L13-49)·memory.html·dashboard.html 그대로, 새 색 0개</div>
+            <div><span class="ok">✓</span> 추천 시안 1개 — 3개 실 컴포넌트에 같은 부품(.g-rows) 하나를 적용(복수 대안 아님)</div>
+            <div><span class="ok">✓</span> 설계 전 조사 — Material Density·Ant Design·zebra striping 연구, 출처는 아래 패널</div>
+            <div><span class="ok">✓</span> 밀도 숫자 — px·표시행수·증감을 3항목 전부 정직 보고(②·③은 역주행도 숨기지 않음)</div>
+            <div><span class="ok">✓</span> 제품 코드 미수정 — client/server 어느 파일도 건드리지 않음(읽기만 함)</div>
+            <div><span class="ok">✓</span> 가짜 상호작용 금지 — 그룹 접기·행 선택만 실동작, 그 외 버튼은 배너로 명시</div>
+            <div><span class="ok">✓</span> 다크 성립 — 토큰 교체만으로 재현(하단 다크 미리보기, 새 CSS 구조 0개)</div>
+            <div><span class="ok">✓</span> 라이트 에디션 범위 밖 — lite-memory.html 등은 이번 시안 미포함(표준 완성 후 선별 반영 대상)</div>
+            <div><span class="ok">✓</span> mockups/ 밖 쓰기 없음 — 이 파일 1개만 생성</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="t">참고한 표준 · 근거</span></div>
+        <div class="panel" style="font-size:12.25px;line-height:1.9;">
+          · Una Kravets, "Using Material Density on the Web" — Material Design 데이터 테이블 기본 행 52dp,
+          밀도 스케일 -1~-3(4px 단위)로 마우스 전용 최고밀도 40px (Google Design, Medium)<br>
+          · Material Design 2 공식 스펙 — data-tables row height 52dp, header 56dp, cell padding 6dp/8dp
+          (m2.material.io/components/data-tables/web)<br>
+          · Ant Design Table — size="small" 셀 패딩 8px 기준, 실무 통용 행높이 약 39px (ant.design/components/table)<br>
+          · Jessica Enders 외, "Zebra Striping: Does It Really Help?" / 후속 "Zebra Striping: More Data
+          for the Case" (A List Apart) — 단순 표는 효과 작음, <b>열이 많고 복잡한 표일수록</b> 정확도·속도
+          개선 유의미<br>
+          · 제품 내부 전례 — client/src/renderer/pages/gijo-ui.css L121-124 `.g-table`, L348-349·365-369
+          `.g-ui table`/`.rv-row`/`.risk-row`/`.srow`/`.aud` 얼룩(`--g-zebra`, 다크 기본값 이미 root 정의),
+          L13-49 pro-white.css `--zebra` 토큰 — "엑셀형"은 이 제품에 이미 있던 방향의 통일 적용
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      GIJO AS · mockups/knowledge-rows/시안.html · 2026-08-20 · 대상: memory.html(문서·관계 목록) + dashboard.html(지식창고) · 제품 코드 미수정
+    </div>
+  </div>
+</div>
+
+<script>
+// 정직한 상호작용만 — 그룹 접기/펴기, 행 선택 표시. 그 외 어떤 것도 서버·데이터에 닿지 않는다.
+document.querySelectorAll('.g-rows-gh[data-fold]').forEach(function (h) {
+  h.addEventListener('click', function () {
+    var body = h.nextElementSibling;
+    if (!body) return;
+    var folded = body.classList.toggle('folded');
+    var tri = h.querySelector('.tri');
+    if (tri) tri.textContent = folded ? '▸' : '▾';
+  });
+});
+document.querySelectorAll('.g-rows-r[data-selectable]').forEach(function (r) {
+  r.addEventListener('click', function () {
+    var box = r.closest('.g-rows');
+    if (box) box.querySelectorAll('.g-rows-r.sel').forEach(function (x) { x.classList.remove('sel'); });
+    r.classList.add('sel');
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 조치 요청서 UI 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 「조치 요청서」(2026-08-21 사장님 지시)
+  파일: mockups/remediation-request/시안.html — 정지 그림. 제품 코드는 읽기만 했고 고치지 않았다.
+  추천 시안 1개 원칙(2026-08-09 사용자 결정)에 따라 대안 없이 하나만 낸다.
+
+  ■ 지시 원문 요지
+    보안담당자의 조치 실무는 "우리가 직접 고친다"가 아니라 담당자나 해당 보안제품(벤더)에
+    수정을 요청하는 것이다. 제품엔 담당자 배정까지만 있고, 벤더/시스템 담당자로 나가는 요청
+    흐름이 없다. 「조치 요청서」= 고른 취약점들의 ①쉬운 설명 ②공격 경로 요지 ③요청 사항
+    (조치 기한·재점검 조건)을 묶어 문서로 만들고, 보안제품 화면의 유지보수 이력과 연결해
+    회신을 추적하는 것.
+
+  ■ 2026-08-21 방향 정정(사장님) — 이 파일은 정정을 반영한 최종본이다
+    최초안은 결재판 승인 → 즉시 DOCX/PDF 확정 문서였다. 사장님 지시로 바뀐다:
+    "조치 요청서 또한 우리 문서함에서 최종적으로 수정해서 보내는 걸로 하자." →
+    결재판 승인의 산출물은 **내 문서(문서함, mydocs.html)의 md 초안 1건**이다. 담당자가
+    거기서 다듬고(오탈자·어색한 문구를 사람이 검수) "⬇ PDF · Word 내보내기"를 눌러야
+    비로소 보낼 문서가 나온다. 아래 Scene A(결재판→초안 생성)·Scene C(문서함에서 다듬기→
+    내보내기, 신설)·Scene B(요청 이력의 "초안" 단계 표기)가 전부 이 정정을 반영했다.
+
+  ■ 정찰 — 이미 있는 것 / 완전히 없는 것 (코드로 직접 확인)
+    · grep "조치 요청서|remediationRequest" 전체 저장소 — 0건. 순수 신규 기능이다.
+    · server/src/engine/scenarios.ts:21-26(같은 날 커밋) "취약점 이해" 시나리오 주석이 이미
+      이 지시를 인용한다 — "조치는 담당자·제품에 수정 요청이 메인". 즉 방향은 이미 문서화됐고
+      이 시안이 그 UI를 처음 그린다.
+    · server/src/engine/picklist.ts:41-44 PICK_ACTIONS = 담당자 배정(assign)·기한 정하기(due)·
+      조치완료로(done)·오탐으로(false) 4개뿐 — "요청서 만들기"는 다섯 번째 항목으로 자연스럽게
+      더할 자리가 이미 있다(새 UI 부품이 아니라 배열에 원소 하나).
+    · client/src/renderer/pages/console.js:610-718 attachApproval() — 결재판(그리드 필드·승인/
+      취소·"실행되면"/"되돌리기" 문구)이 이미 있다. 필드 3개(수신처·조치기한·재점검조건)를
+      더 채우는 것뿐, 새 승인 장치를 만들지 않는다.
+    · client/src/renderer/pages/mydocs.html:391-410 TEMPLATES — 업무 템플릿이 **이미 7종**
+      코드 상수로 있다(침해사고 1차 보고·개인정보 유출 신고서·주간 보안 보고·인수인계 메모·
+      취약점 조치 계획·보안 예외 신청·장비 점검 기록). "조치 요청서"는 8번째로 자연스럽게
+      더할 자리다 — 새 템플릿 서랍을 만들지 않는다.
+    · server/src/engine/personaldocs.ts:142 — 개인 문서 생성 시 기본값은 `ragOptIn:false,
+      shared:false`(명시 옵트인 전엔 철저히 개인 격리). 조치 요청서는 업무 산출물이라 이
+      기본값과 방향이 다르다 — 이 템플릿만 `shared:true`를 기본으로 켠다(§7, 사장님 결정③으로
+      확정).
+    · client/src/renderer/pages/mydocs.html:792 — 문서 내보내기는 지금 **"⬇ .md 내려받기"
+      1종뿐**이다. PDF/Word 내보내기는 완전히 새 버튼이다 — 다만 만드는 엔진은 새로 짓지
+      않는다. server/src/engine/report.ts:52,612-646의 DOCX(+선택 PDF) 생성 + base+사이드카
+      관례를 재사용한다(사장님이 이를 "문서 핵심 요건 ④"로 지칭 — 이 저장소에서 그 제목의
+      문서를 직접 찾지는 못했으나, 있다면 이 버튼이 그 항목과 같은 부품임을 밝혀 둔다).
+    · client/src/renderer/pages/products.html:284-337 — 2026-08-21 같은 날 엑셀형(.g-rows 30px
+      행)으로 개편된 참이다. 이번 시안도 그 관례(행 30px·접기 헤더 28px)를 그대로 따른다.
+
+  ■ 설계 전 조사 — 표준·모범사례(직접 확인한 근거만)
+    1) Vulnerability Remediation Tracker 표준 필드 — securityscientist.net(2026 게시글) 요약:
+       "ID, Finding/CVE, Asset, Source, Severity, Date found, SLA days, Due date, Status, Owner,
+        Remediation/evidence, Risk accepted" 12칸. 이 시안의 결재판 필드(수신처=Owner 대응,
+        조치기한=Due date, 재점검조건=Remediation/evidence 대응)가 이 표준 부분집합과 겹친다 —
+        새 어휘를 만들지 않고 업계 관례 이름에 맞췄다.
+    2) 벤더 대상 정식 요청의 형식 — 같은 출처: "a formal written request from the engineering
+        team owner, a compensating control, a maximum exception duration… explicit sign-off".
+        → "정식 문서 + 명시적 기한 + 승인 절차"가 핵심이고 **자동 발송은 표준에 없다** — 이 시안이
+        발송을 사람 손에 남기는 근거로 재사용(§2).
+    3) 심각도별 SLA 일수 — decryptiondigest.com(2026): "critical: 7 days, high: 30 days,
+        medium: 90 days". 우리 제품은 이미 자체 기준이 있다 — GIJO_AS_취약점관리_지침.md
+        "KEV 7일 · Critical 14일 · High 30일" — 새 규칙을 만들지 않고 **기존 내부 기준을 결재판
+        기본값에 그대로 흘려 넣는다**(SLA 계산 로직 재사용, 사람이 승인 전에 고칠 수 있음).
+    4) CISA KEV 카탈로그 — cisa.gov "Known Exploited Vulnerabilities": 취약점마다 개별 기한을
+        배정하는 방식(2026-08-21 기준 BOD 26-04로 개정)도 "심각도가 아니라 사례별 기한"을
+        지지한다 — 그래서 결재판 기한 필드는 **기본값을 자동 계산하되 사람이 고칠 수 있는 입력칸**
+        으로 둔다(자동 확정이 아님).
+    5) NN/g Progressive Disclosure(nngroup.com, 지난 시안 mockups/vuln-plain-line-extend에서
+        WebFetch로 확인, 재사용) — 목록은 간결하게, 상세는 펼쳐서. 요청 이력 판을 기본 접힘으로
+        두는 근거(§6).
+
+  이 파일은 결정을 위한 정지 그림입니다. 모든 버튼·칩·입력창은 자리만 보여주며 클릭해도
+  동작하지 않습니다(정직한 구현 원칙 — mockups/는 시연이 아니라 결정 자료). JS는 한 줄도
+  없습니다 — 상태 전환(Scene A 결재판 대기→승인 후, Scene C 편집 중→저장 후)은 같은 화면의
+  "전/후" 두 스냅샷으로 보여줍니다.
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════════ 0) 실제 화면 색 토큰 — products.html·console.js :root와 동일 ════════ */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+
+/* ════════ 1) 대화창 — console.js CSS 원문 발췌(클래스명·값 그대로, console.js:69-267) ════════ */
+.cs-frame{width:380px;border:1px solid var(--border-strong);border-radius:12px;background:var(--panel-2);
+  display:flex;flex-direction:column;overflow:hidden;}
+.cs-frame-h{font-size:11px;color:var(--muted-2);padding:7px 12px;border-bottom:1px solid var(--border);background:var(--panel);}
+.cs-body{padding:8px 14px;display:flex;flex-direction:column;gap:0;}
+.cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}
+.cs-row.instr .ci{background:rgba(30,185,128,.16);}
+.cs-row .cb{flex:1;min-width:0;}
+.cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+.cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px;}
+.cs-row .cm{font-size:12.5px;color:var(--text);word-break:break-word;line-height:1.62;}
+.cs-chip{font-size:11.75px;border:1px solid var(--border);border-radius:13px;padding:2px 10px;cursor:default;color:var(--text);background:transparent;white-space:nowrap;}
+/* 목록에서 골라 조치하기(cs-pick) — console.js:200-207,724-822 원문 */
+.cs-row .cs-pick{margin-top:8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:8px 10px;}
+.cs-row .cs-pick.done{opacity:.75;}
+.cs-row .cs-ph{font-size:12.25px;color:var(--muted-2);margin-bottom:6px;}
+.cs-row .cs-pi{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;}
+.cs-row .cs-pi input{width:auto;margin:0;flex:0 0 auto;}
+.cs-row .cs-pl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cs-row .cs-ps{flex:0 0 auto;font-size:12px;color:var(--muted-2);}
+/* ⚠ 시안 확장(제안, 아직 코드에 없음) — 픽 항목 아래 쉬운 설명 한 줄. 선택카드(console.js:1244-1252)
+   f.plain 값을 그대로 재사용하는 것이라 데이터는 이미 있다 — 이 줄만 cs-pick에 새로 그린다. */
+.cs-pi-plain{font-size:11.75px;color:var(--muted-2);padding:0 0 5px 21px;line-height:1.5;}
+.cs-pi-plain b{color:var(--muted);font-weight:700;}
+.cs-row .cs-pb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);}
+.cs-row .cs-pc{font-size:12.25px;color:var(--muted);margin-right:auto;}
+.cs-row .cs-pact{font-size:12.25px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.30);border-radius:7px;padding:4px 9px;font-family:inherit;}
+.cs-row .cs-pact.hi{background:rgba(59,130,246,.24);border-color:var(--blue);color:#fff;}
+.cs-row .cs-pact:disabled{color:var(--muted-2);background:none;border-color:rgba(255,255,255,.08);}
+/* 실행 승인(결재판, cs-ap) — console.js:219-247,610-718 원문 */
+.cs-row .cs-ap{flex:1 1 auto;min-width:0;margin-top:8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:9px 11px;}
+.cs-row .cs-aph{font-size:12px;font-weight:800;color:var(--amber);margin-bottom:3px;}
+.cs-row .cs-apsub{font-size:12.25px;color:var(--muted);margin-bottom:8px;}
+.cs-row .cs-apgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:5px 8px;margin-bottom:8px;}
+.cs-row .cs-apf{display:flex;align-items:center;gap:5px;min-width:0;background:var(--panel-2);border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:0 8px;height:26px;}
+.cs-row .cs-apf.wide{grid-column:1/-1;}
+.cs-row .cs-apk{flex:0 0 auto;font-size:11px;color:var(--muted-2);white-space:nowrap;}
+.cs-row .cs-apin{flex:1;min-width:0;background:transparent;border:none;color:var(--text);font-size:11.5px;font-family:inherit;height:100%;}
+.cs-row .cs-ape{font-size:12.25px;color:var(--muted);margin-top:7px;line-height:1.6;}
+.cs-row .cs-apb{display:flex;gap:6px;margin-top:9px;}
+.cs-row .cs-apgo{font-size:12.5px;font-weight:800;color:#fff;background:var(--teal);border:none;border-radius:7px;padding:6px 12px;font-family:inherit;}
+.cs-row .cs-apno{font-size:12.5px;font-weight:700;color:var(--muted);background:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:6px 12px;font-family:inherit;}
+.cs-row .cs-apd{font-size:12px;color:var(--muted);}
+/* 완료 뒤 문서 카드 — 시안 확장(리포트 이력과 같은 값을 보여주는 자리, report.ts base+사이드카 재사용) */
+.rq-doc{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:12px;}
+.rq-doc .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-weight:700;}
+.rq-doc .dl{flex:0 0 auto;color:var(--blue-light);font-weight:700;font-size:11.75px;}
+/* 다음 걸음 칩(gcp-next) — chatparts.js:98-101 원문 */
+.gcp-next{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:7px;border-top:1px dashed rgba(255,255,255,.10);}
+.gcp-nh{font-size:11.5px;color:var(--muted-2);flex:0 0 auto;}
+.gcp-nc{font-size:12px;color:var(--text);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:3px 10px;font-family:inherit;}
+
+/* ════════ 2) products.html 엑셀형(.g-rows) — gijo-ui.css:352-369 원문 그대로 ════════ */
+.g-rows{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel);}
+.g-rows-scroll{overflow-y:auto;}
+.g-rows-head{display:grid;align-items:center;height:26px;padding:0 12px;font-size:11px;font-weight:800;color:var(--muted-2);letter-spacing:.4px;background:var(--panel-2);border-bottom:1px solid var(--border-strong);}
+.g-rows-r{display:grid;align-items:center;height:30px;padding:0 12px;font-size:12.5px;color:var(--text);}
+.g-rows-flat .g-rows-r:nth-child(even){background:rgba(255,255,255,.025);}
+.g-rows-r:hover{background:rgba(59,130,246,.07);}
+.g-rows .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.g-rows .ta-r{text-align:right;font-variant-numeric:tabular-nums;}
+.g-rows .gm2{color:var(--muted-2);}
+.row-chev{justify-self:end;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:6px;color:var(--muted-2);font-size:11px;}
+/* products.html 실제 상세 칸 — products.html:71-119 원문 발췌(이번 변경과 무관한 부분만 축약 사용) */
+.prod-maint{font-size:12.5px;color:var(--muted);margin-top:8px;padding:6px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;}
+.fields-toggle{margin-top:10px;padding:8px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;font-size:12.5px;font-weight:700;color:var(--blue-light);display:flex;align-items:center;gap:6px;}
+.fields-toggle .car{margin-left:auto;color:var(--muted-2);font-size:11.75px;}
+.fields-panel{margin-top:8px;padding:12px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;}
+.rq-pill{font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.rq-pill.draft{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.rq-pill.sent{background:rgba(240,160,32,.16);color:var(--amber);}
+.rq-pill.reply{background:rgba(30,185,128,.16);color:var(--teal);}
+.rq-pill.late{background:rgba(226,72,61,.16);color:#f5928a;}
+
+/* ════════ 3) mydocs.html(내 문서) v4 작업공간 — 원문 발췌(mydocs.html:60-250, 클래스명 그대로) ════════
+   Scene C 전용. 실제 화면은 3단(사이드바 118px·목록 400px·문서창 나머지, 폭·패딩 전부 mydocs.html 원문
+   그대로)이지만 이 시안은 문서 폭(1180px, closeup-col 520/380px) 안에 넣어야 해서 폭·패딩·글자 크기를
+   전부 축소 재현했다(비율은 유지, 절대값만 줄임). ⚠ 그래서 아래 글자 크기는 실제 mydocs.html보다 작다
+   (§7 자가점검에 밝힘) — 실제 구현은 mydocs.html 원래 크기(12px대)를 그대로 쓴다. */
+.mock-md{border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;background:var(--bg);display:flex;height:420px;}
+.v4sidebar{flex:0 0 118px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--panel-2);}
+.v4sh{flex:0 0 32px;height:32px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 8px;font-size:11.5px;font-weight:800;color:var(--text);}
+.v4tree{flex:1 1 auto;overflow-y:auto;padding:5px;}
+.v4node{display:flex;align-items:center;gap:5px;width:100%;padding:5px 7px;border:none;background:transparent;border-radius:6px;font-size:11.25px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-align:left;}
+.v4node.on{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.v4node .cnt{margin-left:auto;color:var(--muted-2);font-size:10.5px;font-weight:700;}
+.v4grouplbl{font-size:10px;letter-spacing:.4px;color:var(--muted-2);padding:7px 7px 2px;font-weight:800;}
+.v4main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+.v4toolbar{flex:0 0 32px;height:32px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;padding:0 8px;font-size:11px;color:var(--muted-2);}
+.v4content{flex:1 1 auto;min-height:0;display:flex;}
+.v4list{flex:0 0 168px;width:168px;border-right:1px solid var(--border);overflow-y:auto;}
+.v4docpane{flex:1 1 auto;min-width:0;overflow-y:auto;padding:10px 13px;}
+.detail{font-size:12px;}
+.detail .dn{font-weight:800;font-size:12.75px;margin-bottom:4px;}
+.detail .dm{color:var(--muted);line-height:1.6;font-size:11.5px;}
+.detail .dbt{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+.detail .dbt button{background:transparent;border:1px solid var(--border-strong);color:var(--muted);padding:4px 9px;border-radius:7px;font-size:11px;font-weight:700;font-family:inherit;}
+.detail .dbt button.new{color:var(--teal);border-color:rgba(30,185,128,.5);background:rgba(30,185,128,.08);}
+.gtxt-rag{color:var(--teal);font-weight:700;}
+.gtxt-share{color:var(--amber);font-weight:700;}
+.st-top{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+.st-top .back{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;font-family:inherit;}
+.st-title-in{flex:1;min-width:120px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;color:var(--text);font-size:12px;font-weight:700;padding:6px 9px;font-family:inherit;}
+.st-btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;font-family:inherit;}
+.st-btn.save{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:800;}
+.st-btn.on{border-color:var(--blue);color:var(--blue-light);}
+.viewseg{display:flex;border:1px solid var(--border-strong);border-radius:7px;overflow:hidden;}
+.viewseg button{background:var(--panel-2);border:none;color:var(--muted);padding:5px 9px;font-size:10.75px;font-weight:700;font-family:inherit;}
+.viewseg button.on{background:rgba(59,130,246,.18);color:var(--blue-light);}
+.st-warn{border-left:3px solid var(--amber);background:rgba(240,160,32,.07);border-radius:7px;padding:6px 9px;font-size:10.75px;line-height:1.6;margin-bottom:7px;color:var(--muted);}
+.st-warn b{color:var(--amber);}
+.tpl-drawer{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);padding:8px 9px;margin-bottom:7px;}
+.tpl-lead{font-size:10.5px;color:var(--muted-2);margin-bottom:6px;line-height:1.5;}
+.tpl-chip{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;background:var(--panel);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:5px 8px;margin:0 5px 5px 0;font-size:10.75px;font-weight:700;text-align:left;}
+.tpl-chip.sel{border-color:var(--teal);background:rgba(30,185,128,.08);}
+.tpl-chip .tag{font-size:9.75px;font-weight:800;color:var(--teal);}
+.edit-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.edit-src textarea{width:100%;height:180px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;color:var(--text);font:10.75px/1.6 Consolas,"Cascadia Mono",monospace;padding:8px 10px;resize:none;}
+.edit-prev{border:1px solid var(--border);border-radius:7px;background:var(--panel-2);padding:9px 11px;height:180px;overflow-y:auto;font-size:11px;}
+.edit-prev h3{font-size:11.5px;margin:0 0 5px;color:var(--blue-light);}
+.edit-prev p,.edit-prev li{color:var(--text);line-height:1.7;font-size:10.75px;margin-bottom:4px;}
+.edit-prev ul{margin-left:14px;}
+
+/* ════════ 4) 이 문서(시안) 전용 설명 CSS — 실제 제품에는 없다 ════════ */
+.docwrap{max-width:1180px;margin:0 auto;padding:26px 30px 90px;}
+h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:6px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:1020px;line-height:1.75;margin-bottom:16px;}
+.summary-box{border:1px solid var(--blue);background:rgba(59,130,246,.08);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:12.75px;line-height:1.85;}
+.summary-box b{color:#fff;}
+.summary-box ol{margin-left:18px;margin-top:4px;}
+.banner{border:1px solid rgba(240,160,32,.5);background:rgba(240,160,32,.08);color:#f0c060;border-radius:8px;padding:11px 15px;font-size:12.25px;margin-bottom:24px;line-height:1.6;}
+h2{font-size:14.5px;font-weight:800;color:#fff;margin:34px 0 9px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+h2 .n{color:var(--blue-light);font-size:11px;font-weight:700;letter-spacing:.4px;border:1px solid var(--blue-light);border-radius:4px;padding:2px 7px;}
+h3{font-size:13px;font-weight:800;color:#fff;margin:18px 0 8px;}
+.note{font-size:12.25px;color:var(--muted);line-height:1.75;margin-bottom:10px;max-width:1040px;}
+.note b.hi{color:var(--text);}
+.note b.bad{color:#f5928a;}
+.note b.ok{color:var(--teal);}
+table.t{width:100%;border-collapse:collapse;font-size:12.15px;margin:8px 0 6px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+code{background:var(--panel-2);border-radius:4px;padding:1px 6px;font-size:11.5px;color:#dfe6ff;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+.meas b{color:var(--teal);}
+.closeup-row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;margin:14px 0 6px;}
+.closeup-col{flex:0 0 auto;}
+.closeup-tag{font-size:11.5px;font-weight:800;letter-spacing:.3px;color:var(--muted-2);margin-bottom:8px;}
+.closeup-tag.after{color:var(--teal);}
+.px-tag{display:inline-block;margin-top:6px;font-size:11.5px;color:var(--teal);font-weight:800;background:rgba(30,185,128,.1);border:1px solid rgba(30,185,128,.35);border-radius:6px;padding:3px 9px;}
+.evid-box{border:1px solid rgba(59,130,246,.4);border-radius:10px;padding:12px 14px;background:rgba(59,130,246,.05);margin:10px 0;font-size:12.25px;line-height:1.7;color:var(--text);}
+.evid-box .cap{font-size:11.5px;color:var(--blue-light);font-weight:800;margin-bottom:6px;}
+.reject-box{border:1px solid rgba(226,72,61,.4);border-radius:10px;padding:12px 14px;background:rgba(226,72,61,.05);margin:10px 0;}
+.reject-cap{font-size:11.5px;color:#f5928a;font-weight:800;margin-bottom:8px;}
+.checkline{display:flex;gap:8px;align-items:flex-start;padding:6px 0;font-size:12.25px;line-height:1.65;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05);}
+.checkline:last-child{border-bottom:none;}
+.checkline .ic{flex:0 0 auto;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;}
+footer.docfoot{margin-top:50px;padding-top:14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);line-height:1.8;}
+.tag-off{display:inline-block;font-size:10.5px;color:var(--muted-2);border:1px dashed var(--border-strong);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1>「조치 요청서」— 대화창에서 만들고, 보안제품 화면에서 회신을 추적한다</h1>
+<p class="lead">
+  담당자·벤더에게 나가는 조치 요청은 <b style="color:#fff">새 화면이 아니라 이미 있는 픽리스트→결재판→내
+  문서 계약을 한 걸음 더 쓰는 것</b>이다. 만드는 순간(대화창)·다듬는 자리(<code>mydocs.html</code> 내
+  문서)·추적하는 자리(<code>products.html</code> 유지보수 이력)를 분리한다. 결재판 승인은 <b>md 초안</b>만
+  만들고, 사람이 문서함에서 검수·수정한 뒤 "⬇ PDF · Word 내보내기"를 눌러야 실제로 보낼 문서가
+  나온다(2026-08-21 사장님 정정 — 위 방향 정정 참고).
+</p>
+
+<div class="banner">
+  ⚠ <b>정직한 구현 고지</b> — 이 파일은 <b>정지 그림</b>이며 JS가 없습니다. 아래 대화창·엑셀형 표는 실제
+  <code>console.js</code>·<code>products.html</code>·<code>gijo-ui.css</code>의 클래스명·값을 그대로 복사해 <b>모양만</b>
+  재현합니다. 클릭해도 아무 동작도 하지 않습니다. "결재판 대기 중"과 "승인 후"는 <b>같은 대화의 두 스냅샷</b>이지
+  실제로 전환되는 것이 아닙니다.
+</div>
+
+<div class="summary-box">
+  <b>핵심 결정 3줄</b>
+  <ol>
+    <li><b>새 화면을 만들지 않는다.</b> 취약점 목록에서 체크→기존 픽리스트 조치 버튼에 "📨 조치 요청서 만들기" 하나를
+    더한다(<code>picklist.ts</code> PICK_ACTIONS에 원소 1개) → 기존 결재판(<code>cs-ap</code>)이 필드 3개(수신처·기한·
+    재점검조건)를 보여준다 → 승인하면 <b class="hi">내 문서(mydocs.html)에 md 초안 1건</b>이 만들어진다(2026-08-21
+    정정 — 즉시 DOCX/PDF 확정 발급이 아니다).</li>
+    <li><b>다듬기·내보내기는 이미 있는 「내 문서」 편집기를 그대로 쓴다(Scene C, 신설).</b> 업무 템플릿이
+    7종에서 8종으로 늘고, 저장된 문서 상세 칸(<code>.dbt</code>)에 "⬇ PDF · Word 내보내기" 버튼 하나가 더
+    붙는다(지금은 <code>.md</code> 내려받기만 있다) — 엔진은 리포트 엔진(<code>report.ts</code>) 재사용, 새 변환기
+    없음.</li>
+    <li><b>추적(products.html 유지보수 칸)은 "초안→보냄→회신" 3단계로 표기한다.</b> "초안"은 아직 문서함에서
+    편집 중이라는 뜻이고, 자동 발송은 이번에도 하지 않는다 — 내보내기 이후 전달은 사람이 한다.</li>
+  </ol>
+</div>
+
+<h2><span class="n">근거</span>설계 전 조사 — 표준·모범사례</h2>
+<table class="t">
+  <tr><th style="width:250px">출처</th><th style="width:360px">확인한 내용</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>Vulnerability Remediation Tracker 표준 필드<br><span style="color:var(--muted-2)">securityscientist.net/blog/vulnerability-remediation-tracker-template</span></td>
+    <td>ID·Finding/CVE·Asset·Source·Severity·Date found·<b>SLA days·Due date·Status·Owner·Remediation/evidence</b>·Risk accepted 12칸.</td>
+    <td>결재판 필드명(수신처=Owner, 조치기한=Due date, 재점검조건=Remediation/evidence)을 이 어휘에 맞춤 — 새 용어를 만들지 않음.</td>
+  </tr>
+  <tr>
+    <td>벤더 대상 정식 요청 형식<br><span style="color:var(--muted-2)">같은 출처, 벤더 커뮤니케이션 절</span></td>
+    <td>원문 요지: "a formal written request… a maximum exception duration… explicit sign-off" — <b>정식 문서 + 기한 명시 + 승인 절차</b>가 핵심, 자동 발송은 표준에 없음.</td>
+    <td>§2 "왜 자동 발송을 안 하나"의 직접 근거 — 문서화까지가 표준, 전달 채널은 조직마다 다름.</td>
+  </tr>
+  <tr>
+    <td>심각도별 SLA 일수<br><span style="color:var(--muted-2)">decryptiondigest.com/blog/vulnerability-remediation-developer-sla-workflow</span></td>
+    <td>업계 관행: critical 7일 · high 30일 · medium 90일.</td>
+    <td>우리 내부 기준(<code>GIJO_AS_취약점관리_지침.md</code> "KEV 7일·Critical 14일·High 30일")과 방향이 같음을 재확인 —
+    <b>새 규칙을 만들지 않고 내부 기준을 결재판 기본값에 흘려 넣는 것</b>이 정당함을 뒷받침.</td>
+  </tr>
+  <tr>
+    <td>CISA KEV 카탈로그<br><span style="color:var(--muted-2)">cisa.gov/known-exploited-vulnerabilities</span></td>
+    <td>취약점마다 <b>개별 기한</b>을 배정(2026-08-21 기준 BOD 26-04) — 심각도 일괄 규칙이 아니라 사례별.</td>
+    <td>결재판의 조치기한 필드를 <b>자동 계산된 기본값 + 사람이 고칠 수 있는 입력칸</b>으로 설계한 근거(자동 확정 금지).</td>
+  </tr>
+  <tr>
+    <td>NN/g Progressive Disclosure<br><span style="color:var(--muted-2)">nngroup.com(지난 시안에서 WebFetch 확인, 재사용)</span></td>
+    <td>"Initially show only the most important options… offer more upon request."</td>
+    <td>요청 이력 판을 <b>기본 접힘</b>으로 두는 근거(§6 밀도).</td>
+  </tr>
+</table>
+
+<h2><span class="n">§1</span>왜 이 안인가 — 기각한 다른 길</h2>
+<table class="t">
+  <tr><th style="width:230px">버린 안</th><th>왜 버렸나</th></tr>
+  <tr>
+    <td>❌ 전용 새 화면(요청서 작성 폼)</td>
+    <td>「지시는 대화창에서만」 원칙(2026-07-25 이래 반복 확립) 정면 위반 — 새 화면에 입력칸을 두면
+    "메뉴는 카드가 전부"(2026-08-20 확정 계약)와도 어긋난다. 취약점을 고르는 동작은 이미 대화창
+    픽리스트가 하고 있어, 폼을 새로 두면 <b class="bad">같은 "고르기"를 두 번 만들게 된다</b>.</td>
+  </tr>
+  <tr>
+    <td>❌ 벤더에게 자동 이메일/포털 발송</td>
+    <td>폐쇄망 배치가 기본인 제품이라 SMTP 설정이 없는 사이트가 있고, 벤더마다 창구(이메일·자체
+    포털·전화)가 다르다. 잘못된 채널로 자동 발송하면 실제 사고가 된다. 표준 조사(위 §근거 2번)도
+    자동 발송을 요구하지 않는다 — <b class="hi">문서까지만 만들고 전달은 사람이</b> 하는 편이
+    "안 되는 자동화를 되는 척"하지 않는 정직한 선택이다.</td>
+  </tr>
+  <tr>
+    <td>❌ 별도 칸반/트래킹 보드</td>
+    <td><code>products.html</code>이 2026-08-21 <b>같은 날</b> 엑셀형(.g-rows)으로 개편되며 "그 제품의
+    유지보수 이력"이라는 자리가 이미 확립됐다. 새 보드를 만들면 "같은 것을 여러 곳에 적으면 어긋난다"
+    (CLAUDE.md 반복 원칙)가 재발한다 — 있는 자리에 접기 판 하나를 더한다.</td>
+  </tr>
+  <tr>
+    <td>❌ 결재판 승인 즉시 DOCX/PDF 확정 발급<br><span style="color:var(--muted-2)">(이 시안의 최초안 — 2026-08-21 사장님이 정정)</span></td>
+    <td>AI가 채운 초안을 사람 검수 없이 바로 "완성 문서"로 내보내면 어색한 문구·오탈자가 그대로 벤더에게
+    나간다. <b class="hi">"우리 문서함에서 최종적으로 수정해서 보내는 걸로 하자"</b>(사장님 지시 원문) —
+    md 초안을 <code>mydocs.html</code>에 만들고, 다듬기·내보내기는 이미 있는 업무 템플릿·편집기 체계에
+    자연히 편입시킨다(Scene C). 부수 이득: 산출물 저장소가 report.ts 폴더 하나가 아니라 "내 문서" 한
+    곳으로 모여, 다른 업무 문서(주간 보고·인수인계 메모 등)와 같은 자리에서 관리된다.</td>
+  </tr>
+</table>
+
+<h2><span class="n">§2</span>무엇을 포기했는가</h2>
+<div class="note">
+  · <b class="hi">벤더 포털/이메일 자동 발송</b> — 문서함에서 다듬어 내보내기까지만. 담당자가 다운로드해
+  직접 보낸다.<br>
+  · <b class="hi">회신 자동 파싱</b> — 벤더 답장 이메일을 읽어 상태를 자동으로 바꾸는 것은 하지 않는다.
+  상태(초안→보냄→회신)는 담당자가 <b class="hi">확인창으로 직접 확인</b>한다(사장님 결정①) — 대신
+  깜빡함을 줄이려고 회신 없는 요청은 다음날 아침 브리핑이 안내한다(자동 재촉·재발송은 아니다,
+  Scene A③). 안 되는 걸 되는 척 하지 않는다(2026-08-21 하지 않은 일을 했다고 말하는 결함 재발 방지
+  원칙과 같은 결).<br>
+  · <b class="hi">수신처 자동 채움</b> — 등록부 벤더명·자산 담당자를 결재판이 자동으로 채우지 않는다
+  (사장님 결정② — 정확도를 담보 못 하는 자동 채움보다 사람이 직접 적는 편이 낫다고 판단).<br>
+  · <b class="hi">벤더별 서식 다양화</b> — 일부 벤더가 자기 포털 전용 양식을 요구할 수 있으나, 1단계는
+  표준 서식 한 가지(리포트 엔진 기본 DOCX 틀)만 지원한다.
+</div>
+
+<!-- ═══════════════════════════ Scene A ═══════════════════════════ -->
+<h2><span class="n">Scene A</span>대화창에서 만드는 흐름 — 칩 → 결재판 → 내 문서 초안</h2>
+<p class="note">
+  <code>console.js</code>의 실제 계약 그대로다: 픽리스트(<code>attachPicks</code>)에서 체크한 취약점을 고르고,
+  새 조치 버튼을 누르면 지시가 자동 조립돼 나가고, 서버가 쓰기 지시로 판단해 결재판(<code>attachApproval</code>)을
+  돌려준다. <b class="hi">새 UI 부품은 0개</b> — 배열에 원소 하나(조치 버튼), 결재판 필드 3개(수신처는
+  <b class="hi">자리만</b> 만든다 — 2026-08-21 사장님 결정 ②), 완료 후 안내 문장 하나가 전부다.
+</p>
+
+<div class="closeup-row">
+  <div class="closeup-col" style="flex:0 0 400px">
+    <div class="closeup-tag">① 결재판 대기 중</div>
+    <div class="cs-frame">
+      <div class="cs-frame-h">대화창(도킹, 380px) — console.js:231 <code>--console-w</code> 기본값</div>
+      <div class="cs-body">
+        <div class="cs-row instr">
+          <div class="ci">나</div>
+          <div class="cb">
+            <div class="cn">나 → AI 팀<span class="ct">14:02:11</span></div>
+            <div class="cm">미조치 취약점 뭐 있어?</div>
+          </div>
+        </div>
+        <div class="cs-row reply">
+          <div class="ci">🧭</div>
+          <div class="cb">
+            <div class="cn">AI 팀<span class="ct">14:02:14</span></div>
+            <div class="cm">미조치 취약점 3건입니다 — 아래에서 골라 바로 처리할 수 있습니다.</div>
+            <div class="cs-pick done">
+              <div class="cs-ph">고쳐야 할 것을 골라 바로 처리할 수 있습니다</div>
+              <label class="cs-pi"><input type="checkbox" checked disabled>
+                <span class="cs-pl" title="Apache Log4j &lt; 2.15.0 Remote Code Execution (CVE-2021-44228)">[critical] Log4j RCE (CVE-2021-44228)</span>
+                <span class="cs-ps">web-01 · 담당 미배정</span></label>
+              <div class="cs-pi-plain">→ 공격자가 이 장비에서 <b>원하는 명령을 실행</b>할 수 있습니다. 가장 급합니다. <span class="tag-off">시안 확장</span></div>
+              <label class="cs-pi"><input type="checkbox" checked disabled>
+                <span class="cs-pl" title="OpenSSL 3.0.x Multiple Vulnerabilities">[high] OpenSSL 3.0.x 다중 취약점</span>
+                <span class="cs-ps">app-02 · 담당 미배정</span></label>
+              <div class="cs-pi-plain">→ 암호화 통신이 <b>도청되거나 위조</b>될 수 있습니다. <span class="tag-off">시안 확장</span></div>
+              <label class="cs-pi"><input type="checkbox" checked disabled>
+                <span class="cs-pl" title="Apache Struts2 RCE (CVE-2023-50164)">[critical] Struts2 RCE (CVE-2023-50164)</span>
+                <span class="cs-ps">web-03 · 담당 김보안</span></label>
+              <div class="cs-pi-plain">→ 공격자가 파일 업로드로 <b>서버를 장악</b>할 수 있습니다. <span class="tag-off">시안 확장</span></div>
+              <div class="cs-pb">
+                <span class="cs-pc">3건 선택</span>
+                <button class="cs-pact" disabled>담당자 배정</button>
+                <button class="cs-pact" disabled>기한 정하기</button>
+                <button class="cs-pact hi" disabled>📨 조치 요청서 만들기</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cs-row instr">
+          <div class="ci">나</div>
+          <div class="cb">
+            <div class="cn">나 → AI 팀<span class="ct">14:02:41</span></div>
+            <div class="cm">고른 3건을 조치 요청서 만들기<span style="color:var(--muted-2)"> (버튼이 자동 조립한 지시 — 새 입력칸 아님)</span></div>
+          </div>
+        </div>
+        <div class="cs-row reply">
+          <div class="ci">🧭</div>
+          <div class="cb">
+            <div class="cn">AI 팀<span class="ct">14:02:42</span></div>
+            <div class="cs-ap">
+              <div class="cs-aph">🗂 실행 승인 — 조치 요청서 만들기</div>
+              <div class="cs-apsub">아래 내용대로 실행합니다. 값을 확인·수정한 뒤 승인하세요.</div>
+              <div class="cs-ape"><b>범위:</b> 📌 고른 취약점 3건</div>
+              <div class="cs-apgrid">
+                <div class="cs-apf"><span class="cs-apk">수신처</span><input class="cs-apin" value="" placeholder="문서함에서 채워 넣으세요(비워도 승인됩니다)" readonly></div>
+                <div class="cs-apf"><span class="cs-apk">조치기한*</span><input class="cs-apin" value="2026-08-28" readonly></div>
+                <div class="cs-apf wide"><span class="cs-apk">재점검조건</span><input class="cs-apin" value="패치 적용 후 재스캔에서 해당 CVE 미검출 확인" readonly></div>
+              </div>
+              <div class="cs-ape"><b>실행되면:</b> 고른 3건을 요약해 <b class="hi" style="color:#fff">내 문서</b>에
+              md 초안 1건을 만듭니다(제목: 조치요청서_웹서버3건_2026-08-21). 수신처는
+              <b class="hi" style="color:#f0c060">비워 둡니다</b> — 문서함에서 직접 채워 넣습니다(2026-08-21
+              사장님 결정 ②, 자동 채움 안 함). 이메일 발송은 하지 않습니다 — 문서함에서 다듬고 내보낸 뒤
+              담당자가 직접 전달합니다.</div>
+              <div class="cs-ape"><b>되돌리기:</b> 초안은 내 문서에서 그냥 지우면 됩니다 — 다른 곳에 흔적이 남지 않습니다(아직 "보냄" 상태가 아니므로).</div>
+              <div class="cs-apb">
+                <button class="cs-apgo">✓ 승인하고 실행</button>
+                <button class="cs-apno">취소</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="px-tag" style="background:rgba(240,160,32,.1);border-color:rgba(240,160,32,.35);color:#f0c060">기본값은 내부 SLA(KEV 7일)로 자동 계산 — 사람이 고칠 수 있음</span>
+  </div>
+
+  <div class="closeup-col" style="flex:0 0 400px">
+    <div class="closeup-tag after">② 승인 후 — 완료 카드(내 문서 초안) + 다음 걸음</div>
+    <div class="cs-frame">
+      <div class="cs-frame-h">같은 대화의 다음 순간(전환 애니메이션 없음 — 정지 그림)</div>
+      <div class="cs-body">
+        <div class="cs-row reply">
+          <div class="ci">🧭</div>
+          <div class="cb">
+            <div class="cn">AI 팀<span class="ct">14:02:58</span></div>
+            <div class="cs-ap">
+              <div class="cs-apd">✅ 실행 완료 — 조치 요청서 만들기</div>
+              <div class="rq-doc">
+                <span class="n">📓 조치요청서_웹서버3건_2026-08-21 <span class="tag-off">초안 · md</span></span>
+                <span class="dl">문서 열기 →</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cs-row reply">
+          <div class="ci">🧭</div>
+          <div class="cb">
+            <div class="cn">AI 팀<span class="ct">14:02:58</span></div>
+            <div class="cm">📓 <b>내 문서에 초안이 만들어졌습니다 — 다듬은 뒤 내보내세요.</b> 수신처는 아직
+            비어 있습니다. 회사 공유가 기본으로 켜져 있습니다(업무 산출물이라 — 끌 수 있습니다).
+              <div class="gcp-next">
+                <span class="gcp-nh">➡ 다음 작업</span>
+                <button class="gcp-nc">내 문서에서 다듬기 →</button>
+                <button class="gcp-nc">요청 이력 보기 →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="px-tag">"내 문서에서 다듬기" 칩 → Scene C로 이동</span>
+  </div>
+</div>
+
+<!-- 사장님 결정 ①(다음 날 회신 없음 안내) — 자동 재발송이 아니라 사람에게 알려주는 안내다.
+     patterns 재사용: maintenance.html 할일그리기()의 "지연 N건" 계산과 같은 자리에 조건 하나
+     ("보낸 지 N일·회신 없음")를 더한다 — 새 배치잡·새 알림 채널을 만들지 않는다. -->
+<h3>③ 다음날 아침 — 회신 없는 요청을 대화창이 알려준다 <span class="tag-off">신설, 사장님 결정 ①</span></h3>
+<p class="note">
+  회신 상태는 <b class="hi">사람이 확인창으로 확인</b>한다(자동 파싱 없음, Scene B 참고) — 대신 확인을 깜빡하지
+  않도록, 보낸 지 하루가 지나도록 "회신" 표시가 없는 요청은 다음날 <b class="hi">아침 브리핑·다음 걸음
+  칩</b>과 같은 문법으로 안내한다. <b class="bad">자동 재촉·재발송이 아니다</b> — 사람에게 알려줄 뿐이고,
+  "재촉 알림 보내기"를 눌러도 그 자체가 새 지시라 다시 결재판을 거친다(이 시안 범위 밖).
+</p>
+<div class="closeup-row">
+  <div class="closeup-col" style="flex:0 0 400px">
+    <div class="cs-frame">
+      <div class="cs-frame-h">다음날 08:30 · 대화 홈(아침 브리핑)</div>
+      <div class="cs-body">
+        <div class="cs-row reply">
+          <div class="ci">🧭</div>
+          <div class="cb">
+            <div class="cn">AI 팀 · 오늘 브리핑<span class="ct">08:30:02</span></div>
+            <div class="cm">어제 보낸 조치 요청 3건 중 <b>1건이 아직 회신 없음</b>입니다(㈜한내네트웍스,
+            2건 · 기한 2026-08-06). 재촉하시겠어요?
+              <div class="gcp-next">
+                <span class="gcp-nh">➡ 다음 작업</span>
+                <button class="gcp-nc">재촉 알림 보내기</button>
+                <button class="gcp-nc">요청 이력에서 보기 →</button>
+                <button class="gcp-nc">나중에</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="px-tag">계산 조건 1개 추가 — maintenance.html 할일그리기() "지연 N건"과 같은 자리</span>
+  </div>
+</div>
+
+<h3>이 흐름에서 실제로 새로 만드는 것</h3>
+<table class="t">
+  <tr><th style="width:280px">항목</th><th>변경 규모</th></tr>
+  <tr><td><code>server/src/engine/picklist.ts</code> PICK_ACTIONS</td><td>원소 1개 추가 — <code>{ key: "request", label: "📨 조치 요청서 만들기" }</code>(needs 없음, assign/due와 같은 자리)</td></tr>
+  <tr><td>디스패처 분기</td><td>"#조치 request" 지시를 받으면 실행하지 않고 결재판 fields 3개(수신처=빈 자리·조치기한·재점검조건)를 채워 돌려주는 새 분기 1개 — 기존 "정기점검 잡아줘" 결재판과 같은 자리(<code>console.js</code> attachApproval은 수정 없음)</td></tr>
+  <tr><td>승인 실행부(서버)</td><td><code>personalDocsCreate</code> 호출 — <code>mydocs.html</code> TEMPLATES의 8번째 골격("조치 요청서")에 고른 3건의 쉬운 설명·공격 경로를 채워 md 초안 생성. <code>shared:true</code>를 명시(이 템플릿 생성 경로만의 예외 — <code>personaldocs.ts:142</code>의 시스템 기본값 false는 다른 템플릿에 그대로 둔다, 사장님 결정 ③).</td></tr>
+  <tr><td>사이드카(.json)</td><td>결재판 승인 시점에는 <b class="hi">만들지 않는다</b> — Scene C "PDF·Word 내보내기"를 누르는 순간 <code>report.ts</code>가 만든다(<code>recipient</code>·<code>findingIds</code>·<code>dueDate</code>·<code>status</code>). "초안" 상태는 사이드카 없이 personal_docs 존재 자체로 판정.</td></tr>
+  <tr><td>다음날 안내(사장님 결정①)</td><td>기존 "지금 손댈 일" 계산(<code>maintenance.html</code> 할일그리기()와 같은 자리)에 조건 1개 추가 — "보낸 지 24h·회신 없음". 새 배치 잡·새 알림 채널 없음.</td></tr>
+  <tr><td>대화창 UI</td><td><b class="ok">0줄</b> — cs-pick·cs-ap·완료 카드·nextChips 전부 기존 부품</td></tr>
+</table>
+
+<!-- ═══════════════════════════ Scene C(신설) ═══════════════════════════ -->
+<h2><span class="n">Scene C</span>내 문서에서 다듬고 내보낸다 <span class="tag-off">신설, 2026-08-21 사장님 정정</span></h2>
+<p class="note">
+  <code>mydocs.html</code> v4 작업공간(사이드바·목록·문서창 3단)을 그대로 재현했다 — 새 화면이 아니라
+  <b class="hi">업무 템플릿이 7종→8종</b>으로 늘고, 문서 상세의 <code>.dbt</code> 조작 줄에 버튼 1개가
+  더 붙는 것뿐이다. 초안에는 쉬운 설명·공격 경로·요청 사항·기한이 <b class="hi">템플릿으로 미리 채워져
+  있다</b>(대화창에서 고른 취약점 데이터를 그대로 흘려 넣음 — 결재판의 "실행되면"과 같은 값).
+</p>
+
+<div class="closeup-row">
+  <div class="closeup-col" style="flex:0 0 520px">
+    <div class="closeup-tag">① 문서함 — 초안이 열린 직후, 다듬는 중</div>
+    <div class="mock-md">
+      <div class="v4sidebar">
+        <div class="v4sh">📁 내 문서</div>
+        <div class="v4tree">
+          <div class="v4grouplbl">내가 쓰는 것</div>
+          <div class="v4node on">👤 내 것<span class="cnt">12</span></div>
+          <div class="v4grouplbl">회사가 가진 것</div>
+          <div class="v4node">🏢 회사 지식<span class="cnt">44</span></div>
+          <div class="v4node">📘 제품 안내<span class="cnt">12</span></div>
+        </div>
+      </div>
+      <div class="v4main">
+        <div class="v4toolbar">👤 내 것 › 조치요청서_웹서버3건_2026-08-21</div>
+        <div class="v4content">
+          <div class="v4list">
+            <div class="detail" style="padding:8px;font-size:10.75px;color:var(--muted)">
+              📨 조치요청서_웹서버3건… <span class="gtxt-share">🏢</span><br>
+              🛠 취약점 조치 계획<br>🔁 인수인계 메모<br>📅 주간 보안 보고
+            </div>
+          </div>
+          <div class="v4docpane">
+            <div class="st-top">
+              <button class="back">← 닫기</button>
+              <input class="st-title-in" value="조치요청서_웹서버3건_2026-08-21">
+              <button class="st-btn on">📋 업무 템플릿</button>
+              <div class="viewseg"><button>원문</button><button class="on">분할</button><button>미리보기</button></div>
+              <button class="st-btn save">💾 저장</button>
+            </div>
+            <div class="st-warn">⚠ <b>비밀번호·계정 정보는 넣지 마세요.</b> 저장할 때 자동으로 살펴봅니다.</div>
+            <div class="tpl-drawer">
+              <div class="tpl-lead">업무 템플릿 8종 <span class="tag-off">7→8, 신규 1개</span></div>
+              <span class="tpl-chip">🚨 침해사고 1차 보고<span class="tag">⏱ 24h</span></span>
+              <span class="tpl-chip">📋 개인정보 유출 신고서<span class="tag">⏱ 72h</span></span>
+              <span class="tpl-chip">📅 주간 보안 보고</span>
+              <span class="tpl-chip">🔁 인수인계 메모</span>
+              <span class="tpl-chip">🛠 취약점 조치 계획</span>
+              <span class="tpl-chip">⚖ 보안 예외 신청</span>
+              <span class="tpl-chip">🔧 장비 점검 기록</span>
+              <span class="tpl-chip sel">📨 조치 요청서<span class="tag">🔗 요청 이력 연계</span></span>
+            </div>
+            <div class="edit-split">
+              <div class="edit-src"><textarea readonly>### 조치 요청서
+
+- 수신처:
+- 조치기한: 2026-08-28
+- 재점검조건: 패치 적용 후 재스캔에서
+  해당 CVE 미검출 확인
+
+### 대상 취약점 (3건)
+
+#### 1. Log4j RCE (CVE-2021-44228)
+- 쉬운 설명: 공격자가 이 장비에서
+  원하는 명령을 실행할 수 있습니다.
+- 공격 경로: 인터넷에 노출된 로그
+  처리 구간에 조작된 문자열을 보내면
+  임의 코드가 실행됩니다.
+- 영향받는 자산: web-01
+
+#### 2. OpenSSL 3.0.x 다중 취약점
+- 쉬운 설명: 암호화 통신이 도청되거나
+  위조될 수 있습니다.
+- 영향받는 자산: app-02
+…</textarea></div>
+              <div class="edit-prev">
+                <h3>조치 요청서</h3>
+                <p><b>수신처:</b> <span style="color:var(--muted-2)">(비어 있음 — 여기에 적으세요)</span></p>
+                <p><b>조치기한:</b> 2026-08-28</p>
+                <p><b>재점검조건:</b> 패치 적용 후 재스캔에서 해당 CVE 미검출 확인</p>
+                <p><b>대상 취약점(3건)</b></p>
+                <ul>
+                  <li>Log4j RCE — 원하는 명령을 실행할 수 있음</li>
+                  <li>OpenSSL 다중 취약점 — 통신 도청·위조 가능</li>
+                  <li>Struts2 RCE — 서버 장악 가능</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="px-tag" style="background:rgba(240,160,32,.1);border-color:rgba(240,160,32,.35);color:#f0c060">수신처는 비어 있다 — 담당자가 여기서 직접 적는다(사장님 결정②)</span>
+  </div>
+
+  <div class="closeup-col" style="flex:0 0 380px">
+    <div class="closeup-tag after">② 다듬어 저장한 뒤 — 내보내기</div>
+    <div class="mock-md" style="height:auto">
+      <div class="v4sidebar">
+        <div class="v4sh">📁 내 문서</div>
+        <div class="v4tree">
+          <div class="v4grouplbl">내가 쓰는 것</div>
+          <div class="v4node on">👤 내 것<span class="cnt">12</span></div>
+        </div>
+      </div>
+      <div class="v4main" style="min-height:220px">
+        <div class="v4toolbar">👤 내 것 › 조치요청서_웹서버3건_2026-08-21</div>
+        <div class="v4docpane">
+          <div class="detail">
+            <div class="dn">조치요청서_웹서버3건_2026-08-21</div>
+            <div class="dm">
+              <span class="gtxt-share">🏢 회사 공유</span> — 업무 산출물이라 기본으로 켜져 있습니다(사장님 결정③, 끌 수 있음)
+              <br><span class="gtxt-rag">AI 포함</span> — 내 AI가 이 문서를 읽습니다
+              <br>수정 2026-08-21 14:12
+            </div>
+            <div class="dbt">
+              <button>✏ 고치기</button>
+              <button>AI 제외</button>
+              <button>공유 해제</button>
+              <button>⬇ .md 내려받기</button>
+              <button class="new">⬇ PDF · Word 내보내기<span class="tag-off">신규</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="px-tag">"내보내기"를 눌러야 report.ts가 DOCX/PDF+사이드카를 만든다 — 그때부터 Scene B "보냄" 단계</span>
+  </div>
+</div>
+
+<div class="evid-box">
+  <div class="cap">내보내기 버튼이 하는 일 — 새 변환기 없음</div>
+  <code>report.ts:612-646</code>의 DOCX(+선택 PDF) 생성 함수는 지금도 "취약점 조치 현황" 등 다른 리포트에
+  쓰이고 있다. "⬇ PDF · Word 내보내기"는 그 함수를 <b>문서 소스(personal_docs body)</b>로 다시 부르는
+  것뿐이다 — 같은 산출물(DOCX/PDF)이지만 <b class="hi">사람이 다듬은 뒤에</b> 나간다는 점이 최초안과의
+  차이다. 사이드카(.json)에 <code>recipient</code>·<code>findingIds</code>·<code>dueDate</code>를 적고,
+  그 값을 Scene B "요청 이력" 판이 읽는다.
+</div>
+
+<!-- ═══════════════════════════ Scene B ═══════════════════════════ -->
+<h2><span class="n">Scene B</span>추적 자리 — products.html 유지보수 칸의 「요청 이력」 접기 판</h2>
+<p class="note">
+  <code>products.html</code>의 제품 상세(<code>prodDetailHtml</code>)는 이미 점검 요약 줄(<code>.prod-maint</code>)과
+  🧬 정형 정보 접기(<code>.fields-toggle</code>)를 갖고 있다. 같은 접기 부품을 하나 더 놓는다 — 새 CSS 클래스를
+  만들지 않는다. 지시대로 <b class="hi">이 판은 그대로 두되</b>, 상태 어휘만 <b class="hi">「초안 → 보냄 →
+  회신」</b> 3단계로 바꾼다. <b>초안</b> = 아직 <code>mydocs.html</code>에서 편집 중(Scene C ①), 문서 칸을
+  누르면 문서함으로 간다. <b>보냄</b> 이후는 내보낸 PDF/DOCX 파일을 가리킨다.
+</p>
+
+<div class="g-rows" style="max-width:640px;margin-bottom:6px">
+  <div class="g-rows-scroll">
+    <div class="g-rows-head" style="grid-template-columns:1fr 110px 84px 52px 22px;gap:8px">
+      <span>제품</span><span>제조사 · 모델</span><span>점검</span><span class="ta-r">다음</span><span></span>
+    </div>
+    <div class="g-rows-flat">
+      <div class="g-rows-r" style="grid-template-columns:1fr 110px 84px 52px 22px;gap:8px;background:rgba(59,130,246,.12);box-shadow:inset 3px 0 0 var(--blue)">
+        <span class="trunc">📘 Palo Alto PA-3260 (NGFW) <span class="gm2" title="연결 자산">🔗fw-edge-01</span></span>
+        <span class="trunc gm2">Palo Alto Networks · PA-3260</span>
+        <span style="color:var(--amber);font-weight:800">승인대기 1</span>
+        <span class="ta-r gm2">08-28</span>
+        <span class="row-chev">▾</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="closeup-row">
+  <div class="closeup-col" style="flex:0 0 380px">
+    <div class="closeup-tag">지금 (요청 이력 없음, 변경 없음)</div>
+    <div class="card" style="max-width:380px">
+      <div class="prod-maint">🔧 점검 4건 · 승인대기 1 · 다음 점검 2026-08-28 <span style="color:var(--blue-light)">→</span></div>
+      <div class="note" style="margin:6px 0 0;font-size:11.5px">⋯ 문서(제품 매뉴얼·로그 매뉴얼)·🧬 정형 정보 접기 — 이번 변경과 무관, 생략</div>
+    </div>
+    <span class="px-tag" style="background:none;border-color:var(--border-strong);color:var(--muted-2)">약 40px(prod-maint 한 줄)</span>
+  </div>
+
+  <div class="closeup-col" style="flex:0 0 380px">
+    <div class="closeup-tag">바뀐 뒤 — 접힘(기본)</div>
+    <div class="card" style="max-width:380px">
+      <div class="prod-maint">🔧 점검 4건 · 승인대기 1 · 다음 점검 2026-08-28 <span style="color:var(--blue-light)">→</span></div>
+      <div class="note" style="margin:6px 0 0;font-size:11.5px">⋯ 문서·정형 정보 접기 — 생략</div>
+      <div class="fields-toggle"><span>📨 조치 요청 이력 (4건)</span><span class="car">▸</span></div>
+    </div>
+    <span class="px-tag">+46px (접기 줄 하나)</span>
+  </div>
+
+  <div class="closeup-col" style="flex:0 0 380px">
+    <div class="closeup-tag after">바뀐 뒤 — 펼침</div>
+    <div class="card" style="max-width:380px">
+      <div class="prod-maint">🔧 점검 4건 · 승인대기 1 · 다음 점검 2026-08-28 <span style="color:var(--blue-light)">→</span></div>
+      <div class="note" style="margin:6px 0 0;font-size:11.5px">⋯ 문서·정형 정보 접기 — 생략</div>
+      <div class="fields-toggle open"><span>📨 조치 요청 이력 (4건)</span><span class="car" style="transform:rotate(90deg)">▸</span></div>
+      <div class="fields-panel">
+        <div class="g-rows">
+          <div class="g-rows-scroll">
+            <div class="g-rows-head" style="grid-template-columns:80px 1fr 42px 60px 92px 46px;gap:6px">
+              <span>요청일</span><span>수신처</span><span class="ta-r">건수</span><span class="ta-r">기한</span><span>상태</span><span>문서</span>
+            </div>
+            <div class="g-rows-flat">
+              <div class="g-rows-r" style="grid-template-columns:80px 1fr 42px 60px 92px 46px;gap:6px">
+                <span class="gm2">08-21</span><span class="trunc">(비어 있음 — 초안)</span>
+                <span class="ta-r">3건</span><span class="ta-r gm2">08-28</span>
+                <span><span class="rq-pill draft">📓 초안</span></span><span class="gm2" title="문서함으로 이동">📓</span>
+              </div>
+              <div class="g-rows-r" style="grid-template-columns:80px 1fr 42px 60px 92px 46px;gap:6px">
+                <span class="gm2">08-19</span><span class="trunc">김보안 (사내)</span>
+                <span class="ta-r">1건</span><span class="ta-r gm2">08-24</span>
+                <span><span class="rq-pill sent">📤 보냄</span></span><span class="gm2" title="내보낸 PDF/DOCX">📄</span>
+              </div>
+              <div class="g-rows-r" style="grid-template-columns:80px 1fr 42px 60px 92px 46px;gap:6px">
+                <span class="gm2">08-10</span><span class="trunc">㈜정보보안기술</span>
+                <span class="ta-r">2건</span><span class="ta-r gm2">08-17</span>
+                <span><span class="rq-pill reply">💬 회신</span></span><span class="gm2" title="내보낸 PDF/DOCX">📄</span>
+              </div>
+              <div class="g-rows-r" style="grid-template-columns:80px 1fr 42px 60px 92px 46px;gap:6px">
+                <span class="gm2">07-30</span><span class="trunc">㈜한내네트웍스</span>
+                <span class="ta-r">2건</span><span class="ta-r gm2">08-06</span>
+                <span><span class="rq-pill late">🔴 무응답</span></span><span class="gm2" title="내보낸 PDF/DOCX">📄</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="px-tag">+46px(접기 줄) + 180px(패널, 4행 기준) = +226px</span>
+  </div>
+</div>
+
+<div class="evid-box">
+  <div class="cap">상태는 사람이 확인창으로 바꾼다 — 자동 파싱 없음(사장님 결정①)</div>
+  상태 4단계(📓 초안 · 📤 보냄 · 💬 회신 · 🔴 무응답)는 담당자가 행을 눌러 <b class="hi">확인창(다이얼로그)</b>으로
+  직접 바꾼다 — 이메일 인바운드로 자동 갱신하는 기능은 §2에서 명시적으로 포기했다. 대신 "보냄" 상태가
+  하루를 넘기도록 "회신"으로 안 바뀌면 다음날 아침 브리핑이 안내한다(자동 재촉 아님, Scene A③) —
+  "됐다"고 말하려면 실제로 되는 경로만 그린다는 정직 원칙(하지 않은 일을 했다고 말하는 결함 재발 방지,
+  2026-08-21) 때문이다.
+</div>
+
+<h2><span class="n">§6</span>밀도 숫자</h2>
+<table class="t">
+  <tr><th style="width:320px">항목</th><th style="width:170px">기존</th><th style="width:230px">신규</th><th>증감</th></tr>
+  <tr><td>제품 상세 안 유지보수 칸(<code>.prod-maint</code> 한 줄)</td><td colspan="2">패딩 6×2=12 + 글줄(12.5×1.4≈17.5, vuln-plain-line-extend와 같은 산식) + 테두리 2 + margin-top 8 ≈ <b>40px</b></td><td>변경 없음(그대로 둠)</td></tr>
+  <tr><td>「요청 이력」접기 줄(<code>.fields-toggle</code>, 요청 0건이어도 항상 보임)</td><td>없음</td><td>패딩 8×2=16 + 글줄17.5 + 테두리2 + margin-top10 ≈ <b>46px</b></td><td><b class="hi">+46px</b>(기본 접힘 — Progressive Disclosure 근거)</td></tr>
+  <tr><td>패널(<code>.fields-panel</code>) 펼친 내부 — 초안·보냄·회신·무응답 4행 기준</td><td>없음</td><td>패딩12×2=24+테두리2+margin-top8=34(패널 여백) + g-rows 머리26 + 행30×4=120 → <b>180px</b></td><td><b class="hi">+180px</b>(펼쳤을 때만 — 3건이면 150px, 1건이면 56px)</td></tr>
+  <tr><td>제품 상세 총합(접힘 상태 기준, 문서·정형정보 칸 제외)</td><td>≈40px</td><td>≈40+46=<b>86px</b></td><td><b class="hi">+46px(+115%)</b> — 접힌 채로 잰다(CLAUDE.md "접기는 접은 채로" 원칙)</td></tr>
+  <tr><td>대안(별도 새 화면)이었다면</td><td colspan="2">사이드바+헤더+정체성 줄 오버헤드 ≈120px가 <b>화면 전체에 추가로</b> 든다(maintenance.html <code>.ident</code>+<code>.sum</code> 실측 기준) — 접기 판 방식은 이 120px가 0</td><td><b class="ok">이 시안이 -120px</b>(화면 오버헤드 없음)</td></tr>
+  <tr><td>Scene A 완료 카드 — 문서 결과 표시(<code>.rq-doc</code>)</td><td>구안: 2개(docx+pdf) ≈84px</td><td>정정판: 1개(초안 열기) ≈42px</td><td><b class="ok">-42px</b>(카드 1개로 줄었다 — DOCX/PDF 2개 다운로드가 아니라 초안 1개 열기)</td></tr>
+  <tr><td>내 문서 업무 템플릿 서랍(<code>.tpl-drawer</code>, Scene C)</td><td>7종 · <code>.tpl-chip</code> 7개</td><td>8종 · <code>.tpl-chip</code> 8개(flex-wrap)</td><td>칩 1개 추가 — 한 줄에 안 들어가면 줄바꿈으로 <b>약 +30px</b>(칩 높이+margin), 들어가면 0px. 폭에 달림.</td></tr>
+</table>
+<p class="meas">
+  ⚠ 위 픽셀 값은 실제 CSS 수치(products.html·gijo-ui.css)에서 계산한 것이지만, 줄 높이(line-height) 값이
+  명시 안 된 항목(<code>.prod-maint</code>·<code>.fields-toggle</code>)은 지난 승인 시안(vuln-plain-line-extend §A)과
+  <b>같은 산식(12.5px×1.4)</b>을 재사용했다 — 실측이 아니라 추정임을 밝힌다. g-rows 행(30px)·머리(26px)는
+  <code>gijo-ui.css:354,359</code> 고정값이라 추정이 아니다.
+</p>
+
+<h2><span class="n">§7</span>제품 원칙 자가점검</h2>
+<div class="card">
+  <div class="checkline"><span class="ic">✅</span><span><b>지시는 대화창에서만</b> — Scene B(products.html)·
+  Scene C(mydocs.html)엔 지시용 입력칸이 없다. "요청서 만들기"는 Scene A(대화창)에서만 시작된다.
+  <code>mydocs.html</code>의 편집기 텍스트영역은 예외로 본다 — 이미 있는 저작 행위 자리(Smart MD와 같은
+  지위, mydocs.html 주석 "자유 텍스트 입력칸 0(지시는 대화창) — 단 편집기·요청 만들기는 예외")라
+  새로 어긴 게 아니다.</span></div>
+  <div class="checkline"><span class="ic">✅</span><span><b>회신 상태 전환 — 확정(사장님 결정①)</b> 상태(초안→보냄→
+  회신)는 <b>확인창(다이얼로그)</b>을 거쳐 사람이 바꾼다 — products.html 기존 제품삭제 확인창과 같은 성격.
+  자동 파싱은 없다. 대신 "보냄" 뒤 회신이 하루 넘게 없으면 <b>다음날 아침 브리핑이 안내</b>한다(Scene A③) —
+  자동 재촉·재발송이 아니라 사람에게 알려줄 뿐이다. 구현 시 정확한 확인창 문구·타이밍은 gijo-architect
+  검토 대상.</span></div>
+  <div class="checkline"><span class="ic">✅</span><span><b>수신처 자동 채움 — 확정(사장님 결정②)</b> 등록부
+  벤더명·자산 담당자를 자동으로 채우지 않는다. 결재판 필드는 "자리만" 만들고(비어 있어도 승인됨),
+  실제 값은 문서함에서 담당자가 자유 텍스트로 적는다 — 정확도를 담보 못 하는 자동 채움보다 사람이
+  직접 적는 편을 택했다.</span></div>
+  <div class="checkline"><span class="ic">✅</span><span><b>메뉴는 보기용, 새 화면 금지</b> — 새 페이지·새 탭 0개.
+  기존 제품 상세 접기(Scene B)와 기존 문서함 3단 작업공간(Scene C)에 얹을 뿐이다.</span></div>
+  <div class="checkline"><span class="ic">✅</span><span><b>자체완결 HTML</b> — 외부 CDN·웹폰트·원격 이미지 0개, JS 0줄.
+  더블클릭으로 바로 열린다.</span></div>
+  <div class="checkline"><span class="ic">✅</span><span><b>다크톤·색 토큰</b> — products.html·console.js·mydocs.html의
+  <code>:root</code> 값을 그대로 복사(글자 하나 안 다름).</span></div>
+  <div class="checkline"><span class="ic">⚠</span><span><b>11px 하한 — Scene C만 실제로 아래로 내려간다</b>
+  Scene A·B는 실제 화면 CSS 값을 그대로 복사해 11px 이상을 지킨다(<code>.tag-off</code> 10.5px는 이 시안
+  전용 주석 태그일 뿐 제품 화면이 아니다). 그런데 <b class="bad">Scene C는 mydocs.html의 3단 작업공간을
+  문서 폭에 맞추려고 값을 통째로 줄였다</b> — <code>.viewseg button</code> 10.75px(실제 12px)·
+  <code>.tpl-lead</code> 10.5px(실제 11.75px)·<code>.detail .dm</code> 11.5px(실제 12.5px, 명시 안 됐던 것을
+  명시)까지 내려갔다. <b class="hi">실제 구현은 mydocs.html의 원래 크기(12px대)를 그대로 쓴다</b> — Scene C의
+  작아진 글자는 "축소 재현"의 부작용이지 제안이 아니다. 본문에도 CSS 주석으로 밝혔다.</span></div>
+  <div class="checkline"><span class="ic">✅</span><span><b>같은 것은 한 곳에서만 센다</b> — 요청 건수·상태는
+  리포트 사이드카(.json, 내보내기 시점에 생성) 한 곳이 진실이고, "초안" 판정은 사이드카 없이 personal_docs
+  존재로 판정한다(둘이 겹치지 않는 배타적 소스). 요청 이력 판은 그 값을 읽기만 한다.</span></div>
+  <div class="checkline"><span class="ic">⚠</span><span><b>정직한 구현</b> — 문서 카드의 "문서 열기"·픽리스트
+  체크박스·결재판 승인 버튼·업무 템플릿 칩·내보내기 버튼·상태 칩은 전부 <b>정지 그림</b>이다(클릭 핸들러
+  없음). Scene A "① → ②"·Scene A③(다음날)·Scene C "① → ②" 전환은 실제 애니메이션이 아니라 같은 화면의
+  두 스냅샷을 나란히 배치한 것 — 코드 주석과 본문에 명시했다.</span></div>
+  <div class="checkline"><span class="ic">✅</span><span><b>개인 격리 vs 업무 산출물 — 확정(사장님 결정③)</b>
+  <code>mydocs.html</code>의 개인 문서는 기본이 격리다(<code>personaldocs.ts:142</code> 시스템 기본값
+  <code>shared:false</code> — 명시 옵트인 전엔 "내 것"만 서버가 준다, 남의 것은 404). 그런데 조치 요청서는
+  다른 담당자·products.html "요청 이력"이 참조해야 하는 <b>업무 산출물</b>이라 성격이 다르다. 결론: <b>이
+  템플릿으로 만든 문서만</b> <code>shared:true</code>를 기본으로 켠다(끌 수 있음) — <b class="hi">시스템
+  전체 기본값을 바꾸는 게 아니라 이 템플릿 생성 경로 하나의 예외</b>다. 비밀번호·계정 정보 자동 가림은
+  기존 공유 규칙 그대로 적용된다(<code>personaldocs.ts:93</code> <code>maskSecrets</code> — <code>shared</code>
+  켜진 문서만 거친다, 새 마스킹 로직 아님).</span></div>
+</div>
+
+<footer class="docfoot">
+  산출물: <code>mockups/remediation-request/시안.html</code> · 시안 작성 2026-08-21 · gijo-mockup 서브에이전트<br>
+  참고 표준: Vulnerability Remediation Tracker Template(securityscientist.net) · Vulnerability Remediation SLA
+  2026(decryptiondigest.com) · CISA Known Exploited Vulnerabilities(cisa.gov) · NN/g Progressive Disclosure
+  (nngroup.com, 재사용) · 내부: <code>GIJO_AS_취약점관리_지침.md</code>(SLA 기준) · <code>server/src/engine/picklist.ts</code>·
+  <code>console.js</code> attachApproval · <code>client/src/renderer/pages/mydocs.html</code> v4 작업공간·
+  TEMPLATES·<code>.dbt</code> · <code>server/src/engine/personaldocs.ts</code>(격리 기본값·maskSecrets) ·
+  <code>report.ts</code> base+사이드카 · <code>maintenance.html</code> 할일그리기() · 내부 선례:
+  mockups/vuln-plain-line-extend(밀도 산식 재사용) · mockups/panels-overview(제품 원칙 자가점검 형식 재사용)
+</footer>
+
+</div>
+</body>
+</html>

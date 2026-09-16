@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 인용 검증(✂)을 감독 화면에 드러내기</title>
+<!--
+  시안: mockups/cite-guard-supervision/시안.html  (2026-09-05)
+  승인 경로: 사장님 「추천으로 승인 및 진행」 → Fable 추천안 =
+    「감독 화면에 kind=cite를 **작게** 드러낸다 — 기존 표에 줄 하나 + 실동작 스트림 아이콘·라벨」
+  성격: 이 파일은 **기록이자 구현 지침**이다. 제품 코드는 한 줄도 안 건드렸다(시안공 권한).
+  ⚠ 아래 「실물 밀도」 구역은 supervision.html / agent.html의 CSS를 **글자 그대로** 옮겼다.
+     폭도 제품과 같게 1132px(= .main max-width 1180 - padding 24*2)로 고정해 재는 자리다 —
+     좁은 칸에 나란히 놓고 재면 줄바꿈이 생겨 「늘었다」가 거짓이 된다.
+-->
+<style>
+/* ── 제품 토큰(supervision.html :root 그대로) ───────────────────────────────── */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+/* ── 시안 문서 껍데기(제품 아님 — 설명 영역) ───────────────────────────────── */
+.doc{max-width:1180px;margin:0 auto;padding:22px 24px 60px;line-height:1.7;}
+.doc h1{font-size:21px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+.doc .lead{font-size:12.75px;color:var(--muted);margin-top:6px;}
+.doc h2{font-size:15px;font-weight:800;color:#fff;margin:30px 0 8px;padding-top:16px;border-top:1px solid var(--border);}
+.doc h3{font-size:13px;font-weight:800;color:var(--blue-light);margin:16px 0 6px;}
+.doc p,.doc li{font-size:12.75px;color:var(--muted);}
+.doc li{margin:3px 0 3px 18px;}
+.doc b.k{color:var(--text);font-weight:700;}
+.doc code{font-family:"Consolas","Menlo",monospace;font-size:11.75px;color:#c9c3ff;background:rgba(139,124,240,.10);
+  border:1px solid rgba(139,124,240,.22);border-radius:5px;padding:0 4px;}
+.doc pre{font-family:"Consolas","Menlo",monospace;font-size:11.75px;line-height:1.65;color:#cfd8cf;background:#1a1a19;
+  border:1px solid var(--border);border-radius:9px;padding:12px 14px;overflow-x:auto;margin:8px 0;white-space:pre;}
+.doc pre .cm{color:#7f8f7f;} .doc pre .add{color:#8fd6a8;} .doc pre .del{color:#f5928a;}
+.cap{font-size:11.5px;color:var(--muted-2);margin:6px 0 10px;}
+.badge{display:inline-block;font-size:11px;font-weight:800;padding:1px 8px;border-radius:10px;margin-right:6px;}
+.badge.now{background:rgba(255,255,255,.08);color:var(--muted);}
+.badge.new{background:rgba(30,185,128,.14);color:var(--teal);}
+.badge.dead{background:rgba(226,72,61,.14);color:#f5928a;}
+table.n{border-collapse:collapse;width:100%;margin:8px 0 4px;}
+table.n th,table.n td{border:1px solid var(--border);padding:5px 9px;font-size:12px;text-align:left;vertical-align:top;}
+table.n th{background:rgba(255,255,255,.04);color:var(--text);font-weight:700;}
+table.n td{color:var(--muted);}
+table.n td b{color:var(--text);}
+.num{font-family:"Consolas","Menlo",monospace;color:var(--text);}
+.warn{border-left:3px solid var(--amber);background:rgba(240,160,32,.07);padding:9px 12px;border-radius:0 8px 8px 0;margin:10px 0;}
+.warn b{color:var(--amber);}
+.stagewrap{overflow-x:auto;background:var(--bg);border:1px dashed var(--border-strong);border-radius:10px;padding:20px 24px;margin:8px 0 4px;}
+
+/* ── 실물 밀도 구역 — 제품 CSS를 글자 그대로(line-height는 제품처럼 normal) ──── */
+.stage{width:1132px;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13px;line-height:normal;color:var(--text);}
+.stage .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.stage .panel h2{font-size:14px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:10px;border:0;padding:0;}
+.stage .sup-line{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.75px;}
+.stage .sup-line:last-child{border-bottom:0;}
+.stage .sup-line .tag{flex:0 0 auto;font-size:11.75px;font-weight:800;padding:1px 8px;border-radius:10px;}
+.stage .tag.idle{background:rgba(255,255,255,.08);color:var(--muted);}
+.stage .tag.err{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}
+.stage .tag.ok{background:rgba(30,185,128,.14);color:var(--teal);}
+/* ★ 신규 1줄 — 기존 tag 3종과 같은 꼴, 잉크 폴백 관례(.tag.err의 var(--red-ink, …))를 따랐다 */
+.stage .tag.cite{background:rgba(139,124,240,.18);color:var(--purple-ink, #b6a9ff);}
+.stage .dim{color:var(--muted-2);}
+.stage .note{font-size:11.75px;color:var(--muted-2);margin-top:10px;}
+/* agent.html 터미널(86·96행) 그대로 */
+.stage .terminal{background:#1a1a19;border:1px solid var(--border);border-radius:10px;padding:12px 14px;
+  font-family:"Consolas","Menlo",monospace;font-size:12.5px;line-height:1.9;color:#8fd6a8;margin-top:8px;
+  flex:1 1 auto;min-height:240px;overflow-y:auto;}
+.stage .terminal .out{color:#b3ada4;}
+.stage .panel-title{font-size:14px;font-weight:800;color:#fff;}
+/* agent.html 181~185행(죽은 함수 llmRowHtml이 쓰는 꼴 — 참고용) */
+.stage .chat-row{display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--panel-2);border-radius:8px;padding:9px 12px;}
+.stage .chat-msg{color:var(--muted);margin-left:2px;}
+.deadbox{opacity:.5;filter:grayscale(.4);}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <h1>✂ 인용 검증을 감독 화면에 드러낸다 — 줄 하나 · 아이콘 하나</h1>
+  <div class="lead">
+    인용 검증 가드(<code>server/src/engine/citeguard.ts</code>, 배포 1245a61f)가 「근거 없는 인용」을 뗀 일은
+    <code>llm_activity_daily(kind=cite)</code>에 이미 쌓이는데 <b class="k">그리는 화면이 한 곳도 없다</b>
+    (citeguard.ts의 뗀인용요약() 위 주석이 그렇게 적어 두었다 — 「미노출」이지 「누락」이 아니다).
+    이 시안은 그 값을 <b class="k">감독 화면 표에 줄 하나</b>와 <b class="k">실동작 스트림 아이콘 하나</b>로만 드러낸다.
+    계획서 위치: <b class="k">전-7 「보여 주기」</b>의 연장(AI 팀 가시화와 같은 갈래) — 최종 확정은 상위 판단.
+  </div>
+
+  <!-- ═══════════════════ ① 감독 화면 ═══════════════════ -->
+  <h2>① 감독 화면 — 「감독 관점」 판에 줄 하나</h2>
+  <p>자리는 <code>supervision.html</code>의 <b class="k">감독 관점 — 규칙 계산(AI 문장 아님)</b> 판이다.
+     그 판은 이미 <b class="k">규칙으로 계산한 사실만</b> 한 줄씩 싣는 자리라, 「가드가 오늘 몇 개의 답을 손봤나」는 성질이 정확히 같다.</p>
+
+  <h3><span class="badge now">지금(배포본)</span> 값이 있을 때 — 인용 얘기가 없다</h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-old-a">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div id="sup-old-a">
+        <div class="sup-line"><span class="tag idle">무호출</span><span>위협 인텔리전스 · 문서 사서 — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>
+        <div class="sup-line"><span class="tag err">오류 상위</span><span>분석가 2건(4%) · 보고서 1건(9%)</span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+
+  <h3><span class="badge new">제안</span> 값이 있을 때 — 마지막에 ✂ 한 줄</h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-new-a">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div id="sup-new-a">
+        <div class="sup-line"><span class="tag idle">무호출</span><span>위협 인텔리전스 · 문서 사서 — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>
+        <div class="sup-line"><span class="tag err">오류 상위</span><span>분석가 2건(4%) · 보고서 1건(9%)</span></div>
+        <div class="sup-line" id="line-cite-a"><span class="tag cite">✂ 인용 제거</span><span>답 3개에서 근거 없는 인용을 뗐습니다 — 분석가 2 · 총괄 1 <span class="dim">(뗀 건수는 팀 활동 기록에)</span></span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+
+  <h3><span class="badge now">지금(배포본)</span> 특이사항이 없을 때</h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-old-b">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div id="sup-old-b">
+        <div class="sup-line"><span class="tag ok">정상</span><span>이 기간 무호출·오류 특이사항이 없습니다.</span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+
+  <h3><span class="badge new">제안</span> 값이 0일 때 — <b class="k">줄을 숨기지 않고 0으로 말한다</b></h3>
+  <div class="stagewrap"><div class="stage">
+    <div class="panel" id="p-new-b">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div id="sup-new-b">
+        <div class="sup-line"><span class="tag ok">정상</span><span>이 기간 무호출·오류 특이사항이 없습니다.</span></div>
+        <div class="sup-line" id="line-cite-b"><span class="tag cite">✂ 인용 제거</span><span>0개 — 이 기간에 뗀 인용이 없습니다</span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div></div>
+
+  <div class="warn">
+    <b>왜 0일 때도 줄을 남기나.</b> 줄을 숨기면 「가드가 안 도는 것」과 「뗄 것이 없었던 것」이 화면에서 똑같아 보인다.
+    이 저장소가 반복해 겪은 <b class="k">「장애 ≠ 부재」</b>가 그것이다 — 없음을 <b class="k">코드가 말해야</b> 사람이 믿는다.
+    0줄은 세로 <span class="num" id="z1">–</span>px를 쓴다(아래 밀도 표).
+  </div>
+
+  <!-- ═══════════════════ ② 실동작 스트림 ═══════════════════ -->
+  <h2>② 실동작 스트림 — 아이콘 ✂ 하나</h2>
+  <p>살아 있는 스트림은 <code>agent.html</code>의 <b class="k">팀 활동 — 협업 · 실동작 기록</b> 터미널 하나다
+     (<code>llmTerminalHtml</code>가 그린다). 여기 <code>kind=cite</code> 줄이 <b class="k">✂</b>로 흐른다.</p>
+
+  <div class="stagewrap"><div class="stage">
+    <div class="panel-title">팀 활동 — 협업 · 실동작 기록</div>
+    <div class="terminal" id="term" style="min-height:auto">
+      <div class="out">[14:31:52] 🔎 문서 12조각 임베딩 · 0.4s</div>
+      <div class="out">[14:31:53] 📚 [analysis] 사내 지식 8건 조회</div>
+      <div class="out">[14:31:53] 🛡 [analysis] 허용 — 위험 표현 없음</div>
+      <div class="out">[14:32:06] 🧠 [analysis] qwen3-14b · 응답 완료 · 1,204→338토큰 · 31 tok/s · 10.8s</div>
+      <div class="out" id="term-cite">[14:32:06] ✂ [analysis] 근거 없는 인용 3건 제거 — 겹침없음 2 · 범위밖 1</div>
+      <div class="out">[14:33:11] 🧠 [orchestrator] qwen3-14b · 응답 완료 · 902→210토큰 · 33 tok/s · 6.4s</div>
+    </div>
+  </div></div>
+  <div class="cap">위 줄은 실제 <code>뗀인용요약()</code>(citeguard.ts)이 만드는 문장 꼴 그대로다 —
+    <b class="k">인용 원문은 안 싣는다</b>(사내 문서 본문이 감독 화면·WS로 새면 안 된다, llm.ts:1098 주석).</div>
+
+  <div class="warn">
+    <b>여기서 정직하게 짚을 것 — 「라벨」은 지금 화면에 안 나온다.</b>
+    검토관이 지목한 <code>agent.html:802</code>의 라벨(<code>"검색"/"가드"/"LLM"</code>)은
+    <b class="k">죽은 함수 <code>llmRowHtml</code> 안에 있다</b> — 저장소 전체에서 호출부가 0곳이다(실측 grep).
+    살아 있는 자리는 <code>fmtLlm</code>의 <b class="k">아이콘</b>과 <code>llmTerminalHtml</code>뿐이다.
+    그러니 <b class="k">「스트림 라벨을 인용으로 바꿨다」고 보고하면 거짓</b>이 된다. 사람이 보는 변화는 <b class="k">✂ 아이콘 하나</b>다.
+    라벨도 함께 고치되(다음에 이 함수를 되살릴 때 또 「LLM」이라 부르지 않도록), <b class="k">보고에는 「미노출 코드」라고 적는다.</b>
+  </div>
+  <div class="stagewrap deadbox"><div class="stage">
+    <div class="chat-row"><span style="color:var(--teal);font-weight:700">✂ 인용</span><span class="chat-msg">[analysis] 근거 없는 인용 3건 제거 — 겹침없음 2 · 범위밖 1</span></div>
+  </div></div>
+  <div class="cap"><span class="badge dead">화면에 안 나옴</span> 죽은 함수 <code>llmRowHtml</code>이 그리던 꼴(참고용). 이 상자가 제품에 뜨는 자리는 지금 없다.</div>
+
+  <!-- ═══════════════════ ③ 밀도 숫자 ═══════════════════ -->
+  <h2>③ 밀도 숫자 <span style="font-size:11.5px;color:var(--muted-2);font-weight:400">— 이 페이지가 브라우저에서 스스로 잰 값(추정 아님)</span></h2>
+  <table class="n" id="dens">
+    <tr><th style="width:38%">잰 것</th><th style="width:16%">지금</th><th style="width:16%">제안</th><th style="width:30%">증감</th></tr>
+    <tr><td>✂ 줄 한 줄 높이(값 있음)</td><td class="num">—</td><td class="num" id="d-line-a">–</td><td id="d-line-a-n">신규</td></tr>
+    <tr><td>✂ 줄 한 줄 높이(0일 때)</td><td class="num">—</td><td class="num" id="d-line-b">–</td><td id="d-line-b-n">신규</td></tr>
+    <tr><td>감독 관점 판 세로 총합 — 특이사항 2줄 상태</td><td class="num" id="d-pa-old">–</td><td class="num" id="d-pa-new">–</td><td class="num" id="d-pa-diff">–</td></tr>
+    <tr><td>감독 관점 판 세로 총합 — 「정상」 1줄 상태</td><td class="num" id="d-pb-old">–</td><td class="num" id="d-pb-new">–</td><td class="num" id="d-pb-diff">–</td></tr>
+    <tr><td>실동작 스트림 ✂ 한 줄 높이</td><td class="num">—</td><td class="num" id="d-term">–</td><td>신규</td></tr>
+    <tr><td>실동작 스트림이 밀어내는 화면 세로</td><td class="num">—</td><td class="num">—</td><td><b>0px</b> — 터미널은 <code>min-height:240px · overflow-y:auto</code>라 줄이 늘어도 <b>상자 크기가 안 변한다</b>(agent.html:86)</td></tr>
+    <tr><td>화면 전체 증가분(감독 화면 1회 렌더)</td><td class="num">—</td><td class="num">—</td><td class="num" id="d-total">–</td></tr>
+  </table>
+  <div class="cap">잰 방법: 제품과 같은 폭(1132px = <code>.main</code> max-width 1180 − padding 24×2)에서 <code>getBoundingClientRect().height</code>.
+    좁은 칸에 나란히 놓고 재면 줄바꿈이 생겨 숫자가 부풀거나 줄어든다 — 그래서 세로로 쌓아 쟀다.<br>
+    <b class="k">실측값(2026-09-05 · 창 1280px):</b> ✂ 줄 <b class="k">31.0px</b>(값 있음·0일 때 같음) ·
+    판 179→<b class="k">211px</b>(특이 2줄) · 148→<b class="k">180px</b>(정상 1줄) · 스트림 ✂ 줄 23.8px · 스트림 화면 증가 <b class="k">0px</b>.<br>
+    <b class="k">31px 줄인데 판은 +32px인 이유:</b> <code>.sup-line:last-child{border-bottom:0}</code>라
+    <b class="k">전에 마지막이던 줄이 아래 테두리 1px를 되찾는다</b> — 31 + 1 = 32. (눈대중이면 「31px 늘었다」고 적었을 자리다.)<br>
+    <b class="k">밀도 원칙(사장님 「엑셀처럼 촘촘」) 대비:</b> 새 판·새 카드·새 KPI를 만들지 않아 증가분이 <b class="k">한 줄</b>로 끝난다.</div>
+
+  <!-- ═══════════════════ ④ 왜 이 안인가 ═══════════════════ -->
+  <h2>④ 왜 이 안인가 — 다른 길을 왜 안 골랐나</h2>
+  <table class="n">
+    <tr><th style="width:20%">길</th><th style="width:44%">안 고른 이유(근거는 코드 실측)</th><th>대가</th></tr>
+    <tr>
+      <td><b>별도 「인용 검증」 카드·판</b></td>
+      <td>① 값이 <b>대부분의 날 0</b>이다(가드는 지어낸 인용이 있을 때만 운다) — 늘 0인 판은 화면에서 죽은 자리가 되고, 이 저장소가 겪은 「카드만 늘고 아무도 안 보는」 실패를 되풀이한다.<br>
+          ② 감독 화면의 <b>KPI는 <code>repeat(4,1fr)</code> 4칸 고정</b>(supervision.html:32)이라 5번째를 넣으면 격자를 다시 짜야 한다.<br>
+          ③ 대화 홈 판(grouppanels.js:787)은 <b>「3줄 고정 — 판 카드 높이 계약」</b>이라 4번째 줄을 더하면 foot가 잘린다(검토관 하1이 이미 못박은 계약).</td>
+      <td>인용 사유별(겹침없음·범위밖·자기인용·통째교체) 추이를 화면에서 못 본다 → <b>지금은 스트림 한 줄에만</b> 있다.</td>
+    </tr>
+    <tr>
+      <td><b>툴팁·ⓘ 설명만</b></td>
+      <td>툴팁은 <b>숫자를 안 낳는다.</b> 감독 화면의 존재 이유가 「실측 숫자를 한 자리에서」인데, 가드가 일한 사실만 설명문으로 적으면 <b>「하고 있다는 말」과 「했다는 기록」이 갈린다</b> — 이 저장소가 「하지 않은 일을 했다고 말함」으로 크게 데인 자리다.</td>
+      <td>—(ⓘ 문구는 <b>이 안에서도 함께 넣는다</b>. 아래 ⑦)</td>
+    </tr>
+    <tr>
+      <td><b>레일에 ✂ 부품 아이콘 추가</b></td>
+      <td><b>게시 관문이 막는다.</b> <code>tools/publish-gate-ui.mjs:809</code>가 <code>「레일 로스터 12개(팀8+부품4)」</code>를 <b>정확히 12로</b> 센다 — 13이 되면 게시가 실패한다. 관문·<code>app.html:120~123</code> 주석·wiringcontract까지 함께 고쳐야 하는 <b>연쇄 3곳</b>짜리 일이라 「작게」와 맞지 않는다.</td>
+      <td>레일에서는 인용 가드가 안 보인다 → 다음 라운드 후보(관문 숫자 동시 수정 조건).</td>
+    </tr>
+    <tr>
+      <td><b>가드레일(G) 부품에 얹기</b></td>
+      <td>가드레일은 <b>입구 검사</b>(<code>gateway.gateUserInput</code>), 인용 가드는 <b>출구 검사</b>다. 한 아이콘에 묶으면 <b>「막았다」와 「뗐다」가 한 숫자로 섞인다</b> — 검토관 M5 계약(<i>라벨도 종류를 말한다</i>)을 정면으로 어긴다.</td>
+      <td>—(선택지에서 탈락)</td>
+    </tr>
+  </table>
+
+  <h2>⑤ 무엇을 포기했나</h2>
+  <ul>
+    <li><b class="k">뗀 「건수」는 표에 못 싣는다.</b> 집계 테이블은 <code>calls</code>만 세는데, <code>cite</code> 이벤트는 <b class="k">답 하나에 한 번</b> 실린다(llm.ts:1104). 그래서 표의 숫자는 <b class="k">「뗀 답의 개수」</b>이고, 「인용 3건」은 스트림 <code>detail</code> 한 줄에만 있다. <b class="k">표에 「3건」이라 쓰면 거짓</b>이다 — 문구를 「답 3개에서」로 못박은 이유.</li>
+    <li><b class="k">비율(%)을 안 쓴다.</b> 분모가 될 「호출」 KPI는 <b class="k">등록된 팀원만</b> 합산하고(supervision.html:129), <code>cite</code>는 <code>agentId ?? "-"</code>라 팀원 밖 값이 섞일 수 있다. 잣대를 억지로 맞추면 <b class="k">세 번째 잣대</b>가 생긴다 — 그래서 개수만 말한다.</li>
+    <li><b class="k">사유별 분해(겹침없음/범위밖/자기인용/통째교체)</b>는 화면에 안 넣었다. 집계 테이블에 사유 칸이 없다(kind 하나뿐) — 넣으려면 스키마를 늘려야 해서 이번 「작게」의 밖이다.</li>
+    <li><b class="k">레일 깜박임·대시보드 부품 카드</b>는 안 건드린다(위 ④ 셋째 줄).</li>
+    <li><b class="k">과거 소급 없음.</b> <code>cite</code>는 배포 1245a61f부터 쌓이므로 그 이전 기간은 0이 맞다 — 이 화면의 기존 규칙(「도입일 전은 0/‘-’가 정직」)과 같다.</li>
+  </ul>
+
+  <!-- ═══════════════════ ⑥ 구현 지침 ═══════════════════ -->
+  <h2>⑥ 구현 때 만질 자리 <span style="font-size:11.5px;color:var(--muted-2);font-weight:400">— 읽어서 확인한 실제 줄</span></h2>
+  <table class="n">
+    <tr><th style="width:34%">파일:줄</th><th style="width:22%">무엇</th><th>어떻게</th></tr>
+    <tr><td><code>client/src/renderer/pages/supervision.html:118</code></td><td>daily를 chat으로 잘라 버린다</td>
+        <td><code>var daily = …filter(kind==="chat")</code> 뒤에 <b>원본 <code>sup.daily</code>를 한 번 더 훑는</b> cite 합산을 더한다(원본을 안 버리게).</td></tr>
+    <tr><td><code>client/src/renderer/pages/supervision.html:170~176</code></td><td>감독 관점 줄 만들기</td>
+        <td>⚠ <b>176행 <code>if (!lines.length)</code>가 깨진다</b> — cite 줄을 늘 넣으면 「정상」이 <b>영영 안 뜬다</b>. 「특이사항 유무」 플래그로 갈라야 한다(아래 코드).</td></tr>
+    <tr><td><code>client/src/renderer/pages/supervision.html:56</code> 아래</td><td>tag 색 1줄</td>
+        <td><code>.tag.cite{background:rgba(139,124,240,.18);color:var(--purple-ink,#b6a9ff);}</code> — <code>--purple</code>은 :root에 이미 있고(20행), 잉크 폴백은 <code>.tag.err</code> 관례 그대로.</td></tr>
+    <tr><td><code>client/src/renderer/pages/agent.html:781</code></td><td>스트림 아이콘(<b>살아 있음</b>)</td>
+        <td><code>evt.kind === "cite" ? "✂"</code>를 <code>guard</code> 뒤에 잇는다. <b>사람이 보는 변화는 여기 하나뿐.</b></td></tr>
+    <tr><td><code>client/src/renderer/pages/agent.html:802</code></td><td>라벨(<b>죽은 함수</b>)</td>
+        <td><code>f.kind === "cite" ? "인용"</code>을 더한다. <b>화면에는 안 나온다</b> — 보고에 그렇게 적는다.</td></tr>
+    <tr><td><code>citeguard.ts</code> 뗀인용요약() 위 주석</td><td>주석이 「그리는 화면은 없다」</td>
+        <td>구현하면 <b>그 주석이 거짓이 된다.</b> 같은 커밋에서 고친다 — <b>약속과 코드의 불일치</b>는 검토관이 매번 잡는 부류다.</td></tr>
+    <tr><td><code>server/src/engine/screenguide.ts:497~500</code></td><td>supervision panels</td>
+        <td>ⓘ 문구 한 줄 추가(아래 ⑦). 화면엔 설명을 안 쓴다 — 원칙대로 챗봇이 말한다.</td></tr>
+    <tr><td><b>안 만짐</b>: <code>railroster.js</code> · <code>dashboard.html:513~519</code> · <code>grouppanels.js:785</code> · <code>office.html:1041</code></td><td>—</td>
+        <td>각각 게시 관문 12개 계약 · 부품 4개 대칭 · 3줄 고정 계약 · chat 전용 신호. <b>이번 라운드에서 손대지 않는 이유를 커밋에 적는다.</b></td></tr>
+  </table>
+
+  <h3>supervision.html — 넣을 코드(그대로 쓸 수 있게)</h3>
+  <pre><span class="cm">// ✂ 인용 검증(2026-09-05) — 원천은 같은 llm_activity_daily(kind=cite). 새 API·새 계수기 없음.</span>
+<span class="cm">// ⚠ daily 행은 (날짜 × 에이전트)라 7·30일에서는 같은 팀원이 여러 줄로 온다 — 반드시 합산.</span>
+<span class="cm">// ⚠ calls는 「뗀 답의 수」다(답 하나에 이벤트 하나 — llm.ts:1104). 「건수」라 쓰면 거짓.</span>
+<span class="add">var 뗀답 = 0, 인용별 = {};</span>
+<span class="add">(sup.daily || []).forEach(function (d) {</span>
+<span class="add">  if (d.kind !== "cite") return;</span>
+<span class="add">  뗀답 += d.calls || 0;</span>
+<span class="add">  인용별[d.agent] = (인용별[d.agent] || 0) + (d.calls || 0);</span>
+<span class="add">});</span>
+<span class="add">var 이름 = {}; agents.forEach(function (a) { 이름[a.id] = a.name; });</span>
+<span class="add">var 누가 = Object.keys(인용별).sort(function (x, y) { return 인용별[y] - 인용별[x]; }).slice(0, 3)</span>
+<span class="add">  .map(function (id) { return esc(이름[id] || (id === "-" ? "미지정" : id)) + " " + 인용별[id]; }).join(" · ");</span>
+
+<span class="cm">// ★ 「정상」 판정은 무호출·오류만 본다 — cite 줄은 늘 있으므로 lines.length로 재면 안 된다.</span>
+<span class="del">- if (!lines.length) lines.push('…정상…');</span>
+<span class="add">+ if (!무호출.length &amp;&amp; !오류상위.length) lines.push('…정상…');</span>
+<span class="add">+ lines.push('&lt;div class="sup-line"&gt;&lt;span class="tag cite"&gt;✂ 인용 제거&lt;/span&gt;&lt;span&gt;' +</span>
+<span class="add">+   (뗀답 ? '답 ' + 뗀답 + '개에서 근거 없는 인용을 뗐습니다 — ' + 누가 +</span>
+<span class="add">+           ' &lt;span class="dim"&gt;(뗀 건수는 팀 활동 기록에)&lt;/span&gt;'</span>
+<span class="add">+         : '0개 — 이 기간에 뗀 인용이 없습니다') + '&lt;/span&gt;&lt;/div&gt;');</span></pre>
+  <div class="cap">확인한 원천 사슬: <code>llm.ts:1104</code>(emit) → <code>llmactivity.ts:22·60</code>(kind 허용·일 집계) →
+    <code>llmactivity.ts:113</code>(<code>daily: activityDaily(days)</code>는 <b class="k">모든 kind</b>를 준다) →
+    화면. 참고로 <code>calls</code> 필드(KPI 「호출」)는 <code>chatCallsByAgent</code>(llmactivity.ts:93)라
+    <b class="k">chat만</b> 세므로 <b class="k">cite가 호출 KPI를 부풀리지 않는다</b>(확인함).</div>
+
+  <div class="warn"><b>짝 시험 제안(구현자용).</b> 「그 값을 누가 넣는가」를 코드로 못박는다 —
+    ① <code>emitLlmActivity({kind:"cite"})</code> 뒤 <code>activityDaily(1)</code>에 <code>kind==="cite"</code> 행이 서는지,
+    ② <code>chatCallsByAgent</code>가 그 행을 <b>안</b> 세는지(호출 KPI 오염 방지),
+    ③ supervision.html 문자열에 <code>tag cite</code>와 <code>kind !== "cite"</code>가 함께 있는지(소스 감시 — 세 번째 재발이면 감시가 규칙).</div>
+
+  <div class="warn"><b>⚠ 「뗐습니다」가 거짓이 될 수 있는 조건 — 구현자가 반드시 다시 볼 것.</b>
+    스트림 이벤트는 <code>llm.ts:1095</code>의 <code>removed.length &gt; 0 <b>||</b> 보류.length &gt; 0</code>에서 나간다.
+    <b>오늘(2026-09-05 working tree 실측)은 <code>보류</code>가 모든 반환 경로에서 빈 배열</b>이라 「cite 이벤트 = 실제로 뗀 답」이 성립한다.
+    하지만 <code>보류</code> 칸은 <b>「막지 못한 부류가 또 생기면 담으려고」 일부러 남겨 둔 자리</b>다(citeguard.ts 주석).
+    그것이 다시 채워지는 날 <b>표의 「뗐습니다」는 거짓이 된다</b> — 그때는 표 문구를 「손댄 답 N개」로 바꾸거나
+    <code>removed</code>만 세는 별도 신호가 필요하다. <b>구현 커밋에 이 조건을 주석으로 남긴다.</b></div>
+
+  <div class="warn"><b>⚠ citeguard.ts는 지금 움직이는 파일이다 — 줄 번호로 찾지 말 것.</b>
+    이 시안을 쓰는 동안에도 <b>2차 커밋 <code>d0714a83</code>(「세는 것과 막는 것을 가른다 — 구멍 4개」)</b>가 들어왔고,
+    작업 트리에 <b>미커밋 119줄</b>이 더 있다(565줄 → 663줄). 그래서 이 시안은 citeguard.ts만은 <b>함수 이름</b>으로 가리킨다.
+    구현 시점에 <code>grep -n "뗀인용요약|kind: \"cite\""</code>로 자리를 다시 잡을 것.
+    <b>배포본은 1245a61f지만 그 위에 2차가 이미 있다</b> — 「배포본 기준」이라 적으면 낡은 말이 된다.</div>
+  <!-- ═══════════════════ ⑦ ⓘ 문구 ═══════════════════ -->
+  <h2>⑦ screenguide에 더할 ⓘ 문구 초안 — <code>screenguide.ts</code> <code>"supervision.html"</code>의 <code>panels</code></h2>
+  <pre>"인용 제거(✂)": "AI가 「[1] \"…\"」처럼 근거를 대고 말했는데 <b>그 근거가 실제로 없으면</b> 답을 내보내기 전에 그 인용을 뗍니다 — 이 줄은 그 기간에 그렇게 손댄 <b>답의 개수</b>입니다(뗀 인용 <b>건수</b>와 사유는 「팀 활동 — 실동작 기록」의 ✂ 줄에 있습니다). <b>0이면 뗄 것이 없었다는 뜻</b>이고, 0이어도 줄을 숨기지 않는 이유는 「없음」도 재서 말하기 위해서입니다."</pre>
+  <div class="cap">화면에는 <b class="k">「✂ 인용 제거」 여섯 글자와 숫자</b>만 둔다 — 풀이는 ⓘ(gijo-info)가 연다.
+    <span style="color:var(--muted-2)">용어 풀이: <b class="k">인용 검증 가드</b> = AI 답에 붙은 「[1] “…”」 같은 근거 표시가 진짜 있는 자료를 가리키는지 대조해, 아니면 그 인용만 조용히 떼는 출구 검사기.</span></div>
+
+  <!-- ═══════════════════ ⑧ 자가점검 ═══════════════════ -->
+  <h2>⑧ 제품 원칙 자가점검</h2>
+  <table class="n">
+    <tr><th style="width:30%">원칙</th><th style="width:10%">지킴</th><th>어떻게</th></tr>
+    <tr><td>화면은 <b>보기용</b> — 입력칸 금지</td><td><b style="color:var(--teal)">O</b></td><td>줄 하나·아이콘 하나. 버튼·입력칸을 안 만들었다(조작은 기존 기간 전환·행 선택 그대로).</td></tr>
+    <tr><td>설명은 <b>ⓘ/screenguide</b>로</td><td><b style="color:var(--teal)">O</b></td><td>화면 문구는 「✂ 인용 제거 / 답 3개…」뿐. 풀이는 ⑦의 panels 한 줄.</td></tr>
+    <tr><td><b>정직</b> — 가짜 UI·거짓 초록 금지</td><td><b style="color:var(--teal)">O</b></td><td>0을 숨기지 않음 · 「건수」를 「답 개수」로 못박음 · 비율 안 만듦 · <b>죽은 라벨은 「안 보인다」고 시안에 적음</b>.</td></tr>
+    <tr><td><b>단일 출처</b> — 새 계수기 금지</td><td><b style="color:var(--teal)">O</b></td><td><code>llm_activity_daily</code> 하나에서만 읽는다. 새 API·새 테이블·새 집계 칸 0개.</td></tr>
+    <tr><td>모든 사용자 대상 텍스트 <b>한글</b></td><td><b style="color:var(--teal)">O</b></td><td>「인용 제거」·「근거 없는 인용」·「뗀 건수는 팀 활동 기록에」.</td></tr>
+    <tr><td><b>프로가 기준</b></td><td><b style="color:var(--teal)">O</b></td><td>감독 화면은 프로 셸이 카드/도킹으로 여는 자산 그대로 — 프로에서 먼저 보이고 표준도 같은 파일이라 함께 반영된다.</td></tr>
+    <tr><td><b>밀도 우선</b>(엑셀처럼 촘촘)</td><td><b style="color:var(--teal)">O</b></td><td>새 판·카드·KPI 0개. 증가분은 <span class="num" id="p8">–</span>px 한 줄.</td></tr>
+  </table>
+
+  <div class="cap" style="margin-top:22px">
+    이 시안은 <b class="k">제품 코드를 한 줄도 바꾸지 않았다</b>(mockups/ 아래 단일 파일, 외부 자원 0).
+    승인되면 ⑥의 자리만 만지고, 구현 뒤 <b class="k">검토관 병렬 → 실화면 관문 → 게시</b> 순서를 탄다.
+  </div>
+</div>
+
+<script>
+// 이 페이지가 스스로 잰다 — 「줄었다/늘었다」를 눈대중으로 적지 않기 위해(실측 원칙).
+(function () {
+  function H(id) { var e = document.getElementById(id); return e ? Math.round(e.getBoundingClientRect().height * 10) / 10 : null; }
+  function put(id, v, suffix) { var e = document.getElementById(id); if (e) e.textContent = (v == null ? "—" : v + (suffix || "")); }
+  function measure() {
+    var la = H("line-cite-a"), lb = H("line-cite-b"), t = H("term-cite");
+    var pao = H("p-old-a"), pan = H("p-new-a"), pbo = H("p-old-b"), pbn = H("p-new-b");
+    put("d-line-a", la, "px"); put("d-line-b", lb, "px"); put("d-term", t, "px");
+    put("d-pa-old", pao, "px"); put("d-pa-new", pan, "px");
+    put("d-pb-old", pbo, "px"); put("d-pb-new", pbn, "px");
+    var da = (pan != null && pao != null) ? Math.round((pan - pao) * 10) / 10 : null;
+    var db = (pbn != null && pbo != null) ? Math.round((pbn - pbo) * 10) / 10 : null;
+    put("d-pa-diff", da == null ? null : "+" + da, "px");
+    put("d-pb-diff", db == null ? null : "+" + db, "px");
+    put("d-total", da == null ? null : "+" + da, "px (감독 화면 한 곳 · 스트림 0px)");
+    put("z1", lb); put("p8", da);
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); else measure();
+  measure();
+})();
+</script>
+</body>
+</html>

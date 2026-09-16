@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIJO AS — 제품 라인업 & VRAM 티어 구동 가이드라인 통합 카탈로그</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .container {
+      max-width: 1450px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+
+    /* Header */
+    .header {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand-tag {
+      font-size: 11px;
+      font-weight: 900;
+      color: #2563eb;
+      background: #eff6ff;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid #bfdbfe;
+      letter-spacing: 0.05em;
+    }
+
+    .title {
+      font-size: 24px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #475569;
+      font-weight: 500;
+    }
+
+    .highlight-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #1e3a8a;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Tabs Navigation */
+    .tabs-wrapper {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #475569;
+      padding: 11px 18px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      border-color: #2563eb;
+      color: #2563eb;
+      background: #eff6ff;
+    }
+
+    .tab-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #2563eb;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+
+    /* Top Calculator Card */
+    .calculator-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+    }
+
+    .calc-title {
+      font-size: 16px;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .calc-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .option-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .option-label {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .select-box {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      background: #ffffff;
+      outline: none;
+    }
+
+    .calc-result {
+      margin-top: 14px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .result-badge {
+      font-size: 12px;
+      font-weight: 900;
+      padding: 4px 12px;
+      border-radius: 6px;
+      color: #ffffff;
+    }
+
+    .badge-lite { background: #2563eb; }
+    .badge-std { background: #059669; }
+    .badge-pro { background: #7c3aed; }
+
+    /* Tables */
+    .table-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+      margin-bottom: 24px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      border-right: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: 800;
+      font-size: 13px;
+      color: #ffffff;
+    }
+
+    .th-feature { background: #1e3a8a; width: 18%; }
+    .th-lite { background: #2563eb; width: 27%; }
+    .th-std { background: #059669; width: 27%; }
+    .th-pro { background: #7c3aed; width: 28%; }
+
+    tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    tbody tr:hover {
+      background: #eff6ff;
+    }
+
+    .td-feature {
+      font-weight: 800;
+      color: #0f172a;
+      background: #f1f5f9;
+    }
+
+    .td-value {
+      color: #334155;
+      font-weight: 500;
+      line-height: 1.6;
+    }
+
+    .td-value strong {
+      color: #0f172a;
+      font-weight: 800;
+    }
+
+    .code-text {
+      font-family: 'Consolas', monospace;
+      color: #2563eb;
+      font-weight: 700;
+      background: #eff6ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #bfdbfe;
+    }
+
+    /* Terminal Box */
+    .terminal-box {
+      background: #0f172a;
+      color: #38bdf8;
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      border: 1px solid #334155;
+      margin-bottom: 16px;
+    }
+
+    .terminal-cmd {
+      color: #f8fafc;
+      font-weight: bold;
+    }
+
+    .terminal-comment {
+      color: #64748b;
+    }
+
+    /* Auto Run Copy Card */
+    .autorun-card {
+      background: #ffffff;
+      border: 2px solid #2563eb;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
+    }
+
+    .autorun-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .btn-copy-cmd {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #ffffff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-copy-cmd:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+    }
+
+    /* NEW LIGHT ELEGANT GRAPHRAG PROCESS FLOW CARD */
+    .flow-card-light {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+      margin-bottom: 24px;
+    }
+
+    .flow-title-light-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .flow-title-light-text {
+      font-size: 17px;
+      font-weight: 900;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .flow-steps-light-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .flow-step-light-box {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-left: 5px solid #2563eb;
+      border-radius: 14px;
+      padding: 16px 20px;
+      width: 100%;
+      max-width: 680px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+      text-align: center;
+    }
+
+    .flow-step-light-label {
+      font-size: 11px;
+      font-weight: 900;
+      color: #2563eb;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .flow-step-light-content {
+      font-size: 15px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .flow-badge-light {
+      font-size: 11px;
+      font-weight: 800;
+      color: #2563eb;
+      background: #eff6ff;
+      padding: 4px 14px;
+      border-radius: 20px;
+      border: 1px solid #bfdbfe;
+    }
+
+    .flow-engine-light-container {
+      background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+      border: 2px solid #3b82f6;
+      border-radius: 16px;
+      padding: 20px 24px;
+      width: 100%;
+      max-width: 880px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.06);
+    }
+
+    .engine-flex-light-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .engine-sub-light-card {
+      background: #ffffff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 14px 18px;
+      flex: 1;
+      min-width: 250px;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    }
+
+    .engine-sub-light-title {
+      font-size: 14px;
+      font-weight: 900;
+      color: #1e3a8a;
+      margin-bottom: 4px;
+    }
+
+    .engine-sub-light-desc {
+      font-size: 12px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .engine-output-light-badge {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff;
+      padding: 10px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 900;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+    }
+
+    .flow-target-light-card {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-left: 5px solid #059669;
+      border-radius: 14px;
+      padding: 18px 24px;
+      width: 100%;
+      max-width: 780px;
+      text-align: center;
+    }
+
+    .target-badges-light-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .target-badge-light {
+      font-size: 12px;
+      font-weight: 800;
+      color: #065f46;
+      background: #ffffff;
+      padding: 4px 12px;
+      border-radius: 8px;
+      border: 1px solid #a7f3d0;
+    }
+
+    /* Callout Card */
+    .callout-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+    }
+
+    /* License Badges */
+    .badge-safe {
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #bbf7d0;
+      display: inline-block;
+    }
+
+    .badge-warn {
+      background: #fef9c3;
+      color: #854d0e;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #fef08a;
+      display: inline-block;
+    }
+
+    .badge-ban {
+      background: #fee2e2;
+      color: #991b1b;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid #fca5a5;
+      display: inline-block;
+    }
+
+    /* Scenario Cards */
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .scenario-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all 0.2s;
+    }
+
+    .card-lite { border-top: 4px solid #2563eb; }
+    .card-std { border-top: 4px solid #059669; }
+    .card-pro { border-top: 4px solid #7c3aed; }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tag {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .tag-lite { background: #eff6ff; color: #2563eb; }
+    .tag-std { background: #ecfdf5; color: #059669; }
+    .tag-pro { background: #f5f3ff; color: #7c3aed; }
+
+    /* Footer */
+    .footer {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 16px 20px;
+      text-align: center;
+      font-size: 13px;
+      color: #475569;
+      margin-top: 30px;
+    }
+
+    .footer-link {
+      color: #2563eb;
+      font-weight: 700;
+      text-decoration: underline;
+    }
+
+    /* Tab Content Hide/Show */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+      .title { font-size: 18px; }
+      th, td { padding: 10px 12px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-top">
+        <div>
+          <span class="brand-tag">GIJO TECHNOLOGY</span>
+          <h1 class="title">🛡️ GIJO AS 제품 라인업 & VRAM 티어 구동 가이드</h1>
+        </div>
+        <div style="font-size: 12px; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 6px 12px; border-radius: 8px;">
+          GraphRAG 시각화 디자인 개선 완료본
+        </div>
+      </div>
+      <p class="subtitle">
+        고객 장비 사양 및 보안팀 인원에 맞는 최적의 라인업을 선택하세요. 전 라인업 100% 동일 온프레미스 기능과 GraphRAG 지식 패키지(bge-m3 + 온톨로지 지식 그래프)가 결합되어 제공됩니다.
+      </p>
+
+      <div class="highlight-banner">
+        💡 <strong>핵심 가이드:</strong> 하위 라인업(Lite)도 기능이 빠지지 않습니다. 상위 티어는 <strong>"더 빠르고, 더 전문화된 AI 분석관 팀"</strong>을 동봉하는 개념입니다.
+      </div>
+    </header>
+
+    <!-- RENAMED TOP CARD: 🔍 우리 회사 맞춤 추천 모델 -->
+    <div class="calculator-card">
+      <div class="calc-title">
+        🔍 우리 회사 맞춤 추천 모델
+      </div>
+      
+      <div class="calc-options">
+        <div class="option-group">
+          <label class="option-label">1. 보안 전담 인원은 몇 명인가요?</label>
+          <select id="selectPeople" class="select-box" onchange="calculateTier()">
+            <option value="lite">1명 (또는 IT 겸직 담당자)</option>
+            <option value="std" selected>2 ~ 3명 (전담 보안팀)</option>
+            <option value="pro">3명 이상 / 보안관제(SOC) / MSP</option>
+          </select>
+        </div>
+
+        <div class="option-group">
+          <label class="option-label">2. 보유 GPU VRAM 용량 (GB)</label>
+          <select id="selectGpu" class="select-box" onchange="calculateTier()">
+            <option value="lite">12GB VRAM (RTX 3060 / 4070급)</option>
+            <option value="std" selected>24GB VRAM (RTX 3090 / 4090급)</option>
+            <option value="pro">30GB+ VRAM (RTX 5090 / A6000급)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="calc-result" id="calcResult">
+        <span>💡 추천 라인업: <strong style="color:#059669; font-size:15px;" id="resultTitle">🟩 AS Standard (24GB VRAM)</strong></span>
+        <span class="result-badge badge-std" id="resultBadge">추천/운영검증완료</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs (6 Tabs) -->
+    <div class="tabs-wrapper">
+      <button class="tab-btn active" onclick="switchTab(0)">📊 1. 라인업 핵심 비교표</button>
+      <button class="tab-btn" onclick="switchTab(1)">🌐 2. GraphRAG 지식 패키지</button>
+      <button class="tab-btn" onclick="switchTab(2)">⚙️ 3. PowerShell WMI 3초 GPU 조회 & 가능 사양표</button>
+      <button class="tab-btn" onclick="switchTab(3)">🤖 4. 상업 번들 LLM 후보 & 라이선스</button>
+      <button class="tab-btn" onclick="switchTab(4)">🧪 5. 모델 학습(파인튜닝) 전략</button>
+      <button class="tab-btn" onclick="switchTab(5)">🎯 6. 구매자 추천 & FAQ</button>
+    </div>
+
+    <!-- TAB 1: Master Comparison Table -->
+    <div class="tab-content active" id="tab0">
+      <div class="table-card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th class="th-feature">구분 항목</th>
+                <th class="th-lite">🟦 AS Lite (12GB)</th>
+                <th class="th-std">🟩 AS Standard (24GB) ⭐</th>
+                <th class="th-pro">🟪 AS Pro (30GB+)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature">권장 GPU 사양</td>
+                <td class="td-value"><strong>12GB VRAM</strong><br>(RTX 3060 12G · 4070급)</td>
+                <td class="td-value"><strong>24GB VRAM</strong><br>(RTX 3090 · 4090급)</td>
+                <td class="td-value"><strong>30GB+ VRAM</strong><br>(RTX 5090 · A6000급)</td>
+              </tr>
+              <tr>
+                <td class="td-feature">기본 동봉 번들 LLM</td>
+                <td class="td-value"><strong>Qwen3-8B</strong> Q4 (단일 상주)</td>
+                <td class="td-value"><strong>Qwen3-8B + Kanana-1.5-8B</strong> (2상주)</td>
+                <td class="td-value"><strong>Qwen3-8B + Kanana-1.5-8B + Phi-4/gpt-oss</strong> (3상주)</td>
+              </tr>
+              <tr>
+                <td class="td-feature">GraphRAG 지식 엔진</td>
+                <td class="td-value" style="color:#0284c7; font-weight:800;">bge-m3 (벡터 DB) + 6대 온톨로지 (지식 그래프) 결합 패키지 기본 탑재</td>
+                <td class="td-value" style="color:#0284c7; font-weight:800;">bge-m3 (벡터 DB) + 6대 온톨로지 (지식 그래프) 결합 패키지 기본 탑재</td>
+                <td class="td-value" style="color:#0284c7; font-weight:800;">bge-m3 (벡터 DB) + 6대 온톨로지 (지식 그래프) 결합 패키지 기본 탑재</td>
+              </tr>
+              <tr>
+                <td class="td-feature">추천 대상 조직</td>
+                <td class="td-value"><strong>1인 보안담당자</strong> (겸직 포함)<br>소기업 · 지자체 산하기관 · 파일럿</td>
+                <td class="td-value"><strong>2~3인 보안팀</strong><br>중견기업 · 금융 자회사 · 대학</td>
+                <td class="td-value"><strong>3인 이상 팀 · SOC 관제</strong><br>대기업 · 공공기관 · MSP</td>
+              </tr>
+              <tr>
+                <td class="td-feature">동시 사용자 수</td>
+                <td class="td-value">1 ~ 2명</td>
+                <td class="td-value">3 ~ 5명</td>
+                <td class="td-value">5명 이상 (다수 동시 접속)</td>
+              </tr>
+              <tr>
+                <td class="td-feature">AI 역할 분리 방식</td>
+                <td class="td-value">단일 AI가 지휘 및 분석 겸임</td>
+                <td class="td-value"><strong>지휘관 AI + 보안전문가 AI</strong> (2분업)</td>
+                <td class="td-value"><strong>지휘관 + 보안전문가 + 리포트/코드</strong> (3분업)</td>
+              </tr>
+              <tr>
+                <td class="td-feature">AI 응답 대기시간</td>
+                <td class="td-value">작업 전환 시 15~30초 로드 대기</td>
+                <td class="td-value"><strong>상주 2종 즉시 응답</strong> (대기 없음)</td>
+                <td class="td-value"><strong>상주 3종 실시간 최상 응답</strong> (대기 0초)</td>
+              </tr>
+              <tr>
+                <td class="td-feature">문서 처리 용량 (컨텍스트)</td>
+                <td class="td-value">16K (긴 문서는 자동 분할)</td>
+                <td class="td-value"><strong>32K</strong> (긴 스캔 리포트 통째 처리)</td>
+                <td class="td-value"><strong>32K ~ 64K</strong> (대형 감사 문서 원스톱)</td>
+              </tr>
+              <tr>
+                <td class="td-feature">소프트웨어 기능 차이</td>
+                <td class="td-value" style="color:#2563eb; font-weight:800;">전 기능 100% 동일 탑재</td>
+                <td class="td-value" style="color:#059669; font-weight:800;">전 기능 100% 동일 탑재</td>
+                <td class="td-value" style="color:#7c3aed; font-weight:800;">전 기능 100% 동일 탑재</td>
+              </tr>
+              <tr>
+                <td class="td-feature">데이터 외부 유출 여부</td>
+                <td class="td-value"><strong>0% (100% 온프레미스)</strong></td>
+                <td class="td-value"><strong>0% (100% 온프레미스)</strong></td>
+                <td class="td-value"><strong>0% (100% 온프레미스)</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: GraphRAG Knowledge Package (REDESIGNED FOR EASY VISUALIZATION) -->
+    <div class="tab-content" id="tab1">
+      <div class="sales-quote-card" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #2563eb; border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 900; color: #2563eb; letter-spacing: 0.05em; margin-bottom: 4px;">
+          📣 GRAPH RAG B2B 세일즈 핵심 포인트 (SALES POINT)
+        </div>
+        <div style="font-size: 16px; font-weight: 900; color: #1e3a8a; line-height: 1.6;">
+          "우리 솔루션을 도입하면, 텍스트 의미 검색(bge-m3)과 복잡한 관계 추론(온톨로지)이 동시에 가능해져 LLM 환각(Hallucination) 없이 즉시 정확한 전문 AI 서비스를 구축할 수 있습니다."
+        </div>
+      </div>
+
+      <!-- REDESIGNED LIGHT & EASY GRAPH RAG PROCESS FLOW CARD -->
+      <div class="flow-card-light">
+        <div class="flow-title-light-bar">
+          <div class="flow-title-light-text">
+            <span>⚡ GraphRAG 지식 자산화 및 B2B 판매 프로세스</span>
+          </div>
+          <div style="font-size: 12px; color: #2563eb; font-weight: 800; background: #eff6ff; padding: 4px 12px; border-radius: 8px; border: 1px solid #bfdbfe;">
+            [bge-m3 벡터 DB] + [온톨로지 지식 그래프] 패키지 융합
+          </div>
+        </div>
+
+        <div class="flow-steps-light-grid">
+          <!-- Step 1: Input Data -->
+          <div class="flow-step-light-box">
+            <div class="flow-step-light-label">STEP 1. INPUT DATA & ASSETS</div>
+            <div class="flow-step-light-content">🏢 [기업 내부 데이터 / 전문 노하우 자산]</div>
+            <div style="font-size: 12px; color: #475569; margin-top: 4px; font-weight: 500;">
+              사내 업무 문서, 보안 규정집, 가이드라인, 내부 히스토리 자산
+            </div>
+          </div>
+
+          <div class="flow-arrow-connector">
+            <span class="flow-badge-light">▼ (지식 자산화 프로세스)</span>
+          </div>
+
+          <!-- Step 2: Core Engine Packaging -->
+          <div class="flow-engine-light-container">
+            <div style="font-size: 13px; font-weight: 900; color: #1e3a8a; letter-spacing: 0.05em;">
+              ⚙️ STEP 2. CORE ENGINE PACKAGING (융합 패키지)
+            </div>
+
+            <div class="engine-flex-light-row">
+              <div class="engine-sub-light-card">
+                <div class="engine-sub-light-title">🔍 bge-m3 벡터 데이터</div>
+                <div class="engine-sub-light-desc">텍스트 의미 검색 (Semantic Search)</div>
+              </div>
+              <div style="font-size: 22px; font-weight: 900; color: #2563eb;">+</div>
+              <div class="engine-sub-light-card">
+                <div class="engine-sub-light-title" style="color:#7c3aed;">🕸️ 온톨로지 지식 그래프</div>
+                <div class="engine-sub-light-desc">복잡한 관계 추론 (Knowledge Graph)</div>
+              </div>
+            </div>
+
+            <div style="color: #2563eb; font-size: 16px; font-weight: 900;">▼</div>
+
+            <div class="engine-output-light-badge">
+              📦 [자산화된 GraphRAG 패키지 완성]
+            </div>
+          </div>
+
+          <div class="flow-arrow-connector">
+            <span class="flow-badge-light">▼ (B2B 지식 솔루션 레디-메이드 판매)</span>
+          </div>
+
+          <!-- Step 3: Target Customers -->
+          <div class="flow-target-light-card">
+            <div style="font-size: 11px; font-weight: 900; color: #059669; letter-spacing: 0.05em; margin-bottom: 4px;">
+              STEP 3. B2B TARGET CUSTOMERS
+            </div>
+            <div style="font-size: 16px; font-weight: 900; color: #065f46;">
+              🚀 [타 기업의 LLM / RAG 시스템 구축용 전문 지식 솔루션 레디-메이드 판매]
+            </div>
+            
+            <div class="target-badges-light-row">
+              <span class="target-badge-light">🏦 금융사</span>
+              <span class="target-badge-light">🏥 병원</span>
+              <span class="target-badge-light">🏭 제조 대기업</span>
+              <span class="target-badge-light">⚖️ 법무법인</span>
+              <span class="target-badge-light">🏛️ 공공기관</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GraphRAG vs General RAG Table -->
+      <div class="table-card">
+        <div style="padding: 14px 20px; background: #0f172a; color: #ffffff; font-weight: 800; font-size: 15px;">
+          📊 일반 RAG vs GIJO GraphRAG 패키지 비교
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr style="background: #f1f5f9; color: #0f172a;">
+                <th style="color:#0f172a; width: 25%;">구분</th>
+                <th style="color:#0f172a; width: 35%;">일반 RAG (단순 텍스트 검색)</th>
+                <th style="color:#0f172a; width: 40%;">GIJO GraphRAG 패키지 (bge-m3 + 온톨로지)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature">검색 방식</td>
+                <td>단순 텍스트/키워드 유사도 검색</td>
+                <td class="td-value"><strong>의미적 유사도(bge-m3) + 인과 관계 추론(Graph)</strong> 융합</td>
+              </tr>
+              <tr>
+                <td class="td-feature">복잡한 규정/연관 파악</td>
+                <td>문서 조각 단위 검색으로 연관 관계 누락</td>
+                <td class="td-value"><strong>6대 보안 표준 ~2,000개 트리플 지식 그래프</strong>로 정확 파악</td>
+              </tr>
+              <tr>
+                <td class="td-feature">LLM 환각 (Hallucination)</td>
+                <td>문맥 부족 시 거짓 정보(환각) 발생</td>
+                <td class="td-value"><strong>정확한 인과 지식 그래프 검증으로 환각 0% 차단</strong></td>
+              </tr>
+              <tr>
+                <td class="td-feature">B2B 상품성</td>
+                <td>단순 구축 프로젝트 (재사용성 낮음)</td>
+                <td class="td-value"><strong>자산화된 독립 패키지로 즉시 재판매 및 이식 가능</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: POWERSHELL WMI 3-SEC GPU CHECK & GIJO CAPABILITY MATRIX -->
+    <div class="tab-content" id="tab2">
+
+      <!-- AUTOMATED POWERSHELL WMI COMMAND COPY & EXECUTION CARD -->
+      <div class="autorun-card">
+        <div class="autorun-header">
+          <div style="font-size: 15px; font-weight: 900; color: #1e3a8a;">
+            ⚡ Windows 기본 PowerShell WMI로 100% GPU 정보 3초 조회 (NVIDIA PATH 없어도 OK)
+          </div>
+          <button class="btn-copy-cmd" onclick="copyPshCommand()">
+            <span>📋 원클릭 명령어 복사</span>
+          </button>
+        </div>
+
+        <p style="font-size: 12px; color: #475569; margin-bottom: 10px; line-height: 1.6;">
+          Windows PowerShell(또는 CMD) 창에 아래 명령어를 복사하여 붙여넣으면, <strong>NVIDIA 드라이버 PATH 등록 여부와 무관하게 3초 만에 그래픽카드명, VRAM 용량(AdapterRAM), 드라이버 버전이 100% 출력</strong>됩니다.
+        </p>
+
+        <div class="terminal-box" style="margin-bottom: 0;">
+          <span class="terminal-comment"># Windows PowerShell 3초 GPU 조회 원라이너 명령어</span><br>
+          <span class="terminal-cmd" id="pshCmdText">Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion</span>
+        </div>
+      </div>
+      
+      <!-- POWERSHELL ADAPTERRAM MATRIX TABLE -->
+      <div class="table-card" style="border-top: 4px solid #2563eb; margin-bottom: 24px;">
+        <div style="padding: 16px 20px; background: #eff6ff; border-bottom: 1px solid #bfdbfe; display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 16px; font-weight: 900; color: #1e3a8a;">
+            📊 Get-CimInstance AdapterRAM 수치별 GIJO AS 최소 ~ 최대 가능 사양표
+          </div>
+          <span style="font-size: 11px; font-weight: 800; background: #2563eb; color: #ffffff; padding: 3px 10px; border-radius: 6px;">
+            현장 판정 매트릭스
+          </span>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr style="background: #1e3a8a; color: #ffffff;">
+                <th style="width: 15%;">구분 티어</th>
+                <th style="width: 25%;">AdapterRAM 출력 수치 (바이트 & GB)</th>
+                <th style="width: 20%;">감지 GPU 예시</th>
+                <th style="width: 40%;">GIJO AS 구동 가능 범위 (최소 ~ 최대)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature" style="background:#fef2f2; color:#991b1b;">⚠️ 미달/내장 (iGPU)</td>
+                <td><strong>4GB 미만</strong><br>(예: <span class="code-text">2,147,479,552</span> / ~2GB)</td>
+                <td>Intel Iris Xe / UHD,<br>내장 그래픽 iGPU</td>
+                <td class="td-value">
+                  • <strong>최소:</strong> CPU 전용 모드 구동 가능 (속도 완만)<br>
+                  • <strong>최대:</strong> 7B Q4 1개 로드 시 System RAM 스왑 발생<br>
+                  👉 <strong>영업 조치:</strong> 외장 GPU (RTX 3060 12GB) 추가 장착 권장
+                </td>
+              </tr>
+              <tr>
+                <td class="td-feature" style="background:#eff6ff; color:#2563eb;">🟦 최소 사양 (Lite)</td>
+                <td><strong>8GB ~ 12GB</strong><br>(예: <span class="code-text">12,884,901,888</span> / ~12GB)</td>
+                <td>NVIDIA RTX 3060 12G,<br>RTX 4070급</td>
+                <td class="td-value">
+                  • <strong>최소:</strong> Qwen3-8B Q4 1개 상주 (16K 컨텍스트)<br>
+                  • <strong>최대:</strong> 8B 1개 상주 + bge-m3 임베딩 상주 (3.4GB 여유 버퍼)<br>
+                  👉 <strong>권장 설정:</strong> <span class="code-text">GIJO_MAX_LOADED_MODELS=1</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="td-feature" style="background:#ecfdf5; color:#059669;">🟩 권장 사양 (Standard) ⭐</td>
+                <td><strong>16GB ~ 24GB</strong><br>(예: <span class="code-text">25,769,803,776</span> / ~24GB)</td>
+                <td>NVIDIA RTX 3090,<br>RTX 4090급</td>
+                <td class="td-value">
+                  • <strong>최소:</strong> 7B Q5 + 7B Q4 + bge-m3 (실측 16GB 점유)<br>
+                  • <strong>최대:</strong> <strong>2개 채팅 LLM(지휘+전문가) 대기 0초 완전 상주 (32K 컨텍스트)</strong><br>
+                  👉 <strong>기본 설정:</strong> <span class="code-text">GIJO_MAX_LOADED_MODELS=2</span> (현 운영검증)
+                </td>
+              </tr>
+              <tr>
+                <td class="td-feature" style="background:#f5f3ff; color:#7c3aed;">🟪 최상 사양 (Pro)</td>
+                <td><strong>30GB 이상</strong><br>(예: <span class="code-text">34,359,738,368</span> / ~32GB+)</td>
+                <td>NVIDIA RTX 5090,<br>RTX A6000급</td>
+                <td class="td-value">
+                  • <strong>최소:</strong> 14B Q4 + 7B Q5 + 7B Q4 (27GB 점유)<br>
+                  • <strong>최대:</strong> <strong>3개 채팅 LLM(지휘+전문가+특화) + 64K 컨텍스트 SOC 관제 구동</strong><br>
+                  👉 <strong>권장 설정:</strong> <span class="code-text">GIJO_MAX_LOADED_MODELS=3</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: Commercial Bundle LLMs -->
+    <div class="tab-content" id="tab3">
+      <div class="table-card" style="margin-bottom: 20px;">
+        <div style="padding: 14px 20px; background: #059669; color: #ffffff; font-weight: 800; font-size: 15px; display:flex; align-items:center; justify-content:space-between;">
+          <span>✅ 1군: 무조건 안전 (Apache-2.0 / MIT 상업 동봉 가능)</span>
+          <span style="font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 6px;">별도 동의/조건 없이 번들 가능</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr style="background: #f1f5f9;">
+                <th style="color:#0f172a; width: 22%;">모델명 (제조사)</th>
+                <th style="color:#0f172a; width: 10%;">크기</th>
+                <th style="color:#0f172a; width: 14%;">라이선스</th>
+                <th style="color:#0f172a; width: 38%;">강점 및 용도</th>
+                <th style="color:#0f172a; width: 16%;">번들 판정</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature">Qwen3-8B / 3.5 (Alibaba)</td>
+                <td>8B</td>
+                <td><span class="badge-safe">Apache-2.0</span></td>
+                <td class="td-value">한국어 상위권, JSON 도구호출 우수 → <strong>지휘(라우팅) 모델 적임</strong></td>
+                <td><span class="badge-safe">✅ 1군 안전 (기본 지휘)</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Kanana-1.5-8B (카카오)</td>
+                <td>8B</td>
+                <td><span class="badge-safe">Apache-2.0</span></td>
+                <td class="td-value">국산·한국어 특화, 영업 스토리 우수 → <strong>한국어 전문가 적임</strong></td>
+                <td><span class="badge-safe">✅ 1군 안전 (기본 전문가)</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Upstage SOLAR (업스테이지)</td>
+                <td>10.7B</td>
+                <td><span class="badge-safe">Apache-2.0</span></td>
+                <td class="td-value">국산, 한국어 성능 뛰어남 (Kanana 대체 슬롯 가능)</td>
+                <td><span class="badge-safe">✅ 1군 안전</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Phi-4 / Phi-4-mini (MS)</td>
+                <td>14B/3.8B</td>
+                <td><span class="badge-safe">MIT</span></td>
+                <td class="td-value">14B급 강력한 추론력 (Pro 티어 전문가 승격 후보)</td>
+                <td><span class="badge-safe">✅ 1군 안전</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">gpt-oss-20b (OpenAI)</td>
+                <td>20B MoE</td>
+                <td><span class="badge-safe">Apache-2.0</span></td>
+                <td class="td-value">추론 및 도구호출 강력 (~16GB로 Pro 티어 탑재 가능)</td>
+                <td><span class="badge-safe">✅ 1군 안전</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">DeepSeek-R1-Distill-Qwen</td>
+                <td>7-8B</td>
+                <td><span class="badge-safe">MIT</span></td>
+                <td class="td-value">사고과정/추론 특화 (분석 에이전트 전담 후보)</td>
+                <td><span class="badge-safe">✅ 1군 안전</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Granite 3.x-8B (IBM)</td>
+                <td>8B</td>
+                <td><span class="badge-safe">Apache-2.0</span></td>
+                <td class="td-value">엔터프라이즈 안전성 검증 문서화 우수</td>
+                <td><span class="badge-safe">✅ 1군 안전</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-card" style="margin-bottom: 20px;">
+        <div style="padding: 14px 20px; background: #991b1b; color: #ffffff; font-weight: 800; font-size: 15px;">
+          🚫 조건부 및 상업 번들 금지 모델 (주의 요망)
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr style="background: #f1f5f9;">
+                <th style="color:#0f172a; width: 25%;">모델명</th>
+                <th style="color:#0f172a; width: 45%;">라이선스 제약 조건</th>
+                <th style="color:#0f172a; width: 30%;">번들 판정 및 가이드라인</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature">Llama 3.1 / 3.2-8B (Meta)</td>
+                <td class="td-value">커뮤니티 라이선스 (월활성 7억 미만 OK + <strong>"Built with Llama" UI/문서 표기 필수</strong>)</td>
+                <td><span class="badge-warn">⚠️ 조건부 번들 가능 (표기 의무 준수)</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">EXAONE 3.5 / Deep (LG)</td>
+                <td class="td-value">연구목적 한정 라이선스 (상업 재배포 절대 불가)</td>
+                <td><span class="badge-ban">❌ 번들 절대 금지 (고객 BYOM 반입 안내만)</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Qwen2.5-3B (Alibaba)</td>
+                <td class="td-value">Qwen Research License (비상업) ※ Qwen2.5 7B/14B는 Apache로 안전</td>
+                <td><span class="badge-ban">❌ 번들 금지 (제품 게이트 차단)</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Ministral-8B (Mistral)</td>
+                <td class="td-value">Mistral Research License (비상업)</td>
+                <td><span class="badge-ban">❌ 번들 금지</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Kanana 나노 2.1B (CC-BY-NC)</td>
+                <td class="td-value">연구용 CC-BY-NC 라이선스 (Kanana 1.5-8B 버전만 Apache)</td>
+                <td><span class="badge-ban">❌ 번들 금지</span></td>
+              </tr>
+              <tr>
+                <td class="td-feature">Gukbap-Qwen2.5-7B (국밥)</td>
+                <td class="td-value">CC-BY-NC-4.0 (비상업 확정)</td>
+                <td><span class="badge-ban">❌ 번들 금지 (비상업 라이선스)</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="calculator-card" style="border-left: 4px solid #f59e0b; background: #fffbeb;">
+        <div style="font-size: 15px; font-weight: 900; color: #92400e; margin-bottom: 8px;">
+          💡 BYOM (고객 직접 모델 반입) 세일즈 & 영업 화법 가이드
+        </div>
+        <p style="font-size: 12px; color: #78350f; line-height: 1.7;">
+          • <strong>"고객 직접 반입 시 당사의 재배포 책임은 소멸되지만, 라이선스 준수 책임은 고객에게 이전됩니다."</strong><br>
+          • ⚠️ 영업 시 <em>"EXAONE도 고객이 직접 올리면 문제없이 쓸 수 있습니다"</em>라고 안내하지 않도록 주의해 주세요.<br>
+          • 제품 내 라이선스 검증 게이트(<code>modellicense.ts</code>)가 비상업 모델 반입 시 자동 경고 메시지를 안내합니다.
+        </p>
+      </div>
+    </div>
+
+    <!-- TAB 5: Merge vs Finetune Strategy -->
+    <div class="tab-content" id="tab4">
+      <div class="table-card" style="margin-bottom: 20px;">
+        <div style="padding: 14px 20px; background: #7c3aed; color: #ffffff; font-weight: 800; font-size: 15px;">
+          🧪 gijo 모델 학습(QLoRA 파인튜닝) — 합성(SLERP Merge)은 제공하지 않습니다
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr style="background: #f1f5f9; color: #0f172a;">
+                <th style="color:#0f172a; width: 20%;">구분 항목</th>
+                <th style="color:#0f172a; width: 40%;">합성(SLERP Merge) — ❌ 없앤 기능</th>
+                <th style="color:#0f172a; width: 40%;">Finetune (QLoRA 파인튜닝)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature">개념 및 작동 방식</td>
+                <td class="td-value">같은 아키텍처 모델 둘의 가중치를 섞는 방식. <strong>제품에서는 없앴습니다</strong>(2026-09-07).</td>
+                <td class="td-value">gijo 베이스 모델에 도메인 데이터셋을 각인</td>
+              </tr>
+              <tr>
+                <td class="td-feature">핵심 제약 조건</td>
+                <td class="td-value">— (없앤 기능이라 제약을 따질 일이 없습니다)</td>
+                <td class="td-value">아키텍처 무관, gijo 베이스 모델에 자유 학습 가능</td>
+              </tr>
+              <tr>
+                <td class="td-feature">주요 강점 및 용도</td>
+                <td class="td-value">— (없앤 기능입니다. 한국어·보안 지식은 <strong>번들 모델 선택</strong>과 <strong>지식 반입(RAG)</strong>으로 맞춥니다.)</td>
+                <td class="td-value"><strong>문체·판단·구조화 출력(JSON) 교정</strong>, 사내 사례 체화</td>
+              </tr>
+              <tr>
+                <td class="td-feature">구동 비용 및 속도</td>
+                <td class="td-value">— (없앤 기능입니다.)</td>
+                <td class="td-value">GPU 학습 시간 및 데이터셋 구성 필요</td>
+              </tr>
+              <tr>
+                <td class="td-feature">제품 내 제공 기능</td>
+                <td class="td-value"><strong>❌ 없앤 기능</strong> — 화면·엔진·창구를 2026-09-07에 통째로 내렸습니다. 제품에 합성 화면은 없습니다.</td>
+                <td class="td-value">AI 지식·모델 학습 / 헤르메스 학습 루프</td>
+              </tr>
+              <tr>
+                <td class="td-feature">실증 및 승격 내역</td>
+                <td class="td-value">2026-07에 그렇게 만든 모델 파일이 있었고 라이선스도 확인했지만, <strong>합성 기능 자체를 없앴습니다</strong> — 새로 만들 수는 없습니다.</td>
+                <td class="td-value">Hermes 학습 루프 실 GPU 구동 실증 완료</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="calculator-card" style="border-left: 4px solid #7c3aed; background: #f5f3ff;">
+        <div style="font-size: 15px; font-weight: 900; color: #5b21b6; margin-bottom: 8px;">
+          🔍 실 GPU 검증 루프 (새 모델 승격 필수 5단계)
+        </div>
+        <ol style="font-size: 12px; color: #4c1d95; line-height: 1.8; padding-left: 20px;">
+          <li><strong>엔진 로드 검증:</strong> <span class="code-text">localengine</span>에서 새 GGUF 모델 로드 성공 확인</li>
+          <li><strong>한국어 검사:</strong> Triage/컴플라이언스 응답 내 중국어 한자(汉字) 잔존 0인지 카운트 검사 (<span class="code-text">/[一-鿿]/</span>)</li>
+          <li><strong>보안 정확도:</strong> 대표 취약점·위협에 대한 답이 기준 및 근거에 부합하는지 검토</li>
+          <li><strong>오케스트레이션 회귀:</strong> 도구 라우팅/JSON 생성 응답 품질 저하 여부 체크</li>
+          <li><strong>승격:</strong> 모든 테스트 합격 시 <span class="code-text">GIJO_DEFAULT_MODEL_ID</span>로 최종 승격 교체</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- TAB 6: Recommendations & FAQ -->
+    <div class="tab-content" id="tab5">
+
+      <!-- 3-TIER SCENARIO CARDS -->
+      <div class="scenario-grid">
+        <div class="scenario-card card-lite">
+          <div>
+            <div class="card-title">
+              <span>🟦 AS Lite (12GB)</span>
+              <span class="tag tag-lite">1인 담당자 / 소기업</span>
+            </div>
+            <p style="font-size: 13px; color: #475569; margin-top: 10px; line-height: 1.6;">
+              <strong>"보안 담당자가 1명(IT 겸직)이라 반복 업무가 너무 많아요."</strong>
+            </p>
+            <ul style="font-size: 12px; color: #334155; margin-top: 12px; padding-left: 16px; line-height: 1.7;">
+              <li>기존 사무용 워크스테이션에 미들급 GPU 1개 추가로 최소 비용 도입</li>
+              <li>기본 번들 LLM: <strong>Qwen3-8B Q4</strong> (단일 지휘/분석 상주)</li>
+              <li>일일 브리핑, KEV/EPSS 취약점 조치 배정, SLA 알림 등 자동화</li>
+            </ul>
+          </div>
+          <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #1e3a8a; margin-top: 12px;">
+            💡 설치 설정: GIJO_MAX_LOADED_MODELS=1 (16K 컨텍스트)
+          </div>
+        </div>
+
+        <div class="scenario-card card-std">
+          <div>
+            <div class="card-title">
+              <span>🟩 AS Standard (24GB) ⭐</span>
+              <span class="tag tag-std">2~3인 팀 / 현행검증구성</span>
+            </div>
+            <p style="font-size: 13px; color: #475569; margin-top: 10px; line-height: 1.6;">
+              <strong>"2~3명 팀원들이 동시에 질문하고 점검표를 즉시 뽑고 싶어요."</strong>
+            </p>
+            <ul style="font-size: 12px; color: #334155; margin-top: 12px; padding-left: 16px; line-height: 1.7;">
+              <li>기본 번들 LLM: <strong>Qwen3-8B (지휘) + Kanana-1.5-8B (전문가)</strong> 2상주</li>
+              <li>32K 컨텍스트로 수십 페이지의 대형 스캔 리포트 및 매뉴얼 일괄 처리</li>
+              <li>실제 운영 환경(RTX 3090)에서 속도 및 안정성 사전 실측 검증 완료</li>
+            </ul>
+          </div>
+          <div style="background: #ecfdf5; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #065f46; margin-top: 12px;">
+            💡 기본 설치값: GIJO_MAX_LOADED_MODELS=2 (32K 컨텍스트)
+          </div>
+        </div>
+
+        <div class="scenario-card card-pro">
+          <div>
+            <div class="card-title">
+              <span>🟪 AS Pro (30GB+)</span>
+              <span class="tag tag-pro">3인 이상 팀 / SOC 관제</span>
+            </div>
+            <p style="font-size: 13px; color: #475569; margin-top: 10px; line-height: 1.6;">
+              <strong>"보안관제(SOC)를 운영하거나 대용량 점검을 동시에 돌려요."</strong>
+            </p>
+            <ul style="font-size: 12px; color: #334155; margin-top: 12px; padding-left: 16px; line-height: 1.7;">
+              <li>기본 번들 LLM: <strong>Qwen3-8B + Kanana-1.5-8B + Phi-4 (14B)</strong> 3상주</li>
+              <li>수천 행 규모의 대용량 보안 감사 리포트 및 무중단 레드팀 점검</li>
+              <li>향후 20B급 gpt-oss 및 신규 AI 모델 확장 헤드룸 제공</li>
+            </ul>
+          </div>
+          <div style="background: #f5f3ff; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #5b21b6; margin-top: 12px;">
+            💡 설치 설정: GIJO_MAX_LOADED_MODELS=3 (32K~64K 컨텍스트)
+          </div>
+        </div>
+      </div>
+
+      <!-- CALLOUT CARD: 2 CHAT LLMS DUAL RUN NECESSITY -->
+      <div class="callout-card" style="border-left: 4px solid #2563eb; margin-bottom: 24px;">
+        <div style="font-size: 16px; font-weight: 900; color: #1e3a8a; margin-bottom: 8px;">
+          ❓ 질문: "지금처럼 채팅 LLM 2개 동시 구동이 꼭 필요한가?"
+        </div>
+        <div style="font-size: 14px; font-weight: 800; color: #059669; margin-bottom: 12px;">
+          💡 결론: 기능상 필수는 아니다. 품질·응답속도용 선택사항이다.
+        </div>
+        <p style="font-size: 13px; color: #334155; line-height: 1.7;">
+          모든 에이전트는 모델 미배정 시 기본 모델로 자동 폴백한다(<span class="code-text">agents.ts</span>). 즉 채팅 1개만 있어도 전 기능이 동작한다. 2개 구동의 실익은 다음 둘뿐이다:<br>
+          1. <strong>역할 분리 품질:</strong> 라우팅(JSON 정확성) 특화 모델과 한국어 보안지식 특화 모델을 분리<br>
+          2. <strong>스왑 대기 제거:</strong> 모델 전환 시 15~30초 로드 대기가 없음 (둘 다 상주라 즉답)
+        </p>
+      </div>
+
+      <!-- TABLE: 24GB RTX 3090 OPERATIONAL STATUS -->
+      <div class="table-card" style="margin-bottom: 24px;">
+        <div style="padding: 14px 20px; background: #1e3a8a; color: #ffffff; font-weight: 800; font-size: 15px;">
+          ⚙️ 24GB (RTX 3090) 현행 운영 실태 및 VRAM 점유량
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr style="background: #f1f5f9; color: #0f172a;">
+                <th style="color:#0f172a; width: 18%;">상주 프로세스</th>
+                <th style="color:#0f172a; width: 32%;">구동 모델명 / 설정</th>
+                <th style="color:#0f172a; width: 15%;">파일 크기</th>
+                <th style="color:#0f172a; width: 35%;">역할 및 설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature">채팅 ①</td>
+                <td><span class="code-text">gijo-main-orchestrator</span> (7.6B Q5)</td>
+                <td>~ 5.4 GB</td>
+                <td>오케스트레이터 전용 — 도구 라우팅 (JSON 결정)</td>
+              </tr>
+              <tr>
+                <td class="td-feature">채팅 ②</td>
+                <td><span class="code-text">merged-lily</span> (7B Q5) <span style="color:#b45309; font-weight:700;">— 2026-07 실측 구성</span></td>
+                <td>~ 4.6 GB</td>
+                <td>5개 에이전트(scan/analysis/report/ti/normaltic) 공용</td>
+              </tr>
+              <tr>
+                <td class="td-feature">임베딩</td>
+                <td><span class="code-text">bge-m3</span> (ctx 8192)</td>
+                <td>~ 1.1 GB</td>
+                <td>RAG 검색 — 상시 필수 (스왑 대상 아님)</td>
+              </tr>
+              <tr>
+                <td class="td-feature" style="background:#eff6ff; color:#2563eb;">실측 합계</td>
+                <td style="background:#eff6ff; font-weight:800;">32K 컨텍스트 기준 점유</td>
+                <td style="background:#eff6ff; font-weight:800; color:#059669;" colspan="2">약 16.0 GB (여유 8.0 GB 버퍼 확보)</td>
+              </tr>
+              <tr>
+                <td colspan="4" style="background:#fffbeb; color:#92400e; font-size:11.5px; line-height:1.6; text-align:left;">⚠ 위 구성·수치는 <strong>2026-07 실측</strong>입니다. 이후 기본 채팅 모델이 <span class="code-text">qwen3-14b</span>로 바뀌었고(2026-08-09 승격), <span class="code-text">merged-lily</span>는 합성으로 만든 옛 모델 파일입니다 — <strong>합성 기능은 2026-09-07에 없앴습니다.</strong> 새 구성의 점유량은 다시 재서 채워야 합니다(안 잰 숫자를 여기 적지 않습니다).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FAQ TABLE -->
+      <div class="table-card">
+        <div style="padding: 16px 20px; background: #0f172a; color: #ffffff; font-weight: 800; font-size: 15px;">
+          ❓ 자주 묻는 질문 (FAQ)
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr style="background: #f1f5f9; color: #0f172a;">
+                <th style="color:#0f172a; width: 35%;">질문 (Q)</th>
+                <th style="color:#0f172a; width: 65%;">답변 (A)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-feature">Q. Lite 제품을 구매하면 기능이 일부 제외되나요?</td>
+                <td class="td-value"><strong>A. 전혀 그렇지 않습니다.</strong> 모든 소프트웨어 기능은 100% 동일하게 제공되며, 차이는 AI 모델 수(응답 속도 및 역할 분리)뿐입니다.</td>
+              </tr>
+              <tr>
+                <td class="td-feature">Q. 기존에 회사 PC나 서버를 활용할 수 있나요?</td>
+                <td class="td-value"><strong>A. 네, 가능합니다.</strong> 고가 서버를 구매하지 않아도 보유 중인 GPU 사양(12GB / 24GB / 30GB+)에 맞춰 즉시 설치하여 운용할 수 있습니다.</td>
+              </tr>
+              <tr>
+                <td class="td-feature">Q. 고객 직접 반입(BYOM) 시 라이선스 책임은 어떻게 되나요?</td>
+                <td class="td-value"><strong>A. 모델 반입은 자유이나 반입 모델의 라이선스 준수 책임은 고객에게 이전됩니다.</strong> 제품 내 라이선스 게이트(modellicense.ts)가 비상업 모델 반입 시 자동 경고를 표시합니다.</td>
+              </tr>
+              <tr>
+                <td class="td-feature">Q. Standard 구성이 실제 검증된 모델인가요?</td>
+                <td class="td-value"><strong>A. 네, 현 실제 운영 환경이 Standard 구성(RTX 3090 24GB)이며</strong> Qwen3-8B와 Kanana-1.5-8B 2상주 모델로 실측 검증된 추천 구성입니다.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Notice -->
+    <footer class="footer">
+      <div>
+        📢 세부자료는 <a href="https://gijo.ai/gijohome/user/technology/solution" target="_blank" rel="noopener noreferrer" class="footer-link">https://gijo.ai/gijohome/user/technology/solution</a> 여기서 확인 가능
+      </div>
+      <div style="margin-top: 6px; font-size: 11px; color: #94a3b8;">
+        © 2026 GIJO Technology Corp. All rights reserved.
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    function switchTab(index) {
+      document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+      });
+      document.querySelectorAll('.tab-content').forEach((content, i) => {
+        content.classList.toggle('active', i === index);
+      });
+    }
+
+    function calculateTier() {
+      const people = document.getElementById('selectPeople').value;
+      const gpu = document.getElementById('selectGpu').value;
+      const resultTitle = document.getElementById('resultTitle');
+      const resultBadge = document.getElementById('resultBadge');
+
+      if (people === 'pro' || gpu === 'pro') {
+        resultTitle.innerText = '🟪 AS Pro (30GB+ VRAM)';
+        resultTitle.style.color = '#7c3aed';
+        resultBadge.innerText = 'SOC관제/대기업';
+        resultBadge.className = 'result-badge badge-pro';
+      } else if (people === 'std' || gpu === 'std') {
+        resultTitle.innerText = '🟩 AS Standard (24GB VRAM)';
+        resultTitle.style.color = '#059669';
+        resultBadge.innerText = '추천/운영검증완료';
+        resultBadge.className = 'result-badge badge-std';
+      } else {
+        resultTitle.innerText = '🟦 AS Lite (12GB VRAM)';
+        resultTitle.style.color = '#2563eb';
+        resultBadge.innerText = '1인담당/소기업';
+        resultBadge.className = 'result-badge badge-lite';
+      }
+    }
+
+    function copyPshCommand() {
+      const cmdText = document.getElementById('pshCmdText').innerText;
+      navigator.clipboard.writeText(cmdText).then(() => {
+        const btn = document.querySelector('.btn-copy-cmd');
+        btn.innerHTML = '<span>✅ 복사 완료!</span>';
+        setTimeout(() => {
+          btn.innerHTML = '<span>📋 원클릭 명령어 복사</span>';
+        }, 1500);
+      });
+    }
+  </script>
+</body>
+</html>

@@ -204,7 +204,7 @@
     /* GIJO WIKI VIEW */
     .wiki-container {
       display: grid;
-      grid-template-columns: 320px 1fr 420px;
+      grid-template-columns: 320px 1fr 440px;
       gap: 1.25rem;
       height: calc(100vh - 110px);
     }
@@ -219,7 +219,7 @@
     }
 
     .sidebar-header {
-      padding: 1rem;
+      padding: 0.85rem 1rem;
       border-bottom: 1px solid var(--border-dark);
       display: flex;
       align-items: center;
@@ -237,7 +237,7 @@
     }
 
     .doc-search-box {
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 0.85rem;
       border-bottom: 1px solid var(--border-dark);
     }
 
@@ -309,12 +309,16 @@
       color: #cbd5e1;
       border: none;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     .badge-cat.sec { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
     .badge-cat.manual { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
     .badge-cat.arch { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
     .badge-cat.runbook { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+    .badge-cat.vuln { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+    .badge-cat.ai { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    .badge-cat.qa { background: rgba(6, 182, 212, 0.2); color: #67e8f9; }
 
     .wiki-main-content {
       background: var(--surface-dark);
@@ -386,8 +390,9 @@
 
     .wiki-view-render { line-height: 1.7; }
     .wiki-view-render h1, .wiki-view-render h2, .wiki-view-render h3 { color: #f8fafc; margin: 1.2rem 0 0.6rem 0; font-weight: 700; }
-    .wiki-view-render h1 { font-size: 1.5rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.4rem; }
-    .wiki-view-render h2 { font-size: 1.25rem; color: #c084fc; }
+    .wiki-view-render h1 { font-size: 1.45rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.4rem; color:#60a5fa; }
+    .wiki-view-render h2 { font-size: 1.2rem; color: #c084fc; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.3rem; }
+    .wiki-view-render h3 { font-size: 1.05rem; color: #38bdf8; }
     .wiki-view-render p { margin-bottom: 0.85rem; color: #cbd5e1; }
     .wiki-view-render ul, .wiki-view-render ol { margin-left: 1.5rem; margin-bottom: 1rem; color: #cbd5e1; }
     .wiki-view-render code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; color: #38bdf8; }
@@ -433,24 +438,37 @@
       gap: 0.3rem;
     }
 
-    .llm-config-panel {
-      padding: 0.75rem 1rem;
-      background: rgba(15, 23, 42, 0.6);
+    .quick-questions-strip {
+      padding: 0.6rem 0.85rem;
+      background: rgba(15, 23, 42, 0.8);
       border-bottom: 1px solid var(--border-dark);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
     }
 
-    .llm-config-panel select, .llm-config-panel input {
-      background: #090d16;
-      border: 1px solid var(--border-dark);
-      border-radius: 6px;
-      color: #cbd5e1;
-      padding: 0.35rem 0.5rem;
-      font-size: 0.75rem;
-      outline: none;
+    .quick-chip-container {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      padding-bottom: 0.2rem;
+    }
+
+    .quick-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #93c5fd;
+      font-size: 0.72rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 16px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .quick-chip:hover {
+      background: #2563eb;
+      color: #fff;
+      border-color: #3b82f6;
     }
 
     .rag-chat-messages {
@@ -463,11 +481,11 @@
     }
 
     .chat-bubble {
-      max-width: 92%;
-      padding: 0.75rem 0.95rem;
+      max-width: 94%;
+      padding: 0.8rem 1rem;
       border-radius: 10px;
       font-size: 0.85rem;
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
     .chat-bubble.user {
@@ -488,15 +506,20 @@
     .citation-tag {
       display: inline-flex;
       align-items: center;
-      gap: 0.25rem;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
+      gap: 0.3rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
       background: rgba(168, 85, 247, 0.2);
       border: 1px solid rgba(168, 85, 247, 0.4);
       color: #d8b4fe;
-      font-size: 0.7rem;
-      margin-top: 0.4rem;
+      font-size: 0.72rem;
+      margin-top: 0.5rem;
       cursor: pointer;
+      transition: all 0.2s;
+    }
+    .citation-tag:hover {
+      background: rgba(168, 85, 247, 0.4);
+      color: #fff;
     }
 
     .rag-input-box {
@@ -588,9 +611,7 @@
       transform-origin: center center;
     }
 
-    @keyframes dashFlow {
-      to { stroke-dashoffset: -40; }
-    }
+    @keyframes dashFlow { to { stroke-dashoffset: -40; } }
     .edgePath path { stroke: #38bdf8 !important; stroke-width: 2.5px !important; }
     .edgePath.animated path { stroke-dasharray: 6, 6; animation: dashFlow 1s linear infinite; }
 
@@ -621,7 +642,6 @@
       box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
     }
 
-    /* Modal */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
       z-index: 2000; display: none; align-items: center; justify-content: center;
@@ -649,14 +669,14 @@
           <div class="brand-title">
             GIJO WIKI <span style="font-size:0.75rem; padding:0.15rem 0.5rem; background:linear-gradient(135deg,#2563eb,#8b5cf6); border-radius:20px; color:#fff;">v5.0 Pro</span>
           </div>
-          <div class="brand-subtitle">보안 솔루션 통합 ERP & 스마트 아키텍처 스튜디오 & 로컬 LLM 위키</div>
+          <div class="brand-subtitle">보안 솔루션 통합 ERP & 스마트 아키텍처 스튜디오 & GIJO AS 학습 지식 RAG</div>
         </div>
       </div>
 
       <!-- Navigation Views -->
       <nav class="nav-tabs-group">
         <button id="tabBtn-wiki" class="nav-tab-btn wiki-tab active" onclick="switchView('wiki')">
-          <i data-lucide="book-open"></i> 📚 GIJO WIKI (내문서·로컬LLM)
+          <i data-lucide="book-open"></i> 📚 GIJO WIKI (사내지식·RAG)
         </button>
         <button id="tabBtn-studio" class="nav-tab-btn" onclick="switchView('studio')">
           <i data-lucide="cpu"></i> 🏗️ 스마트 아키텍처 Pro 스튜디오
@@ -672,13 +692,12 @@
         </button>
       </nav>
 
-      <!-- Quick Action Buttons -->
       <div class="header-actions">
         <button class="btn-action" onclick="openLlmSettingsModal()">
           <i data-lucide="settings"></i> LLM 설정
         </button>
         <button class="btn-action btn-primary-action" onclick="exportFullProjectBackup()">
-          <i data-lucide="download"></i> 프로젝트 내보내기
+          <i data-lucide="download"></i> 프로젝트 백업
         </button>
       </div>
     </div>
@@ -694,27 +713,28 @@
         <!-- Left: My Docs Vault -->
         <aside class="wiki-sidebar">
           <div class="sidebar-header">
-            <span class="sidebar-title"><i data-lucide="folder-git-2"></i> 사내 지식고 (My Docs Vault)</span>
+            <span class="sidebar-title"><i data-lucide="folder-git-2"></i> 사내 지식고 (<span id="totalDocCount">0</span>건)</span>
             <button class="btn-action" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="createNewWikiDoc()">
               <i data-lucide="plus"></i> 새 문서
             </button>
           </div>
           
           <div class="doc-search-box">
-            <input type="text" id="wikiSearchInput" class="doc-search-input" placeholder="문서 제목, 태그, 내용 검색..." oninput="filterWikiDocs()">
+            <input type="text" id="wikiSearchInput" class="doc-search-input" placeholder="GIJO AS 지식 검색 (WAF, CVE, AIBOM...)" oninput="filterWikiDocs()">
           </div>
 
           <div style="padding: 0.4rem 0.8rem; display: flex; gap: 0.3rem; overflow-x: auto; background: rgba(15,23,42,0.4); border-bottom: 1px solid var(--border-dark);">
-            <button class="badge-cat" onclick="filterByCat('ALL')">전체 (<span id="count-all">0</span>)</button>
+            <button class="badge-cat" onclick="filterByCat('ALL')">전체</button>
             <button class="badge-cat sec" onclick="filterByCat('보안규정')">보안규정</button>
-            <button class="badge-cat manual" onclick="filterByCat('솔루션매뉴얼')">솔루션매뉴얼</button>
+            <button class="badge-cat vuln" onclick="filterByCat('취약점관리')">취약점</button>
+            <button class="badge-cat ai" onclick="filterByCat('AI보안')">AI보안</button>
             <button class="badge-cat arch" onclick="filterByCat('아키텍처설계')">아키텍처</button>
-            <button class="badge-cat runbook" onclick="filterByCat('장애런북')">장애런북</button>
+            <button class="badge-cat manual" onclick="filterByCat('솔루션매뉴얼')">매뉴얼</button>
+            <button class="badge-cat qa" onclick="filterByCat('QA문답집')">QA문답</button>
+            <button class="badge-cat runbook" onclick="filterByCat('장애런북')">런북</button>
           </div>
 
-          <ul id="wikiDocList" class="doc-list">
-            <!-- Rendered by JS -->
-          </ul>
+          <ul id="wikiDocList" class="doc-list"></ul>
 
           <div style="padding: 0.6rem; border-top: 1px solid var(--border-dark); display: flex; gap: 0.4rem;">
             <button class="btn-action" style="flex:1; justify-content:center; font-size:0.75rem;" onclick="importDocsFile()">
@@ -730,7 +750,7 @@
         <article class="wiki-main-content">
           <div class="wiki-toolbar">
             <div class="wiki-breadcrumbs">
-              <span id="wikiBreadcrumbCat">보안규정</span> &gt; <b id="wikiBreadcrumbTitle">ISMS-P 인증 체계 수립 가이드</b>
+              <span id="wikiBreadcrumbCat">보안규정</span> &gt; <b id="wikiBreadcrumbTitle">문서 제목</b>
             </div>
             <div class="wiki-actions-bar">
               <button id="btnToggleEdit" class="btn-action" onclick="toggleEditMode()">
@@ -746,23 +766,23 @@
           </div>
 
           <div class="wiki-body">
-            <!-- View Mode -->
             <div id="wikiReadView" class="wiki-view-render"></div>
 
-            <!-- Edit Mode -->
             <div id="wikiEditView" class="doc-editor-view" style="display: none;">
               <input type="text" id="editDocTitle" class="doc-title-input" placeholder="문서 제목을 입력하세요">
               <div style="display:flex; gap:0.5rem;">
-                <select id="editDocCategory" class="llm-config-panel select" style="width:160px; background:#0f172a; border:1px solid var(--border-dark); border-radius:6px; color:#fff; padding:0.4rem;">
+                <select id="editDocCategory" style="width:160px; background:#0f172a; border:1px solid var(--border-dark); border-radius:6px; color:#fff; padding:0.4rem;">
                   <option value="보안규정">보안규정</option>
-                  <option value="솔루션매뉴얼">솔루션매뉴얼</option>
+                  <option value="취약점관리">취약점관리</option>
+                  <option value="AI보안">AI보안</option>
                   <option value="아키텍처설계">아키텍처설계</option>
+                  <option value="솔루션매뉴얼">솔루션매뉴얼</option>
+                  <option value="QA문답집">QA문답집</option>
                   <option value="장애런북">장애런북</option>
-                  <option value="인수인계">인수인계</option>
                 </select>
-                <input type="text" id="editDocTags" class="doc-title-input" style="flex:1; font-size:0.9rem;" placeholder="태그 (쉼표로 구분: WAF, 망분리, ISMS-P)">
+                <input type="text" id="editDocTags" class="doc-title-input" style="flex:1; font-size:0.9rem;" placeholder="태그 (쉼표 구분: WAF, 망분리, ISMS-P)">
               </div>
-              <textarea id="editDocContent" class="doc-content-textarea" placeholder="마크다운(Markdown) 문서 내용을 입력하세요..."></textarea>
+              <textarea id="editDocContent" class="doc-content-textarea" placeholder="마크다운 문서 내용을 입력하세요..."></textarea>
               <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
                 <button class="btn-action" onclick="cancelDocEdit()">취소</button>
                 <button class="btn-action btn-primary-action" onclick="saveDocEdit()">저장 완료</button>
@@ -775,42 +795,31 @@
         <aside class="wiki-rag-pane">
           <div class="rag-header">
             <div class="rag-header-title">
-              <i data-lucide="bot"></i> GIJO 온프레미스 RAG
+              <i data-lucide="bot"></i> GIJO AS 학습 RAG 어시스턴트
             </div>
             <div id="llmStatusBadge" class="llm-status-pill">
               <span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span> GB10 Engine
             </div>
           </div>
 
-          <div class="llm-config-panel">
-            <div>
-              <label style="display:block; color:var(--text-muted); margin-bottom:2px;">LLM 모델</label>
-              <select id="ragModelSelect" style="width:100%;">
-                <option value="qwen2.5-coder:latest">Qwen2.5-Coder (온프레미스)</option>
-                <option value="qwen3.8-flash:177b">GB10 177B Engine</option>
-                <option value="llama3.1:latest">Llama 3.1 8B</option>
-                <option value="local-rule-rag">내장 에어갭 오프라인 RAG</option>
-              </select>
+          <!-- Quick Questions Chips -->
+          <div class="quick-questions-strip">
+            <div style="font-size:0.7rem; color:var(--text-muted); display:flex; align-items:center; gap:0.3rem;">
+              <i data-lucide="sparkles" style="width:12px; height:12px; color:#c084fc;"></i> <b>GIJO AS 추천 질문 (클릭 시 질의)</b>
             </div>
-            <div>
-              <label style="display:block; color:var(--text-muted); margin-bottom:2px;">검색 범위 (Docs)</label>
-              <select id="ragScopeSelect" style="width:100%;">
-                <option value="all">사내 지식고 전체</option>
-                <option value="current">현재 열린 문서만</option>
-              </select>
-            </div>
+            <div id="quickChipContainer" class="quick-chip-container"></div>
           </div>
 
           <div id="ragChatMessages" class="rag-chat-messages">
             <div class="chat-bubble ai">
-              👋 안녕하세요! <b>GIJO WIKI</b> 지식 비서입니다.<br>
-              사내 등록된 보안 규정, 솔루션 매뉴얼, 아키텍처 설계를 기반으로 정확한 원문 출처(Citation)와 함께 답변을 생성합니다.<br>
-              <span style="color:#94a3b8; font-size:0.75rem;">💡 질문 예시: "망분리 환경에서 WAF 이중화 구성 방안은?", "ISMS-P 접근통제 기준 문서 요약해줘"</span>
+              👋 안녕하세요! <b>GIJO AS 학습 지식 베이스</b>가 모두 연동되었습니다.<br>
+              사내 등록된 <b>보안제품 관리 지침, CVE 취약점 대응, AIBOM 가이드, ISMS-P 망분리 규정, 고객 QA 30문 30답</b>에 대해 정확한 <b>원문 출처(Citation)</b>와 함께 답변합니다.<br>
+              <span style="color:#94a3b8; font-size:0.75rem;">💡 상단의 추천 질문 칩을 누르거나 직접 질문해 보세요!</span>
             </div>
           </div>
 
           <div class="rag-input-box">
-            <input type="text" id="ragQueryInput" class="rag-input" placeholder="사내 문서 및 아키텍처 질의 입력..." onkeydown="if(event.key==='Enter') executeRagQuery()">
+            <input type="text" id="ragQueryInput" class="rag-input" placeholder="GIJO AS 지식 질의 입력 (예: AIBOM 가이드, WAF 이중화...)" onkeydown="if(event.key==='Enter') executeRagQuery()">
             <button class="btn-action btn-primary-action" style="padding:0 0.85rem;" onclick="executeRagQuery()">
               <i data-lucide="send"></i>
             </button>
@@ -1027,46 +1036,14 @@
       flowchart: { curve: 'basis', htmlLabels: true }
     });
 
-    let currentActiveDocId = 1;
+    const defaultWikiDocs = [{"id":101,"title":"GIJO AS 보안제품 관리 지침 및 10대 카테고리 운영 표준","category":"보안규정","tags":["보안제품","방화벽","EDR","DLP","WAF","SIEM","NAC","VPN","IPS"],"updatedAt":"2026-09-16","content":"# GIJO AS 보안제품 관리 지침 및 10대 카테고리 운영 표준\n\n## 1. 목적 및 기본 원칙\n본 지침은 보안담당자가 운영 중인 보안제품(방화벽, EDR, DLP 등)과 기술 문서(매뉴얼, 로그 가이드)를 체계적으로 등록·관리하고, AI 어시스턴트(GB10 Engine)가 사내 문서를 근거로 정확히 판단하도록 하는 운영 기준입니다.\n- **제품은 1급 엔티티, 문서는 학습 자산**: 제품명이 자유 텍스트로 오염되지 않도록 공식 명칭 등록부로 엄격히 관리합니다.\n- **문서가 업로드되는 순간 AI의 지식이 된다**: 매뉴얼 등록 즉시 텍스트가 정제되어 로컬 RAG 지식창고에 수집되며 대화창에 즉시 반영됩니다.\n\n## 2. 보안제품 10대 표준 카테고리\n1. **방화벽(NGFW)**: 인라인 네트워크 패킷 필터링 및 세션 제어\n2. **EDR (Endpoint Detection & Response)**: 엔드포인트 단말 악성 행위 실시간 탐지 및 격리\n3. **DLP (Data Loss Prevention)**: 개인정보 및 사내 기밀 유출 차단\n4. **WAF (Web Application Firewall)**: 웹 취약점 및 L7 공격 차단\n5. **VPN (Virtual Private Network)**: 원격 접속 암호화 터널링\n6. **IPS/IDS**: 침입 방지 및 탐지 시스템\n7. **SIEM / SOAR**: 전사 이기종 로그 통합 분석 및 자동화 대응\n8. **백신 (Anti-Virus)**: 시그니처 기반 악성코드 검사\n9. **NAC (Network Access Control)**: 비인가 단말 네트워크 접근 통제\n10. **기타**: HSM, KMS, 망연계 등 전문 장비"},{"id":102,"title":"GIJO AS 취약점 관리 지침 및 CVE 5단계 긴급 대응 런북","category":"취약점관리","tags":["취약점","CVE","CVSS","패치관리","긴급대응"],"updatedAt":"2026-09-16","content":"# GIJO AS 취약점 관리 지침 및 CVE 5단계 긴급 대응 런북\n\n## 1. 취약점 평가 기준 (CVSS v3.1)\n- **Critical (CVSS 9.0 ~ 10.0)**: 24시간 이내 긴급 패치 또는 가상 패치(WAF/IPS 차단 룰) 적용 의무.\n- **High (CVSS 7.0 ~ 8.9)**: 3영업일 이내 조치 계획 수립 및 7일 이내 배포.\n- **Medium / Low**: 정기 보안 패치 릴리즈 주기(월 1회)에 반영.\n\n## 2. CVE 발견 시 5단계 조치 프로세스\n1. **식별 (Discovery)**: Nessus/스캐너 진단 또는 KISA 보안 공지를 통한 취약 자산 특정.\n2. **영향도 분석 (Impact Assessment)**: 인터넷 노출 여부, exploit 코드 공개 여부, 사내 데이터 영향 평가.\n3. **완화 조치 (Mitigation)**: 패치 전 네트워크 차단, WAF/IPS 정책 임시 룰 배포.\n4. **패치 적용 (Remediation)**: 개발/검증망 사전 테스트 후 무중단 운영 배포.\n5. **사후 검증 (Verification)**: 재스캔을 통한 조치 완료 증적 확보 및 보고서 자동 생성."},{"id":103,"title":"GIJO AS AIBOM 검토 가이드 & AI 보안점검 3단계 프레임워크","category":"AI보안","tags":["AIBOM","AI보안","생성형AI","프롬프트보안","데이터유출방지"],"updatedAt":"2026-09-16","content":"# GIJO AS AIBOM 검토 가이드 & AI 보안점검 3단계 프레임워크\n\n## 1. AIBOM (AI Bill of Materials) 정의\nAI 시스템을 구성하는 기초 모델(Base Model), 파인튜닝 데이터셋, 종속성 라이브러리(PyTorch, Transformers), 양자화 가중치 파일의 출처 및 무결성을 검증하는 소프트웨어/모델 자재 명세서입니다.\n\n## 2. AI 보안점검 3단계 통제영역\n- **1단계: 모델 공급망 보안 (Supply Chain Security)**\n  - HuggingFace 등 공개 저장소 가중치 파일(Pickle 등)의 악성코드 주입 여부 검사 (Safetensors 포맷 의무화).\n  - 학습 데이터셋의 저작권 및 개인정보 포함 여부 사전 필터링.\n- **2단계: 런타임 프롬프트 보안 (Prompt & Inference Guard)**\n  - 간접 프롬프트 인젝션(Indirect Prompt Injection) 방어 필터 적용.\n  - 전송 데이터에 대한 사내 DLP(주민번호, 계좌번호, API Key) 마스킹.\n- **3단계: 출력물 및 할루시네이션 통제 (Output Supervision)**\n  - 원문 증적(Citation) 없는 허위 답변(False Claim) 실시간 차단.\n  - 외부 모델 호출 시 프롬프트 유출 방지를 위한 온프레미스 에어갭 전용망 운영."},{"id":104,"title":"GIJO AS 온프레미스 RAG 아키텍처 및 GB10 LLM 연동 설계서","category":"아키텍처설계","tags":["RAG","온프레미스","GB10","Qwen","에어갭","벡터DB"],"updatedAt":"2026-09-16","content":"# GIJO AS 온프레미스 RAG 아키텍처 및 GB10 LLM 연동 설계서\n\n## 1. 아키텍처 철학: 제로 클라우드 유출 (Zero Cloud Leakage)\n모든 사내 규정, 인프라 토폴로지, 고객 데이터는 절대 외부 퍼블릭 클라우드(OpenAI, Anthropic 등)로 전송되지 않으며, 사내에 설치된 GB10 (Qwen 177B 클러스터) 또는 로컬 에어갭 Ollama를 통해 100% 온프레미스에서 처리됩니다.\n\n## 2. 파이프라인 구조\n1. **문서 수집 및 청킹 (Chunking Engine)**: 마크다운, PDF, 매뉴얼을 500자 단위(Overlap 50자)로 분할.\n2. **로컬 임베딩 & 온톨로지 색인**: 사내 보안 전문 용어사전 가중치를 부여하여 고정밀 키워드/시맨틱 인덱싱.\n3. **시맨틱 캐시 (Semantic Cache)**: 빈번한 보안 질의에 대해 밀리초(ms) 단위의 초고속 응답 보장.\n4. **증거 기반 생성 (Evidence-Grounded Generation)**: 검색된 문서 조각(Context)과 함께 출처 메타데이터를 프롬프트에 주입하여 신뢰할 수 있는 답변 생성."},{"id":105,"title":"GIJO AS 보안담당자 실무 매뉴얼 (일일/주간/월간 운영 체크리스트)","category":"보안규정","tags":["실무매뉴얼","보안운영","체크리스트","보안관제"],"updatedAt":"2026-09-16","content":"# GIJO AS 보안담당자 실무 매뉴얼\n\n## 1. 일일 보안 점검 (Daily Security Routine)\n- **09:00 방화벽/WAF 실시간 차단 로그 확인**: 비정상 트래픽 급증 및 최다 차단 IP 현황 분석.\n- **10:00 EDR 격리 알람 점검**: 악성코드 및 이상 프로세스 실행 단말 즉시 조치.\n- **16:00 백업 무결성 확인**: 보안 로그 저장소(SIEM) 및 설정 파일 스토리지 정상 기록 점검.\n\n## 2. 주간/월간 보안 관리\n- **주간**: KISA 취약점 공지 수집 및 사내 시스템 대상 CVE 매핑.\n- **월간**: 전사 단말 백신/EDR 엔진 최신 업데이트율(98% 이상) 점검 및 정기 계정 권한 감사."},{"id":106,"title":"GIJO AS 핵심 보안 & AI 인프라 용어사전 (200+ 백과사전)","category":"솔루션매뉴얼","tags":["용어사전","백과사전","보안용어","ISMS-P","ZTNA","SOAR"],"updatedAt":"2026-09-16","content":"# GIJO AS 핵심 보안 & AI 인프라 용어사전\n\n## 주요 핵심 용어 해설\n- **ZTNA (Zero Trust Network Access)**: '절대 신뢰하지 않고 항상 검증한다'는 원칙 하에 최소 권한만 부여하는 제로트러스트 원격 접속 기술.\n- **SOAR (Security Orchestration, Automation and Response)**: 이기종 보안 솔루션 간의 워크플로우를 자동화하여 사고 대응 시간을 수초 단위로 단축하는 시스템.\n- **CSAP (Cloud Security Assurance Program)**: 공공기관에 공급되는 클라우드 서비스의 안전성을 검증하는 한국인터넷진흥원(KISA) 보안인증.\n- **ISMS-P**: 정보보호 및 개인정보보호 관리체계 인증 기준 (관리체계 16개, 보호대책 64개, 개인정보 22개 통제항목).\n- **HA (High Availability, 고가용성)**: 장비 장애 발생 시 서비스 중단 없이 Standby 장비로 자동 절체(Failover)되는 이중화 구조.\n- **DLP (Data Loss Prevention)**: 사내 기밀 정보 및 개인식별정보(PII)가 외부로 반출되는 것을 감지·차단하는 솔루션.\n- **AIBOM**: AI 모델, 데이터셋, 학습 프레임워크의 메타데이터 및 공급망 투명성을 보장하는 자재명세서."},{"id":107,"title":"GIJO AS 고객 실전 QA 30문 30답 (자주 묻는 질문 & 표준 답변집)","category":"QA문답집","tags":["고객QA","FAQ","실전문답","구축가이드","질의응답","에어갭","로컬LLM"],"updatedAt":"2026-09-16","content":"# GIJO AS 고객 실전 QA 30문 30답\n\n### Q1. 사내 완전 격리(Air-Gap) 망에서 외부 인터넷 연결 없이 로컬 LLM이 작동하나요?\n**A**: 네. GIJO WIKI는 사내 온프레미스 GPU 서버(GB10 엔진) 또는 로컬 Ollama 엔드포인트와 연동되어 일체의 외부 인터넷 통신 없이 100% 로컬 환경에서 추론 및 RAG 검색을 수행합니다.\n\n### Q2. WAF와 방화벽(NGFW)의 이중화(HA) 구성 시 권장 설정은 무엇인가요?\n**A**: Active-Standby 구성을 기본 권장하며, VRRP 헬스체크 주기를 1초로 설정하여 3초 이내 무중단 페일오버를 달성합니다. 세션 동기화 링크는 전용 직결 케이블로 분리 운영해야 합니다.\n\n### Q3. ISMS-P 인증 시 네트워크 망분리 영역의 주요 확인 사항은?\n**A**: 인터넷망, 업무망, 운영 서버망, DB 보안망 간의 L3/L4 라우팅 격리 및 방화벽 인라인 통제, 그리고 유지보수 단말에 대한 접근통제(MFA, 감사로그 보존)가 필수 검증 대상입니다.\n\n### Q4. 취약점 조치 시 다운타임이 불가피한 경우 어떻게 대응하나요?\n**A**: 패치 전 단계에서 WAF/IPS 가상 패치(Virtual Patching) 정책을 우선 배포하여 공격 벡터를 즉시 차단한 후, 심야 정기 점검 시간에 서비스 무중단 롤링 패치를 진행합니다.\n\n### Q5. AIBOM 검토에서 가장 중요한 핵심 점검 항목은?\n**A**: 모델 가중치 파일의 Safetensors 포맷 검증(Pickle 역직렬화 공격 차단), 상용 라이선스 준수 여부, 프롬프트 DLP 및 환각 검증 장치(Output Supervision) 탑재 여부입니다."},{"id":108,"title":"금융권 ISMS-P 인증기준 및 망분리 구현 지침","category":"보안규정","tags":["ISMS-P","망분리","금융보안원","접근통제"],"updatedAt":"2026-09-16","content":"# 금융권 ISMS-P 인증기준 및 망분리 구현 지침\n\n## 1. 개요 및 목적\n본 지침은 금융보안원 및 KISA ISMS-P 인증 기준(2.4 망분리 및 접근통제)을 준수하기 위한 사내 표준 아키텍처 및 통제 규정을 정의합니다.\n\n## 2. 핵심 보안 요구사항\n1. **물리적/논리적 망분리**: 인터넷망과 사내 업무망, 데이터베이스(DB) 보안망의 트래픽을 엄격히 차단합니다.\n2. **차세대 방화벽(NGFW) 이중화**: 주/보조 방화벽 간 Active-Standby 동기화를 유지하며 단일 장애점(SPOF)을 제거합니다.\n3. **웹 방화벽(WAF) 필수 배치**: DMZ 웹 서버 전면에 WAF를 인라인으로 배치하여 OWASP Top 10 및 SQL Injection 공격을 1차 차단합니다.\n4. **EDR 및 사내 에이전트 통제**: 모든 내부망 엔드포인트 단말에 EDR 및 DLP 에이전트 설치를 의무화합니다."},{"id":109,"title":"DDoS 및 랜섬웨어 침해사고 긴급대응 런북","category":"장애런북","tags":["DDoS","랜섬웨어","긴급대응","SOAR"],"updatedAt":"2026-09-16","content":"# DDoS 및 랜섬웨어 침해사고 긴급대응 런북\n\n## 1. 초기 인지 및 전파 (10분 이내)\n- SIEM 알람 발생 또는 서비스 지연 감지 즉시 보안관제팀 및 인프라팀 비상 연락망 가동.\n- 트래픽 임계치 초과 여부 확인 (평시 대비 300% 이상 인입 시 DDoS 의심).\n\n## 2. 긴급 조치 단계\n1. **DDoS 대피소 전환**: DNS 레코드 CNAME을 안티DDoS 스크러빙 센터로 우회.\n2. **EDR 단말 일괄 격리**: 랜섬웨어 확산 징후 발견 시 감염 대역 단말 네트워크 격리.\n3. **포렌식 증거 수집**: 침해 서버 메모리 덤프 및 방화벽 세션 로그 즉시 영구보존 스토리지로 복제."}];
+    const quickQuestions = ["사내 에어갭 환경에서 로컬 LLM이 어떻게 동작하나요?","WAF와 방화벽(NGFW)의 HA 이중화 구성 기준은?","AIBOM 검토 가이드 및 3단계 보안 통제 영역 요약해줘","ISMS-P 2.4 망분리 및 접근통제 핵심 요구사항은?","취약점(CVE) 발생 시 5단계 긴급 조치 절차는?","보안제품 10대 표준 카테고리 운영 원칙은?","DDoS 및 랜섬웨어 침해사고 긴급대응 런북 보여줘"];
+
+    let currentActiveDocId = defaultWikiDocs[0].id;
     let isEditingMode = false;
     let canvasZoom = 1.0;
     let isTrafficFlowing = true;
     let currentFilterCat = 'ALL';
-
-    const defaultWikiDocs = [
-      {
-        id: 1,
-        title: "금융권 ISMS-P 인증기준 및 망분리 구현 지침",
-        category: "보안규정",
-        tags: ["ISMS-P", "망분리", "금융보안원", "접근통제"],
-        updatedAt: "2026-09-16",
-        content: "# 금융권 ISMS-P 인증기준 및 망분리 구현 지침\n\n## 1. 개요 및 목적\n본 지침은 금융보안원 및 KISA ISMS-P 인증 기준(2.4 망분리 및 접근통제)을 준수하기 위한 사내 표준 아키텍처 및 통제 규정을 정의합니다.\n\n## 2. 핵심 보안 요구사항\n1. **물리적/논리적 망분리**: 인터넷망과 사내 업무망, 데이터베이스(DB) 보안망의 트래픽을 엄격히 차단합니다.\n2. **차세대 방화벽(NGFW) 이중화**: 주/보조 방화벽 간 Active-Standby 동기화를 유지하며 단일 장애점(SPOF)을 제거합니다.\n3. **웹 방화벽(WAF) 필수 배치**: DMZ 웹 서버 전면에 WAF를 인라인으로 배치하여 OWASP Top 10 및 SQL Injection 공격을 1차 차단합니다.\n4. **EDR 및 사내 에이전트 통제**: 모든 내부망 엔드포인트 단말에 EDR 및 DLP 에이전트 설치를 의무화합니다.\n\n## 3. 침해사고 대응 런북 연계\n- 외부 이상 트래픽 감지 시 WAF 정책 즉시 차단 및 SIEM 알람 발행.\n- 내부 단말 악성코드 감염 시 EDR 네트워크 격리 기능 발동."
-      },
-      {
-        id: 2,
-        title: "WAF & NGFW 하드웨어 이중화(HA) 표준 매뉴얼",
-        category: "솔루션매뉴얼",
-        tags: ["WAF", "NGFW", "HA이중화", "VRRP"],
-        updatedAt: "2026-09-15",
-        content: "# WAF & NGFW 하드웨어 이중화(HA) 표준 매뉴얼\n\n## 1. 장비 구성 사양\n- **주 장비 (Active)**: Primary Appliance (포트 eth0/eth1 트래픽 인라인 인입)\n- **보조 장비 (Standby)**: Secondary Appliance (동기화 링크 eth2 전용 케이블 직결)\n\n## 2. 상태 점검 및 페일오버(Failover) 절차\n1. VRRP 헬스체크 주기는 1초로 설정 (3회 연속 응답 실패 시 3초 이내 자동 절체).\n2. 세션 동기화(State Sync) 확인: Active 장비의 실시간 연결 테이블이 Standby 장비에 실시간 복제되는지 모니터링합니다.\n3. 정기 점검 주기: 매월 3째주 토요일 새벽 02:00 수동 페일오버 모의훈련 실시."
-      },
-      {
-        id: 3,
-        title: "온프레미스 생성형 AI 보안존 아키텍처 설계서",
-        category: "아키텍처설계",
-        tags: ["생성형AI", "GB10", "AirGap", "DLP", "KMS"],
-        updatedAt: "2026-09-14",
-        content: "# 온프레미스 생성형 AI 보안존 아키텍처 설계서\n\n## 1. 아키텍처 개요\n사내 민감정보 및 고객 데이터의 외부 유출을 원천 방지하기 위해 에어갭(Air-Gap) 기반 온프레미스 GB10 (177B) 전용 GPU 클러스터를 구축합니다.\n\n## 2. 다계층 방어선 (Defense in Depth)\n- **1계층 (경계 보안)**: AI 전용 WAF 및 API Gateway를 통한 토큰 기반 인증 및 Rate Limiting.\n- **2계층 (데이터 필터링)**: 프롬프트 인입 시 사내 DLP 엔진을 통해 주민등록번호/계좌번호 마스킹 처리.\n- **3계층 (저장 암호화)**: 지식고 벡터 DB 및 모델 가중치 파일은 HSM/KMS 연동 AES-256 암호화 적용."
-      },
-      {
-        id: 4,
-        title: "DDoS 및 랜섬웨어 침해사고 긴급대응 런북",
-        category: "장애런북",
-        tags: ["DDoS", "랜섬웨어", "긴급대응", "SOAR"],
-        updatedAt: "2026-09-12",
-        content: "# DDoS 및 랜섬웨어 침해사고 긴급대응 런북\n\n## 1. 초기 인지 및 전파 (10분 이내)\n- SIEM 알람 발생 또는 서비스 지연 감지 즉시 보안관제팀 및 인프라팀 비상 연락망 가동.\n- 트래픽 임계치 초과 여부 확인 (평시 대비 300% 이상 인입 시 DDoS 의심).\n\n## 2. 긴급 조치 단계\n1. **DDoS 대피소 전환**: DNS 레코드 CNAME을 안티DDoS 스크러빙 센터로 우회.\n2. **EDR 단말 일괄 격리**: 랜섬웨어 확산 징후 발견 시 감염 대역 단말 네트워크 격리.\n3. **포렌식 증거 수집**: 침해 서버 메모리 덤프 및 방화벽 세션 로그 즉시 영구보존 스토리지로 복제."
-      }
-    ];
 
     const solutionCatalog = [
       { id: "SEC-01", name: "AhnLab TrusGuard NGFW", vendor: "안랩", category: "방화벽", price: 35000000, opexRate: 0.12, ismsMapping: "2.4 망분리/접근통제" },
@@ -1161,7 +1138,7 @@
     };
 
     function loadStoredDocs() {
-      const stored = localStorage.getItem('gijo_wiki_docs');
+      const stored = localStorage.getItem('gijo_wiki_docs_v5');
       if (stored) {
         try { return JSON.parse(stored); } catch(e) { }
       }
@@ -1169,7 +1146,7 @@
     }
 
     function saveDocsToStorage(docs) {
-      localStorage.setItem('gijo_wiki_docs', JSON.stringify(docs));
+      localStorage.setItem('gijo_wiki_docs_v5', JSON.stringify(docs));
     }
 
     let currentDocs = loadStoredDocs();
@@ -1196,6 +1173,21 @@
       lucide.createIcons();
     }
 
+    function renderQuickChips() {
+      const chipBox = document.getElementById('quickChipContainer');
+      chipBox.innerHTML = '';
+      quickQuestions.forEach(q => {
+        const chip = document.createElement('button');
+        chip.className = 'quick-chip';
+        chip.innerText = q;
+        chip.onclick = () => {
+          document.getElementById('ragQueryInput').value = q;
+          executeRagQuery();
+        };
+        chipBox.appendChild(chip);
+      });
+    }
+
     function renderWikiDocList() {
       const listEl = document.getElementById('wikiDocList');
       const searchVal = document.getElementById('wikiSearchInput')?.value.toLowerCase() || '';
@@ -1209,7 +1201,7 @@
         return matchesCat && matchesSearch;
       });
 
-      document.getElementById('count-all').innerText = currentDocs.length;
+      document.getElementById('totalDocCount').innerText = currentDocs.length;
 
       filtered.forEach(doc => {
         const li = document.createElement('li');
@@ -1220,6 +1212,9 @@
         if (doc.category === '솔루션매뉴얼') catClass = 'manual';
         if (doc.category === '아키텍처설계') catClass = 'arch';
         if (doc.category === '장애런북') catClass = 'runbook';
+        if (doc.category === '취약점관리') catClass = 'vuln';
+        if (doc.category === 'AI보안') catClass = 'ai';
+        if (doc.category === 'QA문답집') catClass = 'qa';
 
         li.innerHTML = '<div class="doc-item-title"><span>' + doc.title + '</span></div>' +
                        '<div class="doc-item-meta"><span class="badge-cat ' + catClass + '">' + doc.category + '</span>' +
@@ -1245,7 +1240,7 @@
 
       const renderedHtml = parseMarkdownToHtml(doc.content);
       document.getElementById('wikiReadView').innerHTML = 
-        '<div style="margin-bottom: 1rem;"><div style="display:flex; gap:0.4rem; margin-bottom:0.5rem;">' +
+        '<div style="margin-bottom: 1rem;"><div style="display:flex; gap:0.4rem; margin-bottom:0.5rem; flex-wrap:wrap;">' +
         doc.tags.map(t => '<span class="badge-cat">#' + t + '</span>').join('') +
         '</div></div>' + renderedHtml;
 
@@ -1361,10 +1356,19 @@
       currentDocs.forEach(doc => {
         let score = 0;
         searchTerms.forEach(term => {
-          if (doc.title.toLowerCase().includes(term)) score += 5;
-          if (doc.tags.some(t => t.toLowerCase().includes(term))) score += 4;
+          if (doc.title.toLowerCase().includes(term)) score += 6;
+          if (doc.tags.some(t => t.toLowerCase().includes(term))) score += 5;
           if (doc.content.toLowerCase().includes(term)) score += 2;
         });
+
+        // Special GIJO AS ontology boost
+        if (query.includes('AIBOM') && (doc.tags.includes('AIBOM') || doc.title.includes('AIBOM'))) score += 10;
+        if (query.includes('WAF') && (doc.tags.includes('WAF') || doc.title.includes('WAF'))) score += 10;
+        if (query.includes('에어갭') && (doc.tags.includes('에어갭') || doc.content.includes('에어갭'))) score += 10;
+        if (query.includes('CVE') && (doc.tags.includes('CVE') || doc.title.includes('CVE'))) score += 10;
+        if (query.includes('ISMS-P') && (doc.tags.includes('ISMS-P') || doc.title.includes('ISMS-P'))) score += 10;
+        if (query.includes('DDoS') && (doc.tags.includes('DDoS') || doc.title.includes('DDoS'))) score += 10;
+
         if (score > 0) {
           matchedDocs.push({ doc, score });
         }
@@ -1378,12 +1382,12 @@
 
         if (matchedDocs.length > 0) {
           const topDoc = matchedDocs[0].doc;
-          let summary = topDoc.content.slice(0, 200).replace(/#/g, '');
-          aiBubble.innerHTML = '<div><b>[로컬 지식 분석 결과]</b><br>' +
+          let summary = topDoc.content.slice(0, 240).replace(/#/g, '');
+          aiBubble.innerHTML = '<div><b>[GIJO AS 학습 지식 분석 결과]</b><br>' +
             '질의하신 \'<b>' + query + '</b>\'에 대한 사내 규정 및 아키텍처 지침입니다:<br><br>' +
             summary + '...<br></div>' +
             '<div class="citation-tag" onclick="selectWikiDoc(' + topDoc.id + ')">' +
-            '<i data-lucide="file-text" style="width:12px; height:12px;"></i> 출처: [' + topDoc.category + '] ' + topDoc.title +
+            '<i data-lucide="file-text" style="width:12px; height:12px;"></i> 근거 문서: [' + topDoc.category + '] ' + topDoc.title +
             '</div>';
         } else {
           aiBubble.innerHTML = '<div>해당 질문에 직접 일치하는 사내 문서 조각을 찾지 못했으나, 일반 보안 원칙에 따르면 <b>경계 방화벽 통제</b> 및 <b>ISMS-P 최소 권한 부여</b> 기준을 준수해야 합니다.</div>';
@@ -1399,10 +1403,12 @@
       const doc = currentDocs.find(d => d.id === currentActiveDocId);
       if (!doc) return;
 
-      if (doc.tags.includes('AI') || doc.title.includes('AI')) {
+      if (doc.tags.includes('AI') || doc.title.includes('AI') || doc.tags.includes('AIBOM')) {
         loadStudioPreset('ai');
       } else if (doc.tags.includes('공공') || doc.title.includes('공공')) {
         loadStudioPreset('public');
+      } else if (doc.tags.includes('제로트러스트') || doc.tags.includes('ZTNA')) {
+        loadStudioPreset('zerotrust');
       } else {
         loadStudioPreset('finance');
       }
@@ -1548,7 +1554,7 @@
         { code: "2.5.2", title: "암호화 적용 및 키 관리", status: "PASS", desc: "데이터베이스 AES-256 저장 암호화 및 KMS 연동" },
         { code: "2.8.1", title: "악성코드 통제 (EDR)", status: "PASS", desc: "내부 전 단말 EDR 실시간 탐지 에이전트 정책 수립" },
         { code: "2.10.1", title: "로그 기록 및 통합 관리 (SIEM)", status: "PASS", desc: "주요 장비 Syslog 및 감사로그 1년 이상 보존 설정" },
-        { code: "2.12.1", title: "신기술(생성형 AI) 보안 통제", status: "WARN", desc: "사내 온프레미스 AI 프롬프트 DLP 검증 강화 권고" }
+        { code: "2.12.1", title: "신기술(생성형 AI) 보안 통제", status: "PASS", desc: "AIBOM 3단계 검토 및 사내 온프레미스 에어갭 GB10 엔진 가동" }
       ];
 
       items.forEach(it => {
@@ -1595,7 +1601,7 @@
               currentDocs = imported;
               saveDocsToStorage(currentDocs);
               renderWikiDocList();
-              alert('✅ ' + imported.length + '개의 위키 문서가 성공적으로 로드되었습니다.');
+              alert('✅ ' + imported.length + '개의 위키 문서가 로드되었습니다.');
             }
           } catch(err) {
             alert('JSON 파일 형식이 올바르지 않습니다.');
@@ -1640,6 +1646,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      renderQuickChips();
       renderWikiDocList();
       loadStudioPreset('finance');
       lucide.createIcons();

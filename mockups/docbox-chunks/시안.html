@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 문서함 「조각 없음 / 일부 없음」</title>
+<!--
+  자체완결 목업. 바깥 자원 0(글꼴·그림·스크립트 전부 없음).
+  페이지 안 스크립트는 **자기 높이를 재는 일만** 한다(제품 코드 아님).
+  색·치수는 client/src/renderer/pages/gijo-ui.css :root 값을 그대로 옮겨 적었다 — 새 토큰 0개.
+-->
+<style>
+:root{
+  /* gijo-ui.css :root에서 그대로 (새 색 없음) */
+  --g-bg:#262624; --g-surface-1:#30302e; --g-surface-2:#1f1e1d;
+  --g-border:rgba(255,255,255,.08); --g-border-strong:rgba(255,255,255,.16);
+  --g-blue:#3b82f6; --g-blue-light:#5fa1ff; --g-teal:#1eb980; --g-amber:#f0a020;
+  --g-red:#e2483d; --g-purple:#8b7cf0;
+  --g-text:#e9e7e2; --g-muted:#b3ada4; --g-muted-2:#a49d95;
+  --g-zebra:rgba(255,255,255,.025);
+  --g-t-xs:11px; --g-t-sm:13px; --g-t-md:14.5px; --g-t-h2:16px; --g-t-h1:22px;
+  --g-r-sm:8px; --g-r:12px; --g-r-pill:999px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--g-bg);color:var(--g-text);font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+  font-size:var(--g-t-sm);line-height:1.62;padding:24px 26px 60px;max-width:1180px}
+h1{font-size:var(--g-t-h1);font-weight:800;letter-spacing:-.3px}
+h2{font-size:var(--g-t-h2);font-weight:800;margin:26px 0 9px;padding-bottom:5px;border-bottom:1px solid var(--g-border-strong)}
+h3{font-size:var(--g-t-md);font-weight:800;margin:16px 0 6px}
+p,li{font-size:var(--g-t-sm)}
+ul,ol{margin:6px 0 6px 20px}
+li{margin:3px 0}
+b{color:#fff}
+.sub{color:var(--g-muted);margin-top:5px}
+.why{background:var(--g-surface-1);border:1px solid var(--g-border);border-left:3px solid var(--g-blue);
+  border-radius:0 var(--g-r-sm) var(--g-r-sm) 0;padding:10px 14px;margin:10px 0}
+.warn{border-left-color:var(--g-amber)}
+.bad{border-left-color:var(--g-red)}
+.ok{border-left-color:var(--g-teal)}
+code{font-family:Consolas,"D2Coding",monospace;font-size:12px;background:var(--g-surface-2);
+  border:1px solid var(--g-border);border-radius:4px;padding:0 4px;color:var(--g-blue-light)}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12.25px}
+th,td{border:1px solid var(--g-border);padding:5px 8px;vertical-align:top;text-align:left}
+th{background:var(--g-surface-2);font-weight:800;color:var(--g-muted);font-size:var(--g-t-xs);letter-spacing:.4px}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--g-amber);font-weight:800}
+.neu{color:var(--g-muted-2)}
+.gd{color:var(--g-teal);font-weight:800}
+
+/* ── 두 판 나란히 ─────────────────────────────────────────────── */
+.pair{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px}
+.pane{flex:0 0 400px}          /* .v4list = 400px 고정 (mydocs.html:130) */
+.pane>.cap{font-size:12px;font-weight:800;color:var(--g-muted);margin-bottom:5px}
+.pane>.cap .tag{font-weight:700;color:var(--g-muted-2)}
+.v4list{width:400px;background:var(--g-bg);border:1px solid var(--g-border);border-radius:var(--g-r-sm);overflow:hidden}
+
+/* gijo-ui.css .g-rows-* 를 값 그대로 옮김 (369~384행) */
+.g-rows-head{display:grid;align-items:center;height:26px;padding:0 12px;font-size:11px;font-weight:800;
+  color:var(--g-muted-2);letter-spacing:.4px;background:var(--g-surface-2);border-bottom:1px solid var(--g-border-strong)}
+.g-rows-gh{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px;font-size:12px;font-weight:800;
+  color:var(--g-text);background:var(--g-surface-2);border-bottom:1px solid var(--g-border)}
+.g-rows-gh .tri{width:10px;color:var(--g-muted-2);font-size:11px}
+.g-rows-gh .cnt{margin-left:auto;color:var(--g-muted-2);font-weight:700;font-size:11.5px}
+.g-rows-r{display:grid;align-items:center;height:30px;padding:0 12px;font-size:12.5px;color:var(--g-text);cursor:pointer}
+.g-rows-body .g-rows-r:nth-child(even){background:var(--g-zebra)}
+.g-rows-r:hover{background:rgba(59,130,246,.07)}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ta-r{text-align:right;font-variant-numeric:tabular-nums}
+.gm{color:var(--g-muted)}
+.gm2{color:var(--g-muted-2)}
+.gtxt-C{color:var(--g-red);font-weight:800}
+.gtxt-S{color:var(--g-amber);font-weight:800}
+.gtxt-O{color:var(--g-muted);font-weight:700}
+
+/* ★ 새로 더하는 것은 이 두 줄뿐 — 안쪽 그리드(반입 탭 .ing-name 선례 197행)와 칩 */
+.dk-name{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px;align-items:baseline;min-width:0}
+.dk-chip{white-space:nowrap;flex:0 0 auto;font-size:11px;font-weight:800;padding:0 5px;border-radius:var(--g-r-pill);
+  border:1px solid currentColor;line-height:16px;display:inline-block}
+.dk-miss{color:var(--g-red)}      /* 기존 --g-red   — 조각 없음 */
+.dk-short{color:var(--g-amber)}   /* 기존 --g-amber — 일부 없음 */
+.dk-extra{color:var(--g-purple)}  /* 기존 --g-purple — 옛 판이 남음 */
+
+/* 왼쪽 칸 노드(배지 자리) — mydocs.html .v4node 축약 재현 */
+.v4node{display:flex;align-items:center;gap:7px;height:26px;padding:0 9px;background:var(--g-surface-2);
+  border:1px solid var(--g-border);border-radius:var(--g-r-sm);font-size:12.5px;font-weight:700;width:200px}
+.v4node .cnt{margin-left:auto;color:var(--g-muted-2);font-size:11.5px;font-weight:700}
+.v4node .alarm{color:var(--g-red);font-size:11px;font-weight:800}
+
+.measure{font-family:Consolas,"D2Coding",monospace;color:var(--g-teal);font-weight:800}
+.note{color:var(--g-muted-2);font-size:12px;margin-top:5px}
+.kbd{border:1px solid var(--g-border-strong);border-radius:4px;padding:0 5px;font-size:11.5px;color:var(--g-muted)}
+</style>
+</head>
+<body>
+
+<h1>시안 — 문서함 「조각 없음 / 일부 없음」</h1>
+<p class="sub">
+  <b>추천 1개.</b> 반입 대장에는 줄이 있는데 지식 저장소에 조각이 없거나 모자란 문서를,
+  담당자가 <b>내 문서 → 🏢 회사 지식</b>에서 눈으로 보고 스스로 닫는다.<br>
+  승인 근거 — 2026-09-07 사장님 「마감 뒤 목록 1순위 셋 추천으로 진행」 · 「크로드 너가 할 수 있는 것까진 다 해주고,
+  사용자와 내부 LLM+사용자가 이용해서 제품 운용할 수 있도록 하자」 · 시안=추천 1개 바로 진행(2026-08-22).
+  <span class="kbd">계획서 전-4</span> <span class="kbd">제품 코드 0줄 변경</span>
+</p>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>① 왜 이 안인지 — 코드를 읽고 나서 <b>과제 설계를 두 군데 뒤집었다</b></h2>
+
+<div class="why bad">
+  <b>뒤집기 ⓐ — 지금 목록은 유령을 「못 보여주는」 게 아니라 <u>원리상 담을 수 없다</u>.</b><br>
+  과제문은 「목록에는 있는데 조각이 없는 문서」를 전제했다. 실제 코드는 반대다.
+  <code>memory.ts:1609 listDocuments()</code>는 <b>LanceDB를 전수 집계한 <code>agg</code>만 순회</b>하고
+  (<code>for (const [documentId, {scope, chunks}] of agg)</code>), SQLite <code>memory_documents</code>는
+  <b>메타를 채우는 데만</b> 쓴다(<code>metaById.get()</code>). 그래서 조각이 0인 문서는 <code>agg</code>에 아예 없고 —
+  <b>대장에 줄이 있어도 목록에서 통째로 사라진다.</b> 화면이 「없다」고 말하는 게 아니라 <b>아무 말도 안 한다.</b><br>
+  그 결과 <code>mydocs.html:1010</code>의 주석이 오늘 <b>참말</b>이다 —
+  「회사 지식은 목록에 있으면 곧 지식에 있는 문서다」. 참말이지만 <b>담당자는 잃어버린 문서를 영영 못 만난다.</b>
+  운영 실측(2026-09-07): 대장 3,921 / 저장소 3,920 — <code>2025년 사이버 위협 전망.pdf</code>(대장 21조각) 한 편이 그렇게 없다.
+</div>
+
+<div class="why bad">
+  <b>뒤집기 ⓑ — <code>storedChunks</code> 칸을 파지 않는다. 이 저장소가 이미 같은 판단을 적어 뒀다.</b><br>
+  <code>learnmemory.ts:108</code>이 못 박아 둔 문장:
+  「★ 왜 문서 표(memory_documents)에 칸을 만들지 않았나 … <b>새 칸을 파면 백업·복원·문서 목록까지 짝이 늘어난다.</b>
+  반면 이 값은 이미 원천으로 있다 — <b>사본을 만드는 대신 원천을 가리키는 함수를 둔다.</b>」<br>
+  우리 경우가 정확히 그것이다. <b>두 숫자가 이미 둘 다 서버 손안에 있다</b> —
+  저장소 값은 <code>listDocuments()</code>의 <code>agg</code>가 <b>매 호출 세고 있고</b>,
+  대장 값은 <code>memory_documents.chunks</code>에 반입 UPSERT(<code>memory.ts:53</code>)가 <b>이미 적고 있다</b>.
+  한쪽만 화면에 보내고 있었을 뿐이다.<br>
+  → <b>마이그레이션 0건 · 기동 대조 0회 · 지연 실행 고민 0건.</b> 8,470조각 전수 집계 비용은
+  <b>오늘 이미 내고 있는 비용</b>이라 이 기능이 늘리는 몫이 없다(그 비용 자체는 별건 과제 — §⑧ 열린 물음).
+</div>
+
+<div class="why">
+  <b>그래서 이 안의 뼈대는 「새로 만들기」가 아니라 「이미 있는 두 값을 한 줄에 세우기」다.</b>
+  <code>listDocuments()</code>가 <code>agg</code>를 돈 <b>뒤에</b> <code>metaById</code>에만 남은 줄을 마저 담고
+  (조각 0 = 유령), 모든 줄에 <code>ledgerChunks</code>를 실어 보낸다. 화면은 두 값이 다를 때만 칩을 그린다.
+</div>
+
+<h3>다른 길을 왜 안 골랐나</h3>
+<table>
+<tr><th style="width:190px">고를 수 있었던 길</th><th style="width:120px">왜 안 골랐나</th><th>근거(코드·기록)</th></tr>
+<tr><td><b>Ⓐ 유령이 생기면 결재판(approvals.html)에 「다시 올리기 요청」 항목을 자동 생성</b></td>
+    <td class="pos">항목 모델이 안 맞고, 결재판이 알림함이 된다</td>
+    <td><code>approvals.ts</code>의 항목 키는 <b>(assetId, findingKey)</b>다 — 문서에는 assetId가 없다.
+      가짜 assetId를 넣는 순간 <code>isFindingRejected</code>(SBOM 제외)·<code>isOverdue</code>·자산별 묶음이
+      <b>문서를 취약점으로 세기 시작</b>한다. 같은 파일 머리말이 경고하는
+      「같은 이름으로 다른 것을 세는 곳 3군데」가 그대로 재발한다.</td></tr>
+<tr><td><b>Ⓑ 대화창 결재판(PendingApproval)을 서버가 자동으로 쌓아 둔다</b></td>
+    <td class="pos">쌓아 둘 표가 없다</td>
+    <td><code>registry.ts:2384 PendingApproval</code>은 <b>저장되지 않는 일회성 카드</b>다 —
+      <code>agentloop.ts:2626·2734</code>에서 만들어 응답에 실려 나갔다가 <code>/api/agent/approve</code>로 끝난다.
+      큐 표를 새로 파면 그게 곧 <b>새 승인 창구</b>다(지시가 금지한 그것).</td></tr>
+<tr><td><b>Ⓒ 유령을 발견하면 서버가 조용히 재인입</b></td>
+    <td class="pos">원본이 있을 때만 되고, 없을 때 침묵한다</td>
+    <td><code>learnmemory.ts:262</code>의 자동 재동기화는 <b>원문이 <code>chat_logs</code>에 있어서</b> 성립한다.
+      문서는 원본이 디스크에 있어야 하고(<code>sourcePath</code>), 없으면 자동 재인입이 <b>원리상 불가</b>다 —
+      절반만 자동이면 나머지 절반은 아무도 모르게 남는다.</td></tr>
+<tr><td class="gd"><b>★ 채택 — 문서함 칩 + 「사람이 말할 때만」 결재판</b></td>
+    <td class="gd">이 저장소에 <b>같은 갈래의 선례</b>가 이미 있다</td>
+    <td><code>registry.ts:829 doc_duplicates</code> —
+      「지식베이스에서 제목이 겹치는 문서를 묶어 <b>표시만</b> 한다 … <b>삭제는 결재판에서</b>」.
+      중복 문서와 유령 문서는 같은 갈래다. 새 개념을 만들 필요가 없다.</td></tr>
+</table>
+
+<div class="why ok">
+  <b>자율 운용 루프는 그럼 어디서 닫히나 — 서버 규칙이 갈래를 정하고, LLM은 문장만 쓰고, 실행은 결재판.</b>
+  <ol style="margin-top:4px">
+    <li><b>서버 규칙</b>(<code>잣대대조</code> 순수 함수)이 네 갈래 중 하나로 판정한다 — LLM이 판정하지 않는다.</li>
+    <li><b>화면</b>이 칩으로 알린다(+0px). <b>LLM</b>은 물어보면 도구 <code>doc_chunk_gaps</code>로 <b>읽어 말할 뿐</b>이다.</li>
+    <li><b>사람</b>이 대화창에서 「'…' 다시 넣어줘」라고 <b>말해야</b> 쓰기 도구가 서고, <b>결재판</b>이 뜨고,
+      승인해야 <code>/api/agent/approve</code>에서 실행된다.</li>
+  </ol>
+  「고쳤다」를 제품이 먼저 말하는 자리가 <b>한 군데도 없다</b> — 「등록하였습니다」를 지어낸 전례에 대한 답이다.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>② 화면 — 지금 판 / 제안 판 (실제 CSS 값 그대로)</h2>
+<p class="note">두 판 모두 <code>.v4list</code> 400px · <code>.g-rows-r</code> 30px ·
+  칸 <code>20px 1fr 74px 52px 44px</code> · gap 8px — <b>제안 판도 이 값을 하나도 안 바꾼다.</b></p>
+
+<div class="pair">
+  <!-- ─────────── 지금 판 ─────────── -->
+  <div class="pane">
+    <div class="cap">지금 판 <span class="tag">— mydocs.html:999~1020 그대로</span></div>
+    <div class="v4node" style="margin-bottom:6px">🏢<span>회사 지식</span><span class="cnt">3,920</span></div>
+    <div class="v4list" id="paneNow">
+      <div class="g-rows-head" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">
+        <span><input type="checkbox" disabled></span><span>문서</span><span>등급</span>
+        <span class="ta-r">조각</span><span class="ta-r">반입</span></div>
+      <div class="g-rows-gh"><span class="tri">▾</span>🗂 위협대응<span class="cnt">4개</span></div>
+      <div class="g-rows-body">
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">
+          <span><input type="checkbox" disabled></span>
+          <span class="trunc">CrowdStrike_2026_위협보고서.pdf</span>
+          <span class="gtxt-O">O 공개</span><span class="ta-r gm">99</span><span class="ta-r gm2">08-14</span></div>
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">
+          <span><input type="checkbox" disabled></span>
+          <span class="trunc">Tenable_IE_점검결과.md</span>
+          <span class="gtxt-S">S 민감</span><span class="ta-r gm">2</span><span class="ta-r gm2">08-30</span></div>
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">
+          <span><input type="checkbox" disabled></span>
+          <span class="trunc">model-intake-policy.md</span>
+          <span class="gtxt-O">O 공개</span><span class="ta-r gm">2</span><span class="ta-r gm2">09-02</span></div>
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">
+          <span><input type="checkbox" disabled></span>
+          <span class="trunc">KISA_침해사고_대응절차.md</span>
+          <span class="gtxt-O">O 공개</span><span class="ta-r gm">37</span><span class="ta-r gm2">09-05</span></div>
+      </div>
+    </div>
+    <div class="why bad" style="margin-top:8px">
+      <b>여기 없는 줄이 하나 있다.</b> <code>2025년 사이버 위협 전망.pdf</code>(대장 21조각·저장소 0).
+      화면은 <b>있는지조차 말하지 않는다.</b> 「99」·「2」·「2」도 <b>저장소 값</b>이라
+      대장에 101·4·1로 적혀 있는 것과 어긋난 사실이 <b>어디에도 안 보인다.</b>
+    </div>
+  </div>
+
+  <!-- ─────────── 제안 판 ─────────── -->
+  <div class="pane">
+    <div class="cap">제안 판 <span class="tag">— 칩은 줄 안, 행 높이 그대로</span></div>
+    <div class="v4node" style="margin-bottom:6px">🏢<span>회사 지식</span>
+      <span class="alarm" title="조각이 없거나 모자란 문서 4건">⚠ 4</span><span class="cnt">3,921</span></div>
+    <div class="v4list" id="paneNew">
+      <div class="g-rows-head" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">
+        <span><input type="checkbox" disabled></span><span>문서</span><span>등급</span>
+        <span class="ta-r">조각</span><span class="ta-r">반입</span></div>
+      <div class="g-rows-gh"><span class="tri">▾</span>🗂 위협대응<span class="cnt">5개</span></div>
+      <div class="g-rows-body">
+        <!-- ★ 유령 — 지금 판에는 아예 없던 줄 -->
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"
+             title="대장에는 21조각이라 적혀 있는데 저장소에 한 조각도 없습니다 — AI가 근거로 못 씁니다">
+          <span><input type="checkbox" disabled title="조각이 없어 근거로 지정할 수 없습니다"></span>
+          <span class="dk-name"><span class="trunc">2025년 사이버 위협 전망.pdf</span>
+            <span class="dk-chip dk-miss">조각 없음</span></span>
+          <span class="gtxt-O">O 공개</span><span class="ta-r gm">0</span><span class="ta-r gm2">08-11</span></div>
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"
+             title="대장 101 / 저장소 99 — 벡터가 부분적으로 날아갔습니다">
+          <span><input type="checkbox" disabled></span>
+          <span class="dk-name"><span class="trunc">CrowdStrike_2026_위협보고서.pdf</span>
+            <span class="dk-chip dk-short">99/101</span></span>
+          <span class="gtxt-O">O 공개</span><span class="ta-r gm">99</span><span class="ta-r gm2">08-14</span></div>
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"
+             title="대장 4 / 저장소 2 — 벡터가 부분적으로 날아갔습니다">
+          <span><input type="checkbox" disabled></span>
+          <span class="dk-name"><span class="trunc">Tenable_IE_점검결과.md</span>
+            <span class="dk-chip dk-short">2/4</span></span>
+          <span class="gtxt-S">S 민감</span><span class="ta-r gm">2</span><span class="ta-r gm2">08-30</span></div>
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px"
+             title="대장 1 / 저장소 2 — 옛 판 조각이 남아 AI가 두 판을 섞어 읽습니다">
+          <span><input type="checkbox" disabled></span>
+          <span class="dk-name"><span class="trunc">model-intake-policy.md</span>
+            <span class="dk-chip dk-extra">옛 판 섞임</span></span>
+          <span class="gtxt-O">O 공개</span><span class="ta-r gm">2</span><span class="ta-r gm2">09-02</span></div>
+        <!-- 정상 줄 — 칩 없음(정상은 아무 말도 하지 않는다) -->
+        <div class="g-rows-r" style="grid-template-columns:20px 1fr 74px 52px 44px;gap:8px">
+          <span><input type="checkbox" disabled></span>
+          <span class="trunc">KISA_침해사고_대응절차.md</span>
+          <span class="gtxt-O">O 공개</span><span class="ta-r gm">37</span><span class="ta-r gm2">09-05</span></div>
+      </div>
+    </div>
+    <div class="why ok" style="margin-top:8px">
+      <b>정상 3,917줄은 지금과 픽셀 하나 다르지 않다.</b> 칩은 <b>어긋난 줄에서만</b> 이름 칸 안쪽 그리드로 들어간다
+      (<code>.ing-name</code> 선례 — 「짧은 쪽을 지키는 것이 옳다」). 그 4줄만 이름이 잘리고 <b>칩은 절대 안 잘린다.</b>
+    </div>
+  </div>
+</div>
+
+<h3>행을 고르면 오른쪽 문서창에 뜨는 것 (칩을 눌러도 같다)</h3>
+<div class="v4list" style="width:520px;padding:10px 12px;border-radius:var(--g-r-sm)">
+  <div style="font-size:12.5px;font-weight:800;margin-bottom:4px">2025년 사이버 위협 전망.pdf
+    <span class="dk-chip dk-miss" style="margin-left:4px">조각 없음</span></div>
+  <div style="font-size:12.25px;color:var(--g-muted);line-height:1.7">
+    반입 대장에 <b>21조각</b>이라 적혀 있는데 지식 저장소에 <b>한 조각도 없습니다</b> — AI가 이 문서를 근거로 못 씁니다.
+    2026-08-11에 반입된 기록만 남아 있습니다.<br>
+    <b>원본이 서버에 남아 있습니다</b>(2026-08-11 보관).
+  </div>
+  <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+    <span class="dk-chip" style="color:var(--g-blue-light);padding:3px 9px;cursor:pointer">↩ 다시 넣기 — 대화창에 문장을 담습니다</span>
+    <span class="dk-chip" style="color:var(--g-muted);padding:3px 9px;cursor:pointer">ⓘ 이게 무슨 뜻인가요</span>
+  </div>
+  <div class="note" style="margin-top:6px">
+    누르면 대화창 입력칸에 <code>2025년 사이버 위협 전망.pdf 다시 넣어줘</code>가 <b>담기기만</b> 합니다 —
+    보내는 것도, 승인하는 것도 사람이 합니다. <b>원본이 없는 문서</b>에는 이 단추 대신
+    「＋로 파일을 다시 올려 주세요(업무영역·등급을 이어받습니다)」가 뜹니다.
+  </div>
+</div>
+<p class="note"><b>화면에 입력칸을 새로 만들지 않았다.</b> 단추 둘 다 <b>기존 창구</b>로 보낼 뿐이다 —
+  하나는 대화창(지시), 하나는 ＋ 업로드(파일). ⓘ는 <code>screenguide.ts</code> 패널을 연다.</p>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>③ 밀도 숫자 — <span class="pos">아래 표의 px는 이 목업에서 잰 값이며, 제품에서 다시 잰다</span></h2>
+<p class="note">
+  설치본을 열 수 없어(이번 라운드는 제품 코드 0줄 변경) 목업 값을 적는다.
+  다만 <b>치수의 근거는 소스에서 읽은 값</b>이다 —
+  <code>gijo-ui.css:374 .g-rows-r{height:30px;font-size:12.5px}</code> ·
+  <code>gijo-ui.css:369 .g-rows-head{height:26px}</code> ·
+  <code>gijo-ui.css:370 .g-rows-gh{height:28px}</code> ·
+  <code>mydocs.html:130 .v4list{width:400px}</code>. 목업은 이 값을 그대로 옮겨 적었으므로
+  <b>줄 높이·칸 폭은 제품과 같아야 한다</b>(그 「같음」을 제품에서 확인하는 것이 재는 목적이다).
+</p>
+<table id="densityTable">
+<tr><th style="width:230px">무엇</th><th class="n" style="width:90px">지금 판</th><th class="n" style="width:90px">제안 판</th>
+    <th class="n" style="width:90px">증감</th><th>읽는 법</th></tr>
+<tr><td>행 높이(<code>.g-rows-r</code>)</td><td class="n" id="m_rowNow">–</td><td class="n" id="m_rowNew">–</td>
+    <td class="n" id="m_rowD">–</td><td><b>칩은 줄 안</b>이라 0이어야 한다. 0이 아니면 이 시안이 틀린 것이다.</td></tr>
+<tr><td>머리줄 높이(<code>.g-rows-head</code>)</td><td class="n" id="m_hdNow">–</td><td class="n" id="m_hdNew">–</td>
+    <td class="n" id="m_hdD">–</td><td>요약 띠를 <b>안 넣었다</b> — 그 알림은 왼쪽 칸 배지(⚠ 4)로 갔다.</td></tr>
+<tr><td>목록 세로 총합(같은 4문서)</td><td class="n" id="m_boxNow">–</td><td class="n" id="m_boxNew">–</td>
+    <td class="n" id="m_boxD">–</td><td>제안 판은 <b>유령 1줄이 더 있다</b>. 늘어난 30px은
+      <b>없던 줄이 아니라 숨어 있던 줄</b>이다 — 운영 실측 유령 1건 기준.</td></tr>
+<tr><td>문서명 칸 실폭 — 정상 줄</td><td class="n" id="m_nmNow">–</td><td class="n" id="m_nmNew">–</td>
+    <td class="n" id="m_nmD">–</td><td><b>3,917줄(99.90%)</b>이 여기 해당. 0이어야 한다.</td></tr>
+<tr><td>문서명 칸 실폭 — 칩 달린 줄</td><td class="n" id="m_cnNow">–</td><td class="n" id="m_cnNew">–</td>
+    <td class="n" id="m_cnD">–</td><td><b>4줄(0.10%)</b>만 줄어든다. 잘리는 쪽은 이름, 칩은 안 잘린다.</td></tr>
+<tr><td colspan="5" class="neu" style="font-size:11.75px">
+  ⚠ <b>목업이 제품보다 넉넉한 자리가 하나 있다 — 세로 스크롤바.</b> 이 목업은 줄이 적어 스크롤바가 안 서지만
+  제품 목록은 늘 서 있어 문서명 칸이 <b>약 10px 더 좁다</b>(<code>mydocs.html:1210</code>대 주석이 실측으로 적어 둔 그 10px).
+  그래서 제품 실값은 정상 줄 ≈142px · 칩 달린 줄 ≈78px로 보아야 한다.
+  <b>재지 않은 숫자를 적지 않는다</b>는 원칙에 따라 이 차이를 먼저 밝히고, 제품에서 다시 잰다.</td></tr>
+<tr><td>왼쪽 칸 노드 높이</td><td class="n" id="m_ndNow">–</td><td class="n" id="m_ndNew">–</td>
+    <td class="n" id="m_ndD">–</td><td>⚠ N 배지는 <code>.cnt</code> 앞에 끼워 <b>+0px</b>.</td></tr>
+</table>
+<p class="note" id="measureNote">— 재는 중 —</p>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>④ 결재판 항목 — 승인·반려가 무엇을 일으키나 (생산자 → 소비자)</h2>
+<p class="note">이 시안이 세우는 결재판은 <b>대화창 결재판</b>(<code>PendingApproval</code>) 하나뿐이고,
+  종류는 <b>기존 쓰기 도구와 똑같은 꼴</b>이다 — 표 신설 0건 · 상태값 신설 0건.</p>
+<table>
+<tr><th style="width:130px">칸</th><th style="width:150px">그 값을 누가 넣는가(생산자)</th><th style="width:110px">근거 배지</th><th>무엇이 되나(소비자)</th></tr>
+<tr><td><code>tool</code></td><td><code>agentloop.ts</code> 도구 선택</td><td>—</td>
+    <td><code>reingest_document</code> — 새 도구 <b>1개</b>. <code>write:true</code>라 <b>실행 대신 결재판</b>(<code>agentloop.ts:106</code>).</td></tr>
+<tr><td><code>documentId</code>(필수)</td><td>사람의 지시문 또는 앞선 조회 결과</td>
+    <td><span class="gd">said</span> / <span class="gd">found</span></td>
+    <td>지어낸 값(<span class="pos">guess</span>)은 <b>필수라서 빈 칸으로 되돌아간다</b>
+      (<code>registry.ts</code> buildApproval — 「필수값은 LLM이 지어낸 값을 받지 않는다」).</td></tr>
+<tr><td><code>effect</code>「실행되면:」</td><td>도구 정의(코드 상수)</td><td>—</td>
+    <td>「<b>원본 파일을 다시 읽어 조각 N개를 새로 만듭니다. 기존 조각은 지우고 다시 넣습니다.</b>」
+      — <code>fields</code>와 <b>같은 값</b>을 본다(2026-09-04 수리 계약).</td></tr>
+<tr><td><code>undo</code></td><td>도구 정의</td><td>—</td>
+    <td>「되돌리기: 다시 넣기 전 상태로는 못 돌아갑니다 — 조각은 다시 만들어집니다」(정직하게).</td></tr>
+</table>
+<table>
+<tr><th style="width:110px">사람의 행동</th><th style="width:230px">서버에서 실제로 일어나는 일</th><th>화면·기록에 남는 것</th></tr>
+<tr><td class="gd"><b>승인</b></td>
+    <td><code>/api/agent/approve</code> → <b>기존</b> 반입 경로(<code>memory.ts</code> ingest) 재사용.
+      성공하면 대장 UPSERT가 <code>chunks</code>를 <b>새 값으로 다시 적는다</b>(<code>memory.ts:53</code>).</td>
+    <td>칩이 <b>사라진다</b>(다음 목록 조회에서 두 값이 같아진다) · 반입 영수증 1줄 ·
+      <code>recordAudit</code> 「지식 문서 재인입」 · 배지 ⚠ N이 1 줄어든다.</td></tr>
+<tr><td class="pos"><b>반려/무시</b></td><td><b>아무 일도 안 일어난다.</b> 상태를 저장하지 않는다.</td>
+    <td>칩이 <b>그대로 남는다</b>. — 이것이 옳다: 유령은 <b>사실</b>이지 판정이 아니라
+      「반려」로 지울 수 있으면 <b>화면이 거짓말을 하게 된다.</b></td></tr>
+<tr><td class="pos"><b>실패</b>(원본 없음·추출 불가)</td>
+    <td>쓰기 도구가 <b>throw</b>한다(<code>handlers.ts:1531</code> 계약).</td>
+    <td>「다시 넣지 못했습니다 — 원본 파일이 없습니다」. <b>영수증 <code>ingested=0</code></b> —
+      실패를 성공으로 적지 않는다(지켜보는 폴더와 같은 잣대).</td></tr>
+</table>
+
+<h3>⑧ 기존 결재판 항목과 같은 꼴인가 — 코드로 대조</h3>
+<table>
+<tr><th style="width:180px">견줄 자리</th><th style="width:230px">기존(예: <code>watch_folder_add</code>)</th><th>제안(<code>reingest_document</code>)</th></tr>
+<tr><td>어디에 등록</td><td><code>registry.ts</code> 도구 배열</td><td class="gd">같은 배열 · <code>doc_duplicates</code> 바로 옆</td></tr>
+<tr><td><code>domain</code></td><td><code>"knowledge"</code>류</td><td class="gd"><code>"knowledge"</code> — 새 domain 없음</td></tr>
+<tr><td><code>write</code></td><td><code>true</code> → 결재판</td><td class="gd"><code>true</code> → 같은 결재판</td></tr>
+<tr><td>상태값</td><td>없음(일회성 카드)</td><td class="gd">없음 — <code>ApprovalStatus</code> 6종에 <b>안 건드림</b></td></tr>
+<tr><td>표</td><td>표 없음</td><td class="gd">표 없음 — <b>마이그레이션 0건</b></td></tr>
+<tr><td class="pos">⚠ 배열 자리</td><td>—</td><td class="pos">배열 <b>끝</b>에 붙인다. 중간에 넣으면
+  <code>routes.ts</code> 표가 통째로 밀린다(2026-08-10 18줄 사고) — 붙인 뒤
+  <code>node tools/routes-renumber.mjs --write</code>. <b>손으로 세지 않는다.</b></td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>⑤ 구현 때 만질 자리 (파일 · 함수)</h2>
+<table>
+<tr><th style="width:250px">파일</th><th style="width:200px">함수·자리</th><th>무엇을</th></tr>
+<tr><td><code>server/src/engine/docledger.ts</code> <b>(새 파일)</b></td><td><code>잣대대조(대장, 저장조각)</code></td>
+    <td><code>tools/docs-drift.mjs</code>에서 <b>옮겨온다(복사 아님)</b>. 반환은 지금 그대로 —
+      <code>{대장수, 저장수, 유령, 대장밖, 조각어긋남, 조각미기재}</code>.</td></tr>
+<tr><td><code>tools/docs-drift.mjs</code></td><td><code>main()</code> · 잣대대조 정의</td>
+    <td>자기 구현을 <b>지우고</b> <code>server/dist/engine/docledger.js</code>를 동적 import.
+      없으면 <b>exit 2</b>(이 도구의 「빈 값 대신 멈춘다」와 같은 꼴).
+      선례: <code>tools/route-explain.mjs</code>·<code>learn-candidate-review.mjs</code>가 이미 dist를 부른다.</td></tr>
+<tr><td><code>server/src/engine/memory.ts</code></td><td><code>MemoryDocument</code> (1595~1606)</td>
+    <td><code>ledgerChunks: number|null</code> · <code>docState: "ok"|"missing"|"short"|"extra"|"unknown"</code> 두 칸 추가.</td></tr>
+<tr><td><code>server/src/engine/memory.ts</code></td><td><b><code>listDocuments()</code> (1609)</b></td>
+    <td>★ 핵심. <code>agg</code> 순회 <b>뒤에</b> <code>metaById</code>에만 남은 줄을 <code>chunks:0</code>으로 담는다.
+      모든 줄에 <code>ledgerChunks = meta?.chunks ?? null</code>과 <code>docState</code>를 싣는다.
+      정렬(<code>ingestedAt</code>)은 그대로.</td></tr>
+<tr><td><code>server/src/engine/memory.ts</code></td><td><code>/api/memory/documents</code> (1951)</td>
+    <td><b>안 만짐.</b> <code>열람불가()</code> 필터가 유령 줄에도 그대로 걸린다(문서명도 정보다).</td></tr>
+<tr><td><code>server/src/db.ts</code></td><td>—</td><td class="gd"><b>안 만짐</b> — 새 칸·새 표 0개(§①ⓑ).</td></tr>
+<tr><td><code>server/src/engine/agenttools/registry.ts</code></td><td>도구 배열 <b>끝</b></td>
+    <td>읽기 <code>doc_chunk_gaps</code>(<code>write:false</code>·<code>directAnswer:true</code>·
+      설명에 「<b>표시만 한다 — 다시 넣기는 결재판에서</b>」) + 쓰기 <code>reingest_document</code>(<code>write:true</code>).</td></tr>
+<tr><td><code>server/src/engine/agenttools/handlers.ts</code></td><td><code>runDocChunkGaps</code> · <code>runReingestDocument</code></td>
+    <td>재인입은 <b>기존 반입 경로 재사용</b> — 새 파이프라인 금지. 실패는 <b>throw</b>.</td></tr>
+<tr><td><code>server/src/engine/screenguide.ts</code></td><td><code>"mydocs.html".panels</code> (498~)</td>
+    <td>패널 「조각이 없는 문서(⚠)」 신설 — 뜻·왜 생기나·어떻게 닫나. <b>화면엔 칩만, 설명은 여기.</b></td></tr>
+<tr><td><code>client/.../mydocs.html</code></td><td>탭 <code>know</code> 렌더 (999~1020)</td>
+    <td><code>docState !== "ok"</code>일 때만 이름 칸을 <code>.dk-name</code> 안쪽 그리드로 바꾸고 칩 1개.
+      <b>칸 폭·행 높이 문자열은 안 건드린다.</b></td></tr>
+<tr><td><code>client/.../mydocs.html</code></td><td>왼쪽 칸 <code>#nKnow</code> (340)</td>
+    <td><code>.cnt</code> <b>앞에</b> <code>⚠ N</code> 한 조각. 0이면 안 그린다.</td></tr>
+<tr><td><code>client/.../mydocs.html</code></td><td>문서창 상세</td>
+    <td><code>hasSource</code>가 참이면 「↩ 다시 넣기」(대화창에 문장 <b>담기만</b>),
+      거짓이면 「＋로 다시 올리기」(<code>category</code>·<code>grade</code>·<code>scope</code> 이어받기).</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>⑥ 짝 시험 제안 — 「그 값을 누가 넣는가」 위주</h2>
+<table>
+<tr><th style="width:34px">#</th><th style="width:230px">시험</th><th>무엇을 못 박나 / 왜 이게 필요한가</th></tr>
+<tr><td>1</td><td><code>docledger.test.ts</code> — 옮긴 12개 그대로</td>
+    <td><code>docsdriftledger.test.ts</code>의 <code>it()</code> <b>12개</b>를 함께 옮긴다. 회귀 0을 먼저 증명하고 옮긴다.</td></tr>
+<tr><td>2</td><td><b>소스 감시</b> — <code>docs-drift.mjs</code>에 <code>잣대대조</code> <b>정의가 없다</b></td>
+    <td>「두 벌 금지」를 사람 약속이 아니라 <b>빨간 시험</b>으로. 셋째 벌이 생기면 여기서 걸린다.</td></tr>
+<tr><td>3</td><td><b>★ <code>listDocuments()</code>가 대장에만 있는 줄을 돌려준다</b></td>
+    <td>LanceDB 0조각 + <code>memory_documents</code> 1줄을 만들고 목록 길이를 본다.
+      <b>이 시험은 오늘 빨갛다</b> — 그게 이 시안이 고치는 결함이다.</td></tr>
+<tr><td>4</td><td><b>★ 생산자 대조</b> — 화면이 읽는 두 키를 서버가 <b>실제로 넣는가</b></td>
+    <td><code>mydocs.html</code>이 <code>docState</code>·<code>ledgerChunks</code>를 쓰면
+      <code>memory.ts</code>의 <code>out.push</code>에 그 키가 있어야 한다.
+      「소비자만 있고 생산자 없는 값이 하루에 셋」의 답.</td></tr>
+<tr><td>5</td><td>「↩ 다시 넣기」는 <code>hasSource</code>와 짝이다</td>
+    <td>원본 없는 줄에 그 단추가 <b>안 뜬다</b>. 없는 것에 커서를 주면 「눌렀는데 아무 일도 안 난다」
+      (반입 탭 <code>data-id</code> 사고와 같은 병).</td></tr>
+<tr><td>6</td><td>약속–코드 일치(guidance 계열)</td>
+    <td>screenguide가 「⚠ 조각 없음」이라 적었으면 <code>mydocs.html</code>에 그 글자가 실재해야 한다.
+      한쪽만 지우면 빨개진다.</td></tr>
+<tr><td>7</td><td>등급 격리 — <b>유령도 <code>열람불가</code>를 지난다</b></td>
+    <td>기밀(C) 유령 문서의 <b>이름</b>이 목록으로 새지 않는다. 새 줄이 새 구멍이 되지 않게.</td></tr>
+<tr><td>8</td><td>「반려」가 칩을 지우지 않는다</td>
+    <td>유령은 <b>사실</b>이지 판정이 아니다. 지울 수 있으면 화면이 거짓말을 한다.</td></tr>
+<tr><td>9</td><td>재인입 실패를 성공으로 적지 않는다</td>
+    <td>영수증 <code>ingested=0</code> · 대장 <code>chunks</code>를 <b>안 고친다</b>.</td></tr>
+<tr><td>10</td><td><b>★ 자동 실행이 없다</b>(소스 감시)</td>
+    <td>기동·스케줄 경로 어디에도 <code>reingest</code> 호출이 없다. <b>자율이 사람을 건너뛰지 않는다</b>는 계약.</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>⑦ 제품 원칙 자가점검</h2>
+<table>
+<tr><th style="width:210px">원칙</th><th style="width:60px">지킴</th><th>어떻게</th></tr>
+<tr><td>메뉴는 보기용 — 새 화면에 입력칸 금지</td><td class="gd">○</td>
+    <td>입력칸 <b>0개</b>. 단추 둘 다 <b>기존 창구</b>로 보낼 뿐이다(대화창 · ＋ 업로드).</td></tr>
+<tr><td>지시는 대화창에서만</td><td class="gd">○</td>
+    <td>「↩ 다시 넣기」는 대화창에 문장을 <b>담기만</b> 한다 — 보내기·승인은 사람이.</td></tr>
+<tr><td>화면 설명은 screenguide+ⓘ</td><td class="gd">○</td>
+    <td>화면엔 칩(정체성)과 ⚠(경고)만. 뜻·왜·어떻게는 <code>screenguide.ts</code> 새 패널.</td></tr>
+<tr><td>프로 셸 우선</td><td class="gd">○</td>
+    <td>기준 화면이 프로의 도킹된 <code>mydocs.html</code>. 라이트 전용 화면은 이번 라운드에서 안 만진다.</td></tr>
+<tr><td>엑셀처럼 촘촘</td><td class="gd">○</td>
+    <td>행 30px 유지 · 요약 띠 <b>안 만듦</b>(왼쪽 칸 배지로) · 새 판·새 접기 0개.</td></tr>
+<tr><td>새 색 토큰 금지</td><td class="gd">○</td>
+    <td><code>--g-red</code>·<code>--g-amber</code>·<code>--g-purple</code> — <b>전부 이미 있는 것</b>.
+      (<code>--g-purple</code>은 gijo-ui.css:51에 있으나 <code>.g-rows</code>엔 아직 안 쓰였다 — <b>새로 정의하지 않고 참조만</b> 한다.)</td></tr>
+<tr><td><code>window.confirm</code> 금지</td><td class="gd">○</td>
+    <td>확인은 <b>결재판</b>이 한다. 브라우저 대화상자 0개.</td></tr>
+<tr><td>가짜 UI 금지 — 모든 칸에 생산자</td><td class="gd">○</td>
+    <td>칩 4종의 생산자가 전부 <b>이미 도는 코드</b>: 저장소 값=<code>agg</code>(LanceDB) ·
+      대장 값=<code>memory_documents.chunks</code>(반입 UPSERT) · 갈래=<code>잣대대조</code>(순수 함수) ·
+      원본 유무=<code>sourcePath</code>. <b>새로 지어내는 값이 없다.</b></td></tr>
+<tr><td>정직 — 폴백 문구는 FAIL</td><td class="gd">○</td>
+    <td>대장에 조각 수가 <b>안 적힌</b> 문서는 <code>docState:"unknown"</code>으로 칩을 <b>안 그린다</b>
+      (0으로 치면 전부 어긋남이 된다 — <code>잣대대조</code>의 <code>조각미기재</code>가 이미 그렇게 한다).</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2>⑧ 포기한 것 · 라이트/표준 영향 · 열린 물음</h2>
+<h3>포기한 것 (일부러)</h3>
+<ul>
+  <li><b>결재판 자동 항목</b> — 유령이 생겨도 결재판에 줄이 서지 않는다. 담당자가 <b>내 문서를 열어야</b> 안다
+    (또는 대화창에서 「조각 없는 문서 있어?」로 묻는다). <b>자율성을 한 칸 덜 준 것</b>이며, 그 대가로
+    결재판이 알림함이 되는 것과 취약점 잣대가 문서를 세는 것을 막았다.</li>
+  <li><b>메일·알림</b> — 이번 라운드에 안 붙인다. 붙이려면 <code>alert_schedules</code>의 <code>kind</code>에
+    한 갈래를 더하는 별도 결정이 필요하다.</li>
+  <li><b><code>대장밖</code>(저장소엔 있는데 대장에 줄 없는 문서)</b> — 목록에 이미 뜨고 있고
+    (<code>agg</code> 기준이라), <code>ingestedAt=null</code>「이전 업로드」로 보인다. 칩을 더 만들지 않는다.</li>
+  <li><b>기동 때 1회 대조·<code>storedChunks</code> 칸·지연 실행</b> — §①ⓑ대로 전부 버렸다.
+    <b>얻은 것</b>: 마이그레이션 0 · 백업/복원 짝 0 · 「그 칸을 누가 갱신하나」라는 새 숙제 0.</li>
+  <li><b>목록 위 요약 띠</b> — 26px을 아꼈다. 대신 왼쪽 칸 배지라 <b>다른 탭에서도 보인다</b>(오히려 낫다).</li>
+</ul>
+<h3>라이트/표준 영향 — 한 줄</h3>
+<p>서버 값(<code>ledgerChunks</code>·<code>docState</code>)은 공용 <code>memory.ts</code>라 <b>표준·라이트에 공짜로 따라가고</b>,
+  칩은 <code>mydocs.html</code>에만 그려진다 — <code>lite-mydocs</code>는 <b>이번 라운드에서 안 만진다</b>
+  (「라이트=프로 부분집합 · 포크 0」 원칙대로, 필요해지면 같은 부품을 재사용).</p>
+<h3>열린 물음 (사장님·설계관 결정이 필요한 것)</h3>
+<ol>
+  <li><b>도구를 dist에 묶어도 되나.</b> <code>docs-drift.mjs</code>가 <code>server/dist</code>를 부르면
+    <b>서버를 빌드해야 도구가 돈다.</b> 선례는 있으나(route-explain), 이 도구는 「운영이 이상할 때」 부르는 도구다.
+    <b>추천</b>: dist 없으면 <b>exit 2</b>(「판정 못 함」) — 이 도구의 기존 정직 원칙과 같은 꼴.</li>
+  <li><b><code>listDocuments()</code>의 LanceDB 전수 스캔</b>(8,470조각, <code>limit(1_000_000)</code>)은
+    이 시안과 <b>무관한 기존 비용</b>이지만, 유령 때문에 목록을 더 자주 보게 되면 드러난다. <b>별건 과제로 분리</b>를 제안.</li>
+  <li><b><code>doc_chunk_gaps</code>를 <code>knowledge_status</code>에 합칠까, 따로 둘까.</b>
+    추천은 <b>따로</b> — <code>doc_duplicates</code>가 이미 따로다.</li>
+</ol>
+
+<script>
+/* 이 페이지의 유일한 스크립트 — 자기 높이를 잰다. 제품 동작 아님. */
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var r = function (el) { return el ? Math.round(el.getBoundingClientRect().height * 10) / 10 : 0; };
+  var w = function (el) { return el ? Math.round(el.getBoundingClientRect().width * 10) / 10 : 0; };
+  function put(nowV, newV, idN, idW, idD, unit) {
+    unit = unit || "px";
+    $(idN).textContent = nowV + unit;
+    $(idW).textContent = newV + unit;
+    var d = Math.round((newV - nowV) * 10) / 10;
+    var cell = $(idD);
+    cell.textContent = (d > 0 ? "+" : "") + d + unit;
+    cell.className = "n " + (d === 0 ? "gd" : "pos");
+  }
+  var now = $("paneNow"), nw = $("paneNew");
+  var rowNow = now.querySelector(".g-rows-r"), rowNew = nw.querySelectorAll(".g-rows-r")[4]; /* 정상 줄 */
+  var rowChip = nw.querySelector(".g-rows-r");  /* 칩 달린 줄 */
+  put(r(rowNow), r(rowNew), "m_rowNow", "m_rowNew", "m_rowD");
+  put(r(now.querySelector(".g-rows-head")), r(nw.querySelector(".g-rows-head")), "m_hdNow", "m_hdNew", "m_hdD");
+  put(r(now), r(nw), "m_boxNow", "m_boxNew", "m_boxD");
+  /* 문서명 칸 실폭 — 정상 줄끼리 */
+  put(w(now.querySelectorAll(".g-rows-r")[3].children[1]),
+      w(rowNew.children[1]), "m_nmNow", "m_nmNew", "m_nmD");
+  /* 칩 달린 줄: 지금 판의 같은 문서(CrowdStrike) 이름 칸 ↔ 제안 판의 이름 글자 칸 */
+  put(w(now.querySelectorAll(".g-rows-r")[0].children[1]),
+      w(rowChip.querySelector(".dk-name .trunc")), "m_cnNow", "m_cnNew", "m_cnD");
+  var nds = document.querySelectorAll(".v4node");
+  put(r(nds[0]), r(nds[1]), "m_ndNow", "m_ndNew", "m_ndD");
+
+  var chipW = w(rowChip.querySelector(".dk-chip"));
+  $("measureNote").innerHTML =
+    "잰 때: " + new Date().toLocaleString("ko-KR") +
+    " · 이 브라우저 창 기준 · 칩 실폭 <b>" + chipW + "px</b>" +
+    " · <b>목업 값이며 제품(Electron 설치본)에서 다시 잰다</b> — 글꼴 대체·DPI 배율에 따라 소수점이 달라질 수 있다." +
+    " 판정 기준은 <b>행 높이 증감 0</b>과 <b>정상 줄 이름 칸 증감 0</b> 두 가지다.";
+})();
+</script>
+</body>
+</html>

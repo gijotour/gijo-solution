@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS — 「내 문서 = 문서·지식·학습 통합 허브」 시안 (추천 1개) · 프로 셸 · 흰 바탕 기준(다크 성립 별첨)
+  경로: mockups/docs-hub-v2/시안.html · gijo-mockup(읽기 전용) · 제품 코드는 한 줄도 건드리지 않았다.
+
+  ── 지시 원문(2026-08-20, 사장님) ────────────────────────────────────────────
+  "내문서에 지식 학습 내문서 다 통합하고 … 내용도 엑셀처럼 촘촘하게 쉽게 많이 보이게"
+
+  ── 승계 관계 ────────────────────────────────────────────────────────────────
+  mockups/docs-single-entry/시안.html(같은 날 승인 원본, 3부류: 👤내 것·🏢회사 지식·🩹반입 원본)의
+  결정을 그대로 이어받는다 — 격리 유지·업로드 목적지 칩 선택·반입=영수증. 이 파일은 그 위에
+  ③ 🎓 학습(learnloop 수집 내역) 탭을 더하고, 전 탭의 목록을 「카드/알약」에서
+  「엑셀형 행 목록(.g-rows)」으로 바꿔 밀도를 올린 **다음 라운드**다. 새 시각 언어를 만들지
+  않았다 — .g-rows는 gijo-ui.css에 이미 구현·게시된 공용 부품(그룹 머리행+열 머리+30px 행+얼룩)을
+  그대로 복사해 썼다(아래 CSS에 원본 그대로 인용, 값 변경 없음).
+
+  ── 현재 코드 확인(읽기만, 2026-08-20) ────────────────────────────────────────
+  · client/src/renderer/pages/mydocs.html:8-14(격리 원칙 주석) · 58-73(헤더·행) · 142-163(가져오기 —
+    personalDocsCreate 직접 호출, 분류 없는 「목적지 확정 업로드」 선례)
+  · client/src/renderer/pages/memory.html:296-301(패널 제목 "📚 올린 문서 확인·관리") ·
+    631-669(업무영역 5분류 DM_GROUPS·열람등급 O/S/C gradeBadge) · 672-727(2026-08-20 엑셀형 전환
+    renderDmList — 그룹 머리행+.g-rows-head+.g-rows-r, 등급은 배지가 아니라 **글자색**
+    gtxt-C/S/O로 뺐다는 주석 포함) · 749-874(selectDoc 상세 — 등급 선택 dm-gradeset·연결·
+    삭제 2옵션: 장기기억만/원본까지)
+  · client/src/renderer/pages/learnloop.html:184-189(루프 4단계 개념: 수집→정제→학습→배포) ·
+    231-260(🗳 학습 후보함 — "코드가 골라 놓는다, 승인 없이 자동 학습 없음") ·
+    356-391(loadTopicStrip — 목표승인건수 기본 300, 주제별 approved/300 진행) ·
+    393-426(loadCandidates — 근거인용/도구성공/수용됨 신호, lc-card 카드형 — **행이 아니라
+    카드**라 세로가 김, 이번 시안이 손대는 지점)
+  · client/src/renderer/pages/gijo-ui.css:344-395(.g-rows 부품 — "엑셀급(2026-08-19, 사장님
+    「세부 리스트는 엑셀처럼 촘촘하게」)"·"원칙: 카드·알약·그림자 없음, 색은 글자 색으로만" —
+    지시 문구가 이미 이 부품 주석에 있다. 5.48.0 게시(과제 지시 근거))
+  · client/src/renderer/pages/pro-white.css:1-107(프로 흰 바탕 확정 토큰 — **실제 프로덕션
+    코드**다. html.theme-light 클래스로 켜진다. 이 시안의 기본 배색은 이 파일 값을 그대로 옮겼다)
+  · mockups/docs-single-entry/시안.html — 승계 원본 전체(격리·목적지 칩·반입=영수증·appframe 셸)
+
+  ── 설계 전 조사(2026-08-20 웹 검색, 이번 라운드 추가분) ─────────────────────────
+  [외부 3] Setproduct, "Data table UI design reference guide for 2026"
+    https://www.setproduct.com/blog/data-table-ui-design
+    핵심: "밀도는 스타일이 아니라 세 가지 이름 붙은 모드다 — compact(40~44px, 분석가·운영팀 선호)
+    · comfortable(48~56px) · spacious. 밀도는 기능이지 기본값이 아니다." WCAG 2.2는 상호작용
+    타깃 최소 24×24px를 요구한다.
+    → 대조: GIJO의 .g-rows 행은 30px로 이 조사가 말하는 "compact"(40~44px)보다도 더 촘촘하다.
+      이건 이 시안이 새로 정한 값이 아니라 **사장님이 이미 지시하고 gijo-ui.css에 게시된 값**이다
+      (2026-08-19 "엑셀처럼 촘촘하게"). 30px도 WCAG 24px 하한은 넘는다 — 행 전체가 클릭 영역이라
+      상호작용 타깃 자체는 30px 그대로 유효하다.
+  [외부 4] Databricks Engineering Blog, "What is Human-in-the-Loop (HITL)?"
+    https://www.databricks.com/blog/human-in-the-loop
+    핵심: "단순하고 효과적인 되먹임 고리는 사람 검토자에게 승인·수정·플래그의 쉬운 길을 주고,
+    그 데이터를 학습 파이프라인에 되먹인다" — 즉 **훑어보기(review)**와 **파이프라인에 실제로
+    되먹이는 조작**은 서로 다른 관심사로 다뤄진다.
+    → 근거: 🎓 학습 탭을 "열람·훑기"로만 한정하고 승인/거절/학습 시작 같은 파이프라인 조작은
+      전용 화면(learnloop.html)에 남긴 이번 시안의 경계와 정확히 같은 방향.
+  [내부 선례, 승계] docs-single-entry 시안의 [외부1] SaaS 업로드 UX·[외부2] Knowledge base vs RAG
+    조사는 이번에도 유효하다(격리·업로드 창구 분리 근거) — 재인용하지 않고 그대로 승계.
+
+  ── 이 파일이 하는 일 / 안 하는 일 ──────────────────────────────────────────
+  한다: 「내 문서」 탭 5개(전체+4부류)의 정보구조를 프로 흰 바탕으로 그린다. 전 탭이 같은 부품
+    (.g-rows)을 쓴다 — 탭마다 다른 시각 언어를 새로 만들지 않았다. 탭 전환·검색 필터·목적지 칩·
+    행 클릭→상세 패널·다크 토글은 **화면 상태 전환만** 실제로 동작한다(서버 호출 없음).
+  안 한다: 서버·IPC 설계는 정하지 않는다. 회사 지식 94건·학습 취약점40/장비22/규정6/위협0은
+    과제 지시값을 그대로 반영한 것이고, 목록에 그려진 개별 행은 **예시일 뿐 실데이터가 아니다**
+    (회사 지식·학습 탭은 그룹 배지 숫자만 지시값과 맞추고, 행은 대표 예시 몇 개만 그렸다 — 아래
+    화면에 그 사실을 명시했다). 학습 탭에서 승인/거절/학습 시작 버튼은 **아예 넣지 않았다**
+    (전용 화면 경계 — 가짜 버튼도 안 둔다).
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 내 문서(문서·지식·학습 통합 허브) 시안</title>
+<style>
+  /* ── 문서 바깥 껍데기(제품과 무관한 설명용 페이지) ── */
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#efeeea;color:#232220;line-height:1.6;}
+  .docwrap{max-width:1200px;margin:0 auto;padding:28px 20px 90px;}
+  .dochead h1{font-size:20px;margin:0 0 6px;color:#181614;}
+  .dochead .lead{font-size:13.5px;color:#5a5347;max-width:960px;}
+  .dochead .quote{margin-top:8px;font-size:12.75px;color:#7a7266;border-left:3px solid #c8beac;padding:4px 0 4px 10px;}
+  .banner{margin:16px 0 12px;background:#fff7e0;border:1px solid #e8d68f;color:#6b5a12;font-size:12.5px;font-weight:700;
+    border-radius:8px;padding:9px 13px;line-height:1.6;}
+  .themerow{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:12.25px;color:#5a5347;}
+  .themebtn{font-family:inherit;font-size:12.25px;font-weight:700;padding:6px 13px;border-radius:18px;cursor:pointer;
+    border:1px solid #c8beac;background:#fff;color:#3f3a32;}
+  .themebtn.on{background:#2b2621;color:#fff;border-color:#2b2621;}
+
+  /* ── 앱 프레임(docs-single-entry 시안 재사용 — 구조 불변) ──────────────────
+     기본 상태 = 프로 흰 바탕(pro-white.css:13-49 값 그대로). .theme-dark 클래스를 얹으면
+     같은 변수가 다크 값(mydocs.html·memory.html·gijo-ui.css :root 원본)으로 바뀐다 — 제품이
+     실제로 쓰는 것과 같은 "CSS 변수만 바꾼다" 방식으로 다크 성립을 보인다(§다크 성립 참고). */
+  .appframe{
+    --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+    --border:rgba(43,38,33,.12); --border-strong:rgba(43,38,33,.22);
+    --text:#2b2621; --muted:#6b6259; --muted-2:#726960; --text-strong:#1f1b14; --fill-contrast:#ffffff;
+    --blue:#1d4f91; --blue-light:#1d4f91; --teal:#086b43; --amber:#8f4d02; --red:#b3241a; --purple:#5b21b6;
+    --zebra:rgba(43,38,33,.035);
+    --g-border:var(--border); --g-border-strong:var(--border-strong); --g-text:var(--text);
+    --g-muted:var(--muted); --g-muted-2:var(--muted-2); --g-blue:var(--blue); --g-teal:var(--teal);
+    --g-amber:var(--amber); --g-red:var(--red); --g-zebra:var(--zebra);
+    --g-surface-1:var(--panel); --g-surface-2:var(--panel-2);
+    --shadow-stage:0 20px 34px rgba(31,27,20,.16);
+    font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    width:100%;height:800px;background:var(--bg);color:var(--text);
+    border:1px solid #ded5c4;border-radius:12px;overflow:hidden;
+    box-shadow:0 18px 40px rgba(60,52,36,.18);
+    display:flex;flex-direction:column;position:relative;margin-top:6px;
+  }
+  .appframe.theme-dark{
+    --bg:#262624; --panel:#30302e; --panel-2:#1f1e1d;
+    --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.16);
+    --text:#e9e7e2; --muted:#b3ada4; --muted-2:#a49d95; --text-strong:#ffffff; --fill-contrast:#06281c;
+    --blue:#3b82f6; --blue-light:#5fa1ff; --teal:#1eb980; --amber:#f0a020; --red:#e2483d; --purple:#8b7cf0;
+    --zebra:rgba(255,255,255,.025);
+    border-color:#3a3936; box-shadow:0 18px 40px rgba(0,0,0,.45);
+  }
+  .appframe *{box-sizing:border-box;}
+
+  .af-top{flex:0 0 auto;height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;
+    border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .af-top .spacer{flex:1;}
+  .af-top .clock{font-size:12.25px;color:var(--muted);}
+  .af-top .status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--teal);
+    background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);padding:3px 10px;border-radius:16px;}
+  .af-top .status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  .af-body{flex:1;min-height:0;display:flex;}
+  .af-rail{flex:0 0 56px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0;
+    border-right:1px solid var(--border);background:var(--panel-2);overflow-y:auto;}
+  .rr-item{width:38px;height:38px;border-radius:9px;background:transparent;border:1px solid var(--border);
+    color:var(--muted);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:default;
+    font-weight:800;flex:0 0 auto;}
+  .rr-item.plain{border-color:transparent;font-size:16px;}
+  .rr-item.hi{border-color:rgba(29,79,145,.55);color:var(--blue);box-shadow:inset 0 0 0 1px rgba(29,79,145,.30);}
+  .rr-div{width:26px;height:1px;background:var(--border-strong);margin:6px 0;flex:0 0 auto;}
+  .rr-foot{margin-top:auto;width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto;}
+
+  .af-work{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--bg);}
+  .dockHead{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:4px 10px;font-size:12.5px;color:var(--muted);
+    background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .dockHead .back{font-size:12.25px;font-weight:700;color:var(--muted);background:transparent;
+    border:1px solid var(--border-strong);border-radius:7px;padding:4px 9px;cursor:default;font-family:inherit;}
+  .dockHead b{color:var(--text);}
+  .stage-screen{flex:1;min-height:0;margin-bottom:10px;box-shadow:var(--shadow-stage);background:var(--panel);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .stage-peek{flex:0 0 auto;height:10px;}
+
+  /* ══════════════ 「내 문서」 화면 자체(시안 본체) ══════════════ */
+  .hub-main{padding:16px 22px 0;flex:0 0 auto;}
+  .hub-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .hub-title{font-size:18px;font-weight:800;color:var(--text);line-height:1.3;}
+  .hub-title .ic{font-size:12.5px;color:var(--muted-2);font-weight:400;margin-left:6px;cursor:default;}
+  .hub-sub{font-size:12.25px;color:var(--muted);margin-top:3px;line-height:1.4;}
+  .hub-acts{display:flex;gap:8px;flex:0 0 auto;}
+  .hbtn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+    padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;}
+  .hbtn:hover{border-color:var(--blue);}
+  .hbtn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+  .dest-picker{display:none;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center;}
+  .dest-picker.on{display:flex;}
+  .dest-picker .lbl{font-size:11.75px;color:var(--muted-2);font-weight:700;margin-right:2px;}
+  .dchip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+    padding:6px 13px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .dchip:hover{border-color:var(--blue);}
+  .dchip.on{background:rgba(29,79,145,.10);border-color:var(--blue);color:var(--blue);}
+  .dest-note{display:none;margin-bottom:10px;font-size:12px;color:var(--text);line-height:1.7;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;}
+  .dest-note.on{display:block;}
+
+  .hub-tabs{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;}
+  .hub-tabs button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+    padding:6px 13px;border-radius:18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;}
+  .hub-tabs button b{font-weight:800;}
+  .hub-tabs button.on{background:rgba(29,79,145,.10);border-color:var(--blue);color:var(--blue);}
+  .hub-tabcap{font-size:11.5px;color:var(--muted-2);margin-bottom:8px;line-height:1.6;min-height:16px;}
+
+  .hub-search-row{margin-bottom:8px;}
+  .hub-search{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);
+    border-radius:8px;padding:7px 12px;font-size:12.25px;color:var(--text);outline:none;font-family:inherit;line-height:1;}
+  .hub-search::placeholder{color:var(--muted-2);}
+  .hub-search:focus{border-color:var(--blue);}
+
+  .hub-body{flex:1;min-height:0;display:flex;padding:0 22px;gap:12px;}
+  .hub-list{flex:0 0 380px;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;min-height:0;}
+  .hub-detail{flex:1;min-width:0;overflow-y:auto;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:15px 17px;}
+
+  /* ── 엑셀형 행 목록 부품 — gijo-ui.css:344-395 그대로 인용(값 변경 없음) ──────
+     시안 규칙(재사용, 새 시각 언어 금지)을 지키려고 클래스명·수치를 원본과 동일하게 복사했다. */
+  .g-rows{border:1px solid var(--g-border);border-radius:8px;overflow:hidden;background:var(--g-surface-1);}
+  .g-rows-scroll{max-height:100%;overflow-y:auto;}
+  .g-rows-head{display:grid;align-items:center;height:26px;padding:0 12px;font-size:11px;font-weight:800;
+    color:var(--g-muted-2);letter-spacing:.4px;background:var(--g-surface-2);
+    border-bottom:1px solid var(--g-border-strong);position:sticky;top:0;z-index:2;}
+  .g-rows-gh{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px;font-size:12px;font-weight:800;
+    color:var(--g-text);background:var(--g-surface-2);border-bottom:1px solid var(--g-border);cursor:pointer;
+    user-select:none;position:sticky;top:26px;z-index:1;}
+  .g-rows-gh .tri{width:10px;color:var(--g-muted-2);font-size:11px;}
+  .g-rows-gh .cnt{margin-left:auto;color:var(--g-muted-2);font-weight:700;font-size:11.5px;}
+  .g-rows-body.folded{display:none;}
+  .g-rows-r{display:grid;align-items:center;height:30px;padding:0 12px;font-size:12.25px;color:var(--g-text);cursor:pointer;}
+  .g-rows-body .g-rows-r:nth-child(even){background:var(--g-zebra);}
+  .g-rows-r:hover{background:rgba(29,79,145,.07);}
+  .g-rows-r.sel{background:rgba(29,79,145,.11);box-shadow:inset 3px 0 0 var(--g-blue);}
+  .g-rows .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .g-rows .ta-r{text-align:right;font-variant-numeric:tabular-nums;}
+  .g-rows .gm{color:var(--g-muted);}
+  .g-rows .gm2{color:var(--g-muted-2);}
+  .g-rows .gtxt-C{color:var(--g-red);font-weight:800;}
+  .g-rows .gtxt-S{color:var(--g-amber);font-weight:800;}
+  .g-rows .gtxt-O{color:var(--g-muted);font-weight:700;}
+  .g-rows .gtxt-ok{color:var(--g-teal);font-weight:800;} /* 이 화면이 더한 것: 학습 "승인됨" 표시(관례상 gtxt-* 계열) */
+  .g-rows-empty{padding:10px 12px;font-size:11.75px;color:var(--g-muted-2);}
+
+  /* 열 폭 — 화면이 .g-rows--이름으로 선언(공용 부품 문서의 명시된 확장 방식, gijo-ui.css 주석) */
+  .g-rows--all .g-rows-head,.g-rows--all .g-rows-r{grid-template-columns:52px 1fr 42px;gap:6px;}
+  .g-rows--mine .g-rows-head,.g-rows--mine .g-rows-r{grid-template-columns:1fr 52px 42px;gap:6px;}
+  .g-rows--company .g-rows-head,.g-rows--company .g-rows-r{grid-template-columns:1fr 52px 40px 44px;gap:6px;} /* memory.html:219 그대로 */
+  .g-rows--learn .g-rows-head,.g-rows--learn .g-rows-r{grid-template-columns:1fr 52px 46px 40px;gap:6px;}
+  .g-rows--raw .g-rows-head,.g-rows--raw .g-rows-r{grid-template-columns:1fr 60px 42px;gap:6px;}
+
+  .hd-title{font-size:14.5px;font-weight:800;color:var(--text);margin-bottom:4px;line-height:1.4;}
+  .hd-meta{font-size:11.75px;color:var(--muted-2);line-height:1.8;margin-bottom:10px;}
+  .hd-metric{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;}
+  .hd-m{flex:1;padding:7px 10px;border-right:1px solid var(--border);}
+  .hd-m:last-child{border-right:0;}
+  .hd-m b{display:block;font-size:13px;color:var(--text);}
+  .hd-m span{font-size:10.75px;color:var(--muted-2);}
+  .hd-sec{font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;padding:9px 11px;
+    background:var(--panel-2);border-radius:8px;}
+  .hd-sec b{color:var(--text);}
+  .hd-warn{font-size:11.75px;color:var(--amber);line-height:1.75;margin-bottom:10px;padding:9px 11px;
+    background:rgba(143,77,2,.06);border:1px solid rgba(143,77,2,.25);border-radius:8px;}
+  .hd-acts{display:flex;gap:7px;flex-wrap:wrap;}
+  .hd-acts button{font-family:inherit;font-size:11.75px;font-weight:700;padding:6px 11px;border-radius:7px;
+    cursor:default;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+  .hd-acts button.danger{color:var(--red);border-color:rgba(179,36,26,.3);}
+  .hd-acts button.go{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .hd-sig{display:inline-flex;align-items:center;gap:5px;font-size:11.25px;font-weight:700;padding:2px 8px;
+    border-radius:12px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);margin:0 5px 5px 0;}
+  .hd-sig.on{background:rgba(8,107,67,.10);border-color:rgba(8,107,67,.35);color:var(--teal);}
+
+  .hub-note{flex:0 0 auto;padding:8px 22px 14px;font-size:11.5px;color:var(--muted-2);line-height:1.7;}
+  .hub-note b{color:var(--text);}
+
+  /* ── 설명 패널 ── */
+  .notes{margin-top:30px;}
+  .notes h2{font-size:16.5px;margin:30px 0 10px;color:#181614;border-bottom:2px solid #ded5c4;padding-bottom:6px;}
+  .notes h2:first-child{margin-top:0;}
+  .notes p{font-size:13px;color:#3f3a32;max-width:960px;}
+  .note-card{background:#fff;border:1px solid #ded5c4;border-radius:10px;padding:14px 16px;margin:10px 0;}
+  .spec-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 4px;}
+  .spec-table th{text-align:left;background:#f3efe6;color:#5a5347;font-weight:800;padding:6px 10px;
+    border:1px solid #ded5c4;font-size:11.75px;}
+  .spec-table td{padding:6px 10px;border:1px solid #e7e1d4;vertical-align:middle;}
+  .spec-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .pass{color:#0a7a4d;font-weight:800;}
+  .warn-txt{color:#8f4d02;font-weight:800;}
+  .fail{color:#b3241a;font-weight:800;}
+  .checklist{list-style:none;margin:8px 0;padding:0;}
+  .checklist li{font-size:13px;padding:5px 0 5px 26px;position:relative;line-height:1.7;}
+  .checklist li b.ok{position:absolute;left:0;color:#0a7a4d;}
+  .checklist li b.mid{position:absolute;left:0;color:#8f4d02;}
+  code{background:#f3efe6;border:1px solid #e7e1d4;border-radius:4px;padding:0 4px;font-size:12px;}
+  footer.doc-foot{max-width:960px;margin:36px auto 0;padding:0 0 10px;font-size:11.25px;color:#7a7266;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+  <div class="dochead">
+    <h1>GIJO AS — 내 문서(문서·지식·학습 통합 허브) 시안 · 추천 1개</h1>
+    <p class="lead">「내 문서」한 화면에 <b>👤 내 것 · 🏢 회사 지식 · 🎓 학습 · 🩹 반입 원본</b> 네 부류를
+      전부 모은다. mockups/docs-single-entry(3부류)의 격리·목적지 칩 결정을 승계하고, 목록은
+      전부 <b>엑셀형 행 목록(.g-rows, 30px)</b>으로 바꿔 카드·알약을 걷어냈다.</p>
+    <p class="quote">"내문서에 지식 학습 내문서 다 통합하고 … 내용도 엑셀처럼 촘촘하게 쉽게 많이
+      보이게" — 사장님, 2026-08-20</p>
+  </div>
+
+  <div class="banner">⚠ 이 페이지는 시안입니다 — <b>탭 전환·검색 필터·목적지 칩·행 클릭→상세 패널·
+    다크 토글</b>만 실제로 동작합니다(서버 호출 없음). 상세 패널 안의 버튼(AI 포함·공유·삭제·등급
+    바꾸기·학습 루프 열기 등)은 이름만 보여줄 뿐 눌러도 동작하지 않습니다. <b>회사 지식 94건·학습
+    취약점40/장비22/규정6/위협0</b>은 이번 과제에서 준 실측값을 배지 숫자에 그대로 반영했지만,
+    <b>목록에 그려진 개별 행은 예시일 뿐 실데이터가 아닙니다</b>(회사 지식·학습 탭에 한함 — 아래
+    각 탭 안내줄에도 적어 뒀습니다).</div>
+
+  <div class="themerow">
+    🎨 배색 확인:
+    <button class="themebtn on" id="thLight">☀ 흰 바탕(기본)</button>
+    <button class="themebtn" id="thDark">🌙 다크로 보기</button>
+    <span>— 같은 마크업·같은 <code>.g-rows</code> CSS, 변수(--bg·--text·--blue 등)만 바꿉니다.
+      제품이 실제로 흰/다크를 켜는 방식(html.theme-light, pro-white.css:6-7)과 같은 원리입니다.
+      이 토글 자체는 시안 전용이며 실제 화면엔 없습니다.</span>
+  </div>
+
+  <div class="appframe" id="appFrame">
+    <div class="af-top">
+      <div class="spacer"></div>
+      <div class="clock">14:32</div>
+      <div class="status"><span class="dot"></span>서버 정상</div>
+    </div>
+    <div class="af-body">
+      <nav class="af-rail">
+        <button class="rr-item plain" title="전체 메뉴 (Ctrl+K)">☰</button>
+        <button class="rr-item plain" title="작업 내역">🕘</button>
+        <button class="rr-item plain" title="즐겨찾기">⭐</button>
+        <button class="rr-item plain" title="열려 있는 창 목록">🗔</button>
+        <button class="rr-item plain" title="새 대화 시작">💬</button>
+        <div class="rr-div"></div>
+        <button class="rr-item hi" title="[감독] 오케스트레이터">🧭</button>
+        <button class="rr-item" title="[스캔] 스캔 에이전트">◣</button>
+        <button class="rr-item" title="[분석] 분석 에이전트">◎</button>
+        <button class="rr-item" title="[보고] 보고서 에이전트">▣</button>
+        <button class="rr-item" title="[인텔] 위협 인텔 에이전트">🛰</button>
+        <button class="rr-item" title="[지식] 표준·지침 정리 에이전트">📚</button>
+        <div class="rr-div"></div>
+        <button class="rr-item" title="임베딩 엔진(bge-m3)">E</button>
+        <button class="rr-item" title="RAG 검색">R</button>
+        <button class="rr-item" title="가드레일">G</button>
+        <button class="rr-item" title="LoRA 전문가 어댑터">L</button>
+        <div class="rr-foot">홍</div>
+      </nav>
+
+      <div class="af-work">
+        <div class="dockHead">
+          <button class="back">← 대화로</button>
+          <b>내 문서</b>
+        </div>
+
+        <div class="stage-screen">
+          <div class="hub-main">
+            <div class="hub-head">
+              <div>
+                <div class="hub-title">내 문서 <span class="ic" title="사용법·개인/회사 차이는 챗봇에게 물어보세요(ⓘ 자리 — 이 시안은 자리만 표시)">ⓘ</span></div>
+                <div class="hub-sub">개인 메모부터 회사 지식·학습 수집 내역·스캐너 파일까지 — 올리거나
+                  쌓인 것은 모두 여기서 보입니다. 다른 담당자의 「내 것」은 보이지 않습니다.</div>
+              </div>
+              <div class="hub-acts">
+                <button class="hbtn primary" id="btnUpload">📥 파일 올리기</button>
+                <button class="hbtn" id="btnWrite" title="Smart MD Studio(문서 작성 창)를 엽니다 — 지금과 동일, 변화 없음">✍ Smart MD로 쓰기</button>
+              </div>
+            </div>
+
+            <div class="dest-picker" id="destPicker">
+              <span class="lbl">어디로 올릴까요?</span>
+              <button class="dchip on" data-d="mine">👤 내 것 (기본)</button>
+              <button class="dchip" data-d="company">🏢 회사 지식</button>
+              <button class="dchip" data-d="raw">🩹 스캐너·장비 파일</button>
+            </div>
+            <div class="dest-note" id="destNote"></div>
+
+            <div class="hub-tabs" id="hubTabs">
+              <button data-t="all" class="on">전체 <b>170</b></button>
+              <button data-t="mine">👤 내 것 <b>4</b></button>
+              <button data-t="company">🏢 회사 지식 <b>94</b></button>
+              <button data-t="learn">🎓 학습 <b>68</b></button>
+              <button data-t="raw">🩹 반입 원본 <b>4</b></button>
+            </div>
+            <div class="hub-tabcap" id="hubCap"></div>
+            <div class="hub-search-row">
+              <input class="hub-search" id="hubSearch" placeholder="🔍 문서·질문 검색 — 지금 탭 안에서만 좁힙니다">
+            </div>
+          </div>
+
+          <div class="hub-body" id="hubBody">
+            <div class="g-rows" style="flex:0 0 380px;min-height:0;display:flex;flex-direction:column;">
+              <div class="g-rows-scroll" id="hubList" style="flex:1;min-height:0;"></div>
+            </div>
+            <div class="hub-detail" id="hubDetail"></div>
+          </div>
+          <div class="hub-note" id="hubNote">다른 담당자의 <b>「내 것」</b> 문서는 여기 보이지 않습니다 —
+            서버가 계정별로 가릅니다. <b>🏢 회사 지식</b>은 열람 등급(공개 O·민감 S·기밀 C)에 따라
+            실제로 보이는 문서가 달라집니다 — 이 시안은 설명을 위해 세 등급을 함께 보여줍니다.</div>
+        </div>
+        <div class="stage-peek"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 설명 패널 ══════════════ -->
+  <div class="notes">
+
+    <h2>1. 왜 이 안인지 (탭 4개가 과한가 — 자가반론 포함)</h2>
+    <div class="note-card">
+      <p><b>왜 세 부류에 학습을 더했나</b> — mydocs.html(내 것)·memory.html(회사 지식)은 이미
+        docs-single-entry에서 한 화면으로 모았다. 그런데 「지식·학습」을 실제로 만드는 재료 중
+        하나인 <b>learnloop.html의 수집 대화·학습 후보</b>가 빠져 있었다 — 지시("지식 학습 내문서
+        다 통합")가 명시적으로 가리키는 세 번째 축이다. 회사 지식(RAG, 검색해서 참고)과 학습
+        (파인튜닝, 모델에 각인)은 memory.html 자신의 안내 문구가 이미 구분하고 있다("📚 그냥
+        참고만 하면 됨 → RAG가 더 쉬움" vs "🎓 AI가 체화하게 하려면 → 학습", memory.html:302-314)
+        — 그 구분을 화면에서도 지운다면 담당자가 "학습 후보에 올린 질문이 지금 당장 검색에도
+        쓰이나?"를 오해한다. 그래서 합치지 않고 <b>탭을 하나 더</b> 두었다.</p>
+
+      <p><b>자가반론 — 탭 4개(+전체)는 과하지 않은가?</b> 세 가지 대안을 먼저 검토하고 기각했다:</p>
+      <ul class="checklist">
+        <li><b class="mid">△</b> <b>대안 A: 학습을 회사 지식 탭에 섞는다</b> — 기각. 학습 후보는
+          아직 <b>파일이 아니다</b>(대화에서 뽑은 Q&amp;A 쌍, learnloop.html:393-426). 회사 지식
+          목록에 섞으면 "이것도 지금 검색에 근거로 쓰이나"로 읽힌다. RAG vs 파인튜닝 차이는 이미
+          한 번 헷갈린 적이 있어 memory.html이 별도 안내 패널까지 뒀다(memory.html:302-314) —
+          같은 혼동을 화면에서 되살리지 않는다.</li>
+        <li><b class="mid">△</b> <b>대안 B: 반입 원본을 회사 지식에 흡수한다</b> — 기각(docs-single-entry
+          §2에서 이미 검토·기각한 이유를 승계) — 스캐너 원본은 파싱해서 finding/이벤트로 바뀌는
+          <b>원료</b>지 사람이 읽는 지식 문서가 아니다.</li>
+        <li><b class="mid">△</b> <b>대안 C: 학습은 탭 대신 상단 KPI 숫자로만 보여준다</b> — 기각.
+          지시가 "학습 …도 내문서에서" 라고 통합을 명시했고, 이번 과제의 경계 조건도
+          "수집 내역 열람+학습 재료 훑기까지"를 요구한다 — 숫자만으로는 <b>훑을 수 없다</b>.
+          훑으려면 목록(행)이 있어야 한다.</li>
+      </ul>
+      <p><b>결론</b> — 4부류(+전체 개요)를 유지하되, 대가를 지불하지 않게 만들었다: 4번째 탭을
+        더해도 <b>새로 배울 상호작용은 없다</b>. 어느 탭이든 같은 부품(.g-rows) · 같은 흐름(왼쪽
+        클릭→오른쪽 상세)이다. 탭을 하나 더 누르는 비용은 알약 18px짜리 버튼 하나뿐이다 — 화면
+        구조·조작법을 다시 배우는 비용이 아니다.</p>
+
+      <p><b>부수 효과(설계 도중 발견) — 행이 30px가 되며 조작이 상세 패널로 이동했다.</b> 원래
+        mydocs.html의 행(약 40px)은 AI포함·공유·⬇·✕ 네 버튼을 행 안에 나란히 뒀다(mydocs.html:99-110).
+        30px 행엔 그 네 버튼이 못 들어간다 — 그래서 <b>모든 탭에서</b> 조작 버튼을 상세 패널로
+        옮겼다. 밀도를 올린 만큼 클릭이 한 번 늘 수 있다(행 클릭→상세→버튼)는 뜻이라, 정직하게
+        적는다. 다만 memory.html이 2026-08-20에 이미 같은 선택을 했다(등급 배지→등급 글자색,
+        조작은 상세 패널)는 선례가 있어 새로 발명한 방식은 아니다.</p>
+    </div>
+
+    <h2>2. 무엇을 포기했는지</h2>
+    <div class="note-card">
+      <ul class="checklist">
+        <li><b class="mid">△</b> <b>docs-single-entry의 📘 제품 도움말 탭을 뺐다</b> — 이번 지시가
+          명시한 부류는 내 것·회사 지식·학습·반입 원본 넷이다. docbox.html의 제품 내장 매뉴얼
+          (guide/policy, docbox.ts:1-58)은 성격이 또 달라(고객이 올린 게 아니라 제품이 담아 온
+          읽기전용 문서) 이번 라운드에 억지로 끼우지 않았다 — 문서함(창)에 그대로 남는다. 다섯
+          번째 탭을 다시 붙일지는 <b>별도 결정</b>이 필요하다(§1의 "탭이 과한가" 논쟁을 스스로
+          더 무겁게 만들 것이므로 이번엔 보류).</li>
+        <li><b class="mid">△</b> <b>학습 탭에 승인/거절/학습 시작 버튼을 넣지 않았다</b> — 과제
+          경계("보기·올리기는 창구, 위험한 관리는 전용 화면")를 그대로 지켰다. GPU 학습·모델
+          배포로 이어지는 조작은 learnloop.html에만 남기고, 이 화면은 "🔄 학습 루프 화면 열기"
+          바로가기 하나만 둔다. HITL(사람 개입 루프) 조사(외부4)도 "훑어보기"와 "파이프라인에
+          되먹이는 조작"을 별개로 다루라고 말한다 — 그 방향과 맞춘 것이지 능력을 깎은 것이 아니다.</li>
+        <li><b class="mid">△</b> <b>회사 지식·학습 탭은 전건을 그리지 않았다</b> — 배지 숫자(94·
+          40/22/6/0)는 지시값 그대로지만, 실제 행은 대표 예시 몇 개뿐이다. 진짜 구현에서는
+          g-rows-scroll이 전건을 담지만(memory.html이 실제로 그렇게 한다), 시안에서 94건·68건을
+          손으로 다 채우는 것은 밀도를 보여주는 데 필요하지 않다고 판단했다 — 화면 안에도 이
+          사실을 밝혀 뒀다(§배너, 각 탭 안내줄).</li>
+        <li><b class="mid">△</b> <b>완전한 단일 입구는 여전히 포기</b> — 콘솔 ＋(2026-07-27)는
+          그대로 둔다. docs-single-entry의 같은 결정을 승계.</li>
+        <li><b class="mid">△</b> <b>검색은 필터 전용</b> — 자유 명령어 없음(지시는 대화창 원칙),
+          승계.</li>
+      </ul>
+    </div>
+
+    <h2>3. 밀도 숫자 (행 30px · 화면당 행 수 · 기존 3화면 대비)</h2>
+    <div class="note-card">
+      <p>아래는 이 파일과 원본 화면들에 실제로 선언된 padding·font-size·line-height 값을 계산한
+        것이다(원본은 mydocs.html·memory.html·learnloop.html — 이번 통합의 <b>기존 3화면</b>).
+        <b>계산값이지 실측 렌더링이 아니다</b> — 구현 단계에서 실앱으로 다시 잴 것.</p>
+      <table class="spec-table">
+        <thead><tr><th>화면 / 행 종류</th><th>지금</th><th>새안(.g-rows)</th><th>증감</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr><td>👤 내 것 — mydocs.html <code>.row</code></td>
+            <td class="num">약 42px<br><span style="color:#8a8171;font-size:11px">pad10+10 + font13×line1.7(22.1) + border1</span></td>
+            <td class="num">30px</td>
+            <td class="num pass">−12px(−29%)</td>
+            <td>mydocs.html:37(.row) · body.g-ui line-height:1.7(gijo-ui.css:325)</td></tr>
+          <tr><td>🏢 회사 지식 — memory.html <code>.g-rows-r</code></td>
+            <td class="num">30px<br><span style="color:#8a8171;font-size:11px">2026-08-20에 이미 엑셀형 전환됨</span></td>
+            <td class="num">30px</td>
+            <td class="num pass">0(이미 최적)</td>
+            <td>gijo-ui.css:359 · memory.html:672-708 주석("2026-08-20 엑셀형 전환")</td></tr>
+          <tr><td>🎓 학습 — learnloop.html <code>.lc-card</code></td>
+            <td class="num">약 126px<br><span style="color:#8a8171;font-size:11px">pad12+12 + 상단줄(20+margin7) + Q줄(18+margin4) + A줄(18) + 액션줄(9+26)</span></td>
+            <td class="num">30px</td>
+            <td class="num pass">−96px(−76%)</td>
+            <td>learnloop.html:129-143(.lc-card·.lc-top·.lc-q·.lc-a·.lc-act)</td></tr>
+          <tr><td>🩹 반입 원본 — docs-single-entry <code>.hrow</code>(2줄 메타)</td>
+            <td class="num">약 52px<br><span style="color:#8a8171;font-size:11px">pad10+10 + 제목줄17 + 설명줄(2px margin+15)</span></td>
+            <td class="num">30px<br><span style="color:#8a8171;font-size:11px">설명은 상세 패널로 이동, 목록은 1줄</span></td>
+            <td class="num pass">−22px(−42%)</td>
+            <td>docs-single-entry/시안.html:185-196(.hrow)</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:8px"><b>화면당 표시 행 수</b> — 목록 영역은 창 높이를 따르는 스크롤
+        박스다(gijo-ui.css:310, <code>--gr-maxh: max(260px, 100vh - 360px)</code>). 900px 높이
+        창을 기준으로 잡으면 스크롤 없이 보이는 영역이 약 540px:</p>
+      <table class="spec-table">
+        <thead><tr><th>탭</th><th>그룹 수</th><th>그룹 머리(28px×n)</th><th>남는 행 공간</th><th>보이는 행 수(30px 나눔)</th></tr></thead>
+        <tbody>
+          <tr><td>👤 내 것</td><td class="num">2</td><td class="num">56px</td><td class="num">484px</td><td class="num pass">약 16행</td></tr>
+          <tr><td>🏢 회사 지식</td><td class="num">5</td><td class="num">140px</td><td class="num">400px</td><td class="num pass">약 13행</td></tr>
+          <tr><td>🎓 학습</td><td class="num">4</td><td class="num">112px</td><td class="num">428px</td><td class="num pass">약 14행</td></tr>
+          <tr><td>🩹 반입 원본</td><td class="num">4</td><td class="num">112px</td><td class="num">428px</td><td class="num pass">약 14행</td></tr>
+        </tbody>
+      </table>
+      <p><b>비교: 지금은 이만큼이 4개 화면·서로 다른 스크롤 맥락에 흩어져 있다.</b> mydocs.html
+        목록은 페이지 전체 스크롤(고정 높이 없음)이라 "지금 몇 개나 더 있는지" 감이 없고,
+        learnloop.html은 카드(126px)라 900px 창에 <b>약 4장</b>만 스크롤 없이 보인다(같은 계산:
+        126px당 1장, 헤더·KPI·루프 띠 등 고정 영역을 빼면 더 적다) — 새안은 같은 자리에
+        <b>14행</b>이 들어간다(약 3.5배).</p>
+      <p><b>외부 기준 대조(외부3)</b> — Setproduct의 2026년 조사는 "compact" 밀도를 40~44px로
+        권한다. 이 부품의 30px는 그보다도 촘촘하다 — 이번 시안이 새로 정한 값이 아니라
+        <b>사장님이 이미 지시하고 gijo-ui.css에 게시된 값</b>이다(2026-08-19 "엑셀처럼
+        촘촘하게", gijo-ui.css:344-346). WCAG 2.2의 상호작용 타깃 하한 24px는 행 전체가 클릭
+        영역이므로 30px가 넉넉히 지킨다.</p>
+    </div>
+
+    <h2>4. 제품 원칙 자가점검</h2>
+    <div class="note-card">
+      <ul class="checklist">
+        <li><b class="ok">✓</b> <b>격리 원칙</b> — 「내 것」은 personalDocs 그대로, 남의 문서는
+          404("그런 문서가 없습니다", personaldocs.ts:126, docs-single-entry 승계). 화면을 합쳐도
+          서버 격리 계약은 안 바뀐다.</li>
+        <li><b class="ok">✓</b> <b>열람 등급 준수</b> — 회사 지식 목록의 등급은 memory.html의
+          <code>gtxt-C/S/O</code> 글자색 관례 그대로 썼다(색 재사용, 새 색 안 만듦). 실제 서버에서는
+          "내 열람 등급보다 높은 문서는 검색에도 안 걸린다"(memory.html:777)는 계약이 그대로
+          적용된다 — 이 시안은 <b>설명을 위해</b> 세 등급을 한 목록에 같이 보여줄 뿐, 실제 화면은
+          서버가 걸러 준 것만 보여줘야 한다(§배너에 명시).</li>
+        <li><b class="ok">✓</b> <b>보기·올리기는 창구, 위험한 관리는 전용 화면</b> — 학습 탭에
+          승인·거절·학습 시작 버튼이 <b>아예 없다</b>(가짜 버튼도 안 둠). "🔄 학습 루프 화면 열기"
+          하나만 있다.</li>
+        <li><b class="ok">✓</b> <b>지시는 대화창 · 새 입력칸 금지</b> — 유일한 텍스트 칸은 검색
+          (필터 전용). 목적지 선택도 칩 3개 중 고르는 것뿐(자유 텍스트 아님).</li>
+        <li><b class="mid">△</b> <b>화면 설명은 챗봇/ⓘ로</b> — 탭별 안내줄("다른 담당자의 회사
+          지식은…" 등)은 <b>이 시안 설명을 위한 장치</b>다. 실제 구현에서는 이 문장들을 화면에
+          남기지 않고 screenguide 패널 + ⓘ로 옮겨야 한다(CLAUDE.md 원칙) — 시안 단계에서만 예외로
+          화면에 그렸다.</li>
+        <li><b class="ok">✓</b> <b>자체완결 HTML</b> — 외부 CDN·웹폰트·원격 이미지 없음. 색은
+          pro-white.css(실제 프로덕션 파일)의 확정 토큰을 그대로 복사했다.</li>
+        <li><b class="ok">✓</b> <b>정직한 구현</b> — 상단 배너로 동작 범위를 고지했고, 회사
+          지식·학습 탭이 예시 데이터임을 명시했다. 학습 탭의 "학습 루프 화면 열기"도 눌러도
+          안 열린다고 배너에 적었다.</li>
+        <li><b class="mid">△</b> <b>파일은 ＋ 한 곳으로(2026-07-27)</b> — docs-single-entry와
+          같은 부분 준수. 최종 판단은 사장님 승인 몫.</li>
+      </ul>
+    </div>
+
+    <h2>5. 「지금 4곳 → 새안 1곳」 대응표</h2>
+    <div class="note-card">
+      <table class="spec-table">
+        <thead><tr><th>지금(화면)</th><th>실제로 하는 일</th><th>새안 위치</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>문서함(창) — docbox.html</td>
+            <td>personalDocsList()를 mydocs와 <b>따로 또</b> 호출(mine 트리) + 제품 내장 매뉴얼
+              (guide/policy, 읽기전용)</td>
+            <td>mine 트리 → 👤 내 것 탭에 흡수 / 매뉴얼 → <span class="warn-txt">범위 밖(§2)</span>,
+              문서함(창)에 잔류</td>
+            <td class="pass">중복 호출 해소는 내 것만</td></tr>
+          <tr><td>내 문서 — mydocs.html</td>
+            <td>personalDocs CRUD·공유·AI 참고 토글·.md 가져오기(mydocs.html:75-207)</td>
+            <td>👤 내 것 탭</td>
+            <td>조작은 그대로, 자리만 30px 행 목록+상세 패널로 이동(§1 부수 효과)</td></tr>
+          <tr><td>AI 기억·학습 — memory.html "📚 올린 문서 확인·관리"</td>
+            <td>업무영역 5분류·열람등급 O/S/C·조각수·연결·원본 열기·삭제 2옵션
+              (memory.html:287-874) — 이미 <b>30px 행</b>으로 되어 있다</td>
+            <td>🏢 회사 지식 탭</td>
+            <td class="pass">구조·밀도 그대로 이식 — 재발명 안 함, 이 통합의 밀도 이득은 0(이미 최적)</td></tr>
+          <tr><td>학습 루프 — learnloop.html "📥 수집된 대화" + "🗳 학습 후보함"</td>
+            <td>카드형 목록(.lc-card, 126px/장)·주제별 진척 띠(취약점/장비운영/사내규정/위협대응,
+              개시선 300, learnloop.html:184-260,356-391)</td>
+            <td>🎓 학습 탭 — <b>카드→행</b> 변환(126px→30px)</td>
+            <td>승인/학습 시작 버튼은 <b>안 옮김</b>(§2) — learnloop.html에 남고 바로가기만 제공</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:6px">참고 — 콘솔 ＋ 업로드의 자동 분류(console.js, uploadAuto)와 그
+        결과가 🩹 반입 원본 탭에 영수증으로 쌓이는 흐름은 docs-single-entry에서 이미 정리했다.
+        네 번째 "지금" 화면으로 새로 세지 않았다(그 문서는 화면이 아니라 업로드 도구다) —
+        승계만 하고 이 표는 <b>화면 4곳</b>으로 맞췄다.</p>
+    </div>
+
+  </div>
+</div>
+
+<footer class="doc-foot">
+  mockups/docs-hub-v2/시안.html · gijo-mockup · 2026-08-20 · 제품 코드 미수정(읽기만 함:
+  client/src/renderer/pages/mydocs.html·memory.html·learnloop.html·gijo-ui.css·pro-white.css·nav.js,
+  mockups/docs-single-entry/시안.html). 표·수치는 위 파일들의 실제 padding·font-size·line 번호에서
+  옮겨 적었다 — 새로 지어낸 값이 아니다. 회사 지식 94건·학습 40/22/6/0은 과제 지시값이다.
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  function esc(s) { var d = document.createElement("i"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
+
+  // ── 예시 데이터(전부 화면 텍스트일 뿐, API 응답 아님) ──────────────────────
+  var COMPANY_GROUPS = [
+    { c: "취약점", icon: "🩹", total: 26 }, { c: "장비운영", icon: "🔧", total: 20 },
+    { c: "사내규정", icon: "📜", total: 18 }, { c: "위협대응", icon: "🛡", total: 14 },
+    { c: "일반", icon: "📄", total: 16 }
+  ];
+  var LEARN_GROUPS = [
+    { c: "취약점", icon: "🩹", approved: 40, goal: 300 }, { c: "장비운영", icon: "🔧", approved: 22, goal: 300 },
+    { c: "사내규정", icon: "📜", approved: 6, goal: 300 }, { c: "위협대응", icon: "🛡", approved: 0, goal: 300 }
+  ];
+  var MINE_GROUPS = [{ c: "개인", icon: "👤" }, { c: "공유", icon: "🏢" }];
+  var RAW_GROUPS = ["🩹 취약점 리포트", "🚨 보안 로그 원본", "🛡 보안제품 자산", "📈 운영 리포트"];
+  var GRADE_LABEL = { O: "공개", S: "민감", C: "기밀" };
+
+  var ITEMS = [
+    { kind: "mine", id: "m1", t: "인수인계 체크리스트 초안.md", scope: "개인", ai: false, updated: "08-20" },
+    { kind: "mine", id: "m2", t: "9월 침투테스트 사전조사 메모.md", scope: "개인", ai: false, updated: "08-19" },
+    { kind: "mine", id: "m3", t: "고객 미팅 메모_A사.md", scope: "개인", ai: false, updated: "08-15" },
+    { kind: "mine", id: "m4", t: "월간 보고 초안.md", scope: "공유", ai: false, updated: "08-12" },
+
+    { kind: "company", id: "c1", t: "2026 상반기 침투테스트 결과 요약.md", grp: "취약점", grade: "C", chunks: 34, updated: "08-20" },
+    { kind: "company", id: "c2", t: "외부 침투테스트 계약사 보고서_B사.pdf", grp: "취약점", grade: "C", chunks: 28, updated: "08-14" },
+    { kind: "company", id: "c3", t: "상반기 취약점 조치 현황.md", grp: "취약점", grade: "S", chunks: 19, updated: "08-05" },
+    { kind: "company", id: "c4", t: "Cisco_ASA_9.x_운영매뉴얼.pdf", grp: "장비운영", grade: "O", chunks: 22, updated: "08-18" },
+    { kind: "company", id: "c5", t: "방화벽_이중화_구성절차.md", grp: "장비운영", grade: "S", chunks: 11, updated: "07-30" },
+    { kind: "company", id: "c6", t: "정보보안_운영지침_v4.md", grp: "사내규정", grade: "S", chunks: 15, updated: "08-10" },
+    { kind: "company", id: "c7", t: "개인정보 처리방침_2026.md", grp: "사내규정", grade: "O", chunks: 9, updated: "07-22" },
+    { kind: "company", id: "c8", t: "랜섬웨어_초동대응_절차.md", grp: "위협대응", grade: "S", chunks: 9, updated: "08-02" },
+    { kind: "company", id: "c9", t: "2026 보안 트렌드 리포트.pdf", grp: "일반", grade: "O", chunks: 41, updated: "07-28" },
+    { kind: "company", id: "c10", t: "해외 지사 화상회의 메모.md", grp: "일반", grade: "O", chunks: 6, updated: "07-15" },
+
+    { kind: "learn", id: "l1", topic: "취약점", q: "SQL 인젝션 취약점은 어떻게 우선순위를 매기나요?", a: "CVSS 기저점수와 자산 등급을 곱해 우선순위를 계산합니다…", sig: { cite: true, tool: true, accepted: true }, status: "approved", updated: "08-19" },
+    { kind: "learn", id: "l2", topic: "취약점", q: "비인증 스캔과 인증 스캔의 차이는?", a: "인증 스캔은 로컬 패치 수준까지 확인합니다…", sig: { cite: true, tool: false, accepted: true }, status: "approved", updated: "08-17" },
+    { kind: "learn", id: "l3", topic: "취약점", q: "제로데이 보고가 왔을 때 첫 조치는?", a: "영향 자산을 먼저 격리하고 벤더 패치를 확인합니다…", sig: { cite: false, tool: false, accepted: false }, status: "pending", updated: "08-20" },
+    { kind: "learn", id: "l4", topic: "장비운영", q: "방화벽 정책 변경 후 검증 절차는?", a: "변경 전후 트래픽 로그를 비교해 확인합니다…", sig: { cite: true, tool: true, accepted: true }, status: "approved", updated: "08-18" },
+    { kind: "learn", id: "l5", topic: "장비운영", q: "IPS 시그니처 업데이트 주기는?", a: "벤더 배포 즉시 스테이징 적용 후 24시간 내 운영 반영…", sig: { cite: true, tool: false, accepted: false }, status: "pending", updated: "08-16" },
+    { kind: "learn", id: "l6", topic: "사내규정", q: "개인정보 유출 신고 기한은?", a: "인지 후 72시간 이내 개인정보위 신고 대상입니다…", sig: { cite: true, tool: false, accepted: true }, status: "approved", updated: "08-11" },
+
+    { kind: "raw", id: "r1", t: "Nessus_scan_20260819.csv", badge: "🩹 취약점 리포트", detail: "finding 12건 등록(호스트 5) · 비인증(원격) 스캔 2대 포함 — 로컬 취약점을 놓쳤을 수 있습니다.", link: "→ 발견·수집에서 보기", updated: "08-20" },
+    { kind: "raw", id: "r2", t: "IPS_syslog_20260818.txt", badge: "🚨 보안 로그 원본", detail: "탐지 규칙에 걸려 통합 분석 이벤트 7건을 등록했습니다.", link: "→ 통합 분석에서 보기", updated: "08-19" },
+    { kind: "raw", id: "r3", t: "AhnLab_EPP_v7_사용설명서.pdf", badge: "🛡 보안제품 자산", detail: "'AhnLab EPP' 제품이 새로 등록되고 이 파일이 로그 매뉴얼로 연결됐습니다.", link: "→ 보안제품 등록부에서 보기", updated: "08-19" },
+    { kind: "raw", id: "r4", t: "방화벽_반기점검_리포트.xlsx", badge: "📈 운영 리포트", detail: "탐지 규칙에 해당하는 항목이 없어 분석 이벤트는 만들지 않았습니다 — 원문은 보관 중입니다.", link: "(이동할 곳 없음)", updated: "08-08" }
+  ];
+
+  var TAB_CAP = {
+    all: "네 부류를 최근 순으로 섞어 보여줍니다.",
+    mine: "다른 담당자의 「내 것」은 보이지 않습니다 — 서버가 계정별로 가립니다.",
+    company: "열람 등급(O 공개/S 민감/C 기밀)에 따라 실제로 보이는 문서가 달라집니다 — 이 시안은 설명을 위해 세 등급을 함께 보여줍니다. (아래는 예시로 일부만 그렸습니다 — 실제 화면은 94건 전체를 그립니다)",
+    learn: "AI가 대화·작업 내역에서 자동으로 골라 놓은 문답입니다. 승인·학습 시작은 이 화면에서 하지 않습니다 — 전용 화면(학습 루프)에서 합니다. (아래는 예시로 일부만 그렸습니다 — 그룹 숫자는 실제 승인 현황입니다)",
+    raw: "스캐너·장비가 뱉은 원본 파일의 처리 결과 영수증입니다. 실제 데이터는 각 결과 화면(발견·수집/통합 분석/보안제품 등록부)에서 봅니다."
+  };
+  var SEARCH_PH = {
+    all: "🔍 문서·질문 검색 — 지금 탭 안에서만 좁힙니다",
+    mine: "🔍 내 문서 검색 — 제목에서 찾습니다",
+    company: "🔍 회사 지식 검색 — 제목에서 찾습니다",
+    learn: "🔍 학습 후보 검색 — 질문에서 찾습니다",
+    raw: "🔍 반입 원본 검색 — 파일명에서 찾습니다"
+  };
+
+  var curTab = "all";
+  var list = document.getElementById("hubList");
+  var detail = document.getElementById("hubDetail");
+
+  function groupBlock(icon, label, cntText, folded, bodyHtml) {
+    return '<div class="g-rows-gh"><span class="tri">▾</span>' + icon + " " + esc(label) +
+      '<span class="cnt">' + esc(cntText) + "</span></div>" +
+      '<div class="g-rows-body">' + (bodyHtml || '<div class="g-rows-empty">아직 후보가 없습니다 — 대화가 쌓이면 코드가 골라 둡니다.</div>') + "</div>";
+  }
+
+  function renderAll(filter) {
+    list.className = "g-rows-scroll g-rows--all";
+    var rows = ITEMS.filter(function (it) {
+      if (!filter) return true;
+      var text = (it.t || it.q || "").toLowerCase();
+      return text.indexOf(filter) !== -1;
+    }).slice().sort(function (a, b) { return b.updated.localeCompare(a.updated); });
+    var kindIcon = { mine: "👤", company: "🏢", learn: "🎓", raw: "🩹" };
+    var head = '<div class="g-rows-head"><span>종류</span><span>제목</span><span class="ta-r">날짜</span></div>';
+    list.innerHTML = head + rows.map(function (it) {
+      var title = it.t || ("Q. " + it.q);
+      return '<div class="g-rows-r" data-id="' + esc(it.id) + '"><span>' + kindIcon[it.kind] + '</span>' +
+        '<span class="trunc" title="' + esc(title) + '">' + esc(title) + '</span>' +
+        '<span class="ta-r gm2">' + esc(it.updated) + "</span></div>";
+    }).join("") || '<div class="g-rows-empty">일치하는 항목이 없습니다.</div>';
+    bindRows();
+    selectFirst();
+  }
+
+  function renderMine(filter) {
+    list.className = "g-rows-scroll g-rows--mine";
+    var head = '<div class="g-rows-head"><span>문서</span><span>범위</span><span class="ta-r">수정</span></div>';
+    var body = MINE_GROUPS.map(function (g) {
+      var rows = ITEMS.filter(function (it) { return it.kind === "mine" && it.scope === g.c && (!filter || it.t.toLowerCase().indexOf(filter) !== -1); });
+      if (!rows.length) return "";
+      var rowsHtml = rows.map(function (it) {
+        return '<div class="g-rows-r" data-id="' + esc(it.id) + '"><span class="trunc" title="' + esc(it.t) + '">' + esc(it.t) + '</span>' +
+          '<span class="gm">' + esc(g.c) + '</span><span class="ta-r gm2">' + esc(it.updated) + "</span></div>";
+      }).join("");
+      return groupBlock(g.icon, g.c, rows.length + "개", false, rowsHtml);
+    }).join("");
+    list.innerHTML = head + (body || '<div class="g-rows-empty">일치하는 문서가 없습니다.</div>');
+    bindRows();
+    selectFirst();
+  }
+
+  function renderCompany(filter) {
+    list.className = "g-rows-scroll g-rows--company";
+    var head = '<div class="g-rows-head"><span>문서</span><span>등급</span><span class="ta-r">조각</span><span class="ta-r">반입</span></div>';
+    var body = COMPANY_GROUPS.map(function (g) {
+      var rows = ITEMS.filter(function (it) { return it.kind === "company" && it.grp === g.c && (!filter || it.t.toLowerCase().indexOf(filter) !== -1); });
+      if (!rows.length && filter) return "";
+      var rowsHtml = rows.map(function (it) {
+        return '<div class="g-rows-r" data-id="' + esc(it.id) + '"><span class="trunc" title="' + esc(it.t) + '">' + esc(it.t) + '</span>' +
+          '<span class="gtxt-' + it.grade + '">' + it.grade + " " + esc(GRADE_LABEL[it.grade]) + '</span>' +
+          '<span class="ta-r gm">' + it.chunks + '</span><span class="ta-r gm2">' + esc(it.updated) + "</span></div>";
+      }).join("") || '<div class="g-rows-empty">예시로 그린 행은 없지만 실제로는 ' + g.total + '건이 있습니다.</div>';
+      return groupBlock(g.icon, g.c, g.total + "개", false, rowsHtml);
+    }).join("");
+    list.innerHTML = head + (body || '<div class="g-rows-empty">일치하는 문서가 없습니다.</div>');
+    bindRows();
+    selectFirst();
+  }
+
+  function renderLearn(filter) {
+    list.className = "g-rows-scroll g-rows--learn";
+    var head = '<div class="g-rows-head"><span>질문</span><span>신호</span><span>상태</span><span class="ta-r">날짜</span></div>';
+    var body = LEARN_GROUPS.map(function (g) {
+      var rows = ITEMS.filter(function (it) { return it.kind === "learn" && it.topic === g.c && (!filter || it.q.toLowerCase().indexOf(filter) !== -1); });
+      var rowsHtml = rows.map(function (it) {
+        var sig = (it.sig.cite ? "📄" : "") + (it.sig.tool ? "🔧" : "") + (it.sig.accepted ? "👍" : "") || "·";
+        var statusHtml = it.status === "approved" ? '<span class="gtxt-ok">✓ 승인</span>' : '<span class="gm2">후보</span>';
+        return '<div class="g-rows-r" data-id="' + esc(it.id) + '"><span class="trunc" title="' + esc(it.q) + '">Q. ' + esc(it.q) + '</span>' +
+          '<span class="gm">' + sig + '</span>' + statusHtml + '<span class="ta-r gm2">' + esc(it.updated) + "</span></div>";
+      }).join("");
+      return groupBlock(g.icon, g.c, g.approved + "/" + g.goal, false, rowsHtml);
+    }).join("");
+    list.innerHTML = head + body;
+    bindRows();
+    selectFirst();
+  }
+
+  function renderRaw(filter) {
+    list.className = "g-rows-scroll g-rows--raw";
+    var head = '<div class="g-rows-head"><span>파일</span><span>유형</span><span class="ta-r">반입</span></div>';
+    var body = RAW_GROUPS.map(function (badge) {
+      var rows = ITEMS.filter(function (it) { return it.kind === "raw" && it.badge === badge && (!filter || it.t.toLowerCase().indexOf(filter) !== -1); });
+      if (!rows.length) return "";
+      var typeShort = badge.split(" ").slice(1).join(" ");
+      var rowsHtml = rows.map(function (it) {
+        return '<div class="g-rows-r" data-id="' + esc(it.id) + '"><span class="trunc" title="' + esc(it.t) + '">' + esc(it.t) + '</span>' +
+          '<span class="gm trunc">' + esc(typeShort) + '</span><span class="ta-r gm2">' + esc(it.updated) + "</span></div>";
+      }).join("");
+      return groupBlock(badge.split(" ")[0], typeShort, rows.length + "개", false, rowsHtml);
+    }).join("");
+    list.innerHTML = head + (body || '<div class="g-rows-empty">일치하는 파일이 없습니다.</div>');
+    bindRows();
+    selectFirst();
+  }
+
+  function bindRows() {
+    Array.prototype.forEach.call(list.querySelectorAll(".g-rows-r[data-id]"), function (el) {
+      el.addEventListener("click", function () { selectDetail(el.dataset.id); });
+    });
+  }
+  function selectFirst() {
+    var first = list.querySelector(".g-rows-r[data-id]");
+    if (first) selectDetail(first.dataset.id);
+    else detail.innerHTML = '<div class="hd-meta">이 범위에 표시할 항목이 없습니다.</div>';
+  }
+
+  function markSel(id) {
+    Array.prototype.forEach.call(list.querySelectorAll(".g-rows-r"), function (el) { el.classList.toggle("sel", el.dataset.id === id); });
+  }
+
+  function selectDetail(id) {
+    markSel(id);
+    var it = ITEMS.find(function (x) { return x.id === id; });
+    if (!it) return;
+    if (it.kind === "mine") return renderMineDetail(it);
+    if (it.kind === "company") return renderCompanyDetail(it);
+    if (it.kind === "learn") return renderLearnDetail(it);
+    if (it.kind === "raw") return renderRawDetail(it);
+  }
+
+  function renderMineDetail(it) {
+    detail.innerHTML =
+      '<div class="hd-title">' + esc(it.t) + "</div>" +
+      '<div class="hd-meta">' + (it.scope === "공유" ? "🏢 공유" : "👤 개인") + " · 수정 " + esc(it.updated) +
+      " · " + (it.ai ? "AI 포함(내 질문 근거로 씀)" : "AI 미포함") + "</div>" +
+      '<div class="hd-sec">개인 문서는 <b>내 질문에만</b> 근거로 나옵니다. 공유하면 회사 지식으로 ' +
+      "전환되어 다른 담당자 질문에도 근거로 쓰일 수 있습니다.</div>" +
+      '<div class="hd-acts">' +
+      '<button>' + (it.ai ? "AI 제외" : "AI 포함") + '</button>' +
+      '<button>' + (it.scope === "공유" ? "공유 해제" : "🏢 공유") + '</button>' +
+      '<button>⬇ 내려받기</button>' +
+      '<button class="danger">✕ 삭제</button></div>';
+  }
+
+  function renderCompanyDetail(it) {
+    detail.innerHTML =
+      '<div class="hd-title">' + esc(it.t) + "</div>" +
+      '<div class="hd-meta">' + esc(it.grp) + " 그룹 · bge-m3 · 반입 " + esc(it.updated) + "</div>" +
+      '<div class="hd-metric"><div class="hd-m"><b>' + it.chunks + '</b><span>임베딩 조각</span></div>' +
+      '<div class="hd-m"><b>전역</b><span>검색 범위</span></div>' +
+      '<div class="hd-m"><b>임베딩됨 ✓</b><span>상태</span></div></div>' +
+      '<div class="hd-sec">🔒 열람 등급 <span class="gtxt-' + it.grade + '">' + it.grade + " " + esc(GRADE_LABEL[it.grade]) + '</span><br>' +
+      "내 열람 등급보다 높은 문서는 검색에도 걸리지 않습니다 — AI가 답에 쓰지 못합니다.</div>" +
+      '<div class="hd-sec">🔗 이 파일이 만든 연결 <span class="gm2">(지식 그래프 — 자리만, 세부는 memory.html 그대로 이식)</span></div>' +
+      '<div class="hd-acts"><button>📂 원본 열기</button><button>영역 수정 ▾</button>' +
+      '<button>O 공개로</button><button>S 민감으로</button><button>C 기밀로</button>' +
+      '<button class="danger">AI 지식에서 빼기</button><button class="danger">원본까지 삭제</button></div>';
+  }
+
+  function renderLearnDetail(it) {
+    var sig = [
+      { on: it.sig.cite, t: "📄 근거 인용" }, { on: it.sig.tool, t: "🔧 도구 성공" }, { on: it.sig.accepted, t: "👍 수용됨" }
+    ].map(function (s) { return '<span class="hd-sig' + (s.on ? " on" : "") + '">' + s.t + "</span>"; }).join("");
+    detail.innerHTML =
+      '<div class="hd-title">Q. ' + esc(it.q) + "</div>" +
+      '<div class="hd-meta">' + esc(it.topic) + " 주제 · " +
+      (it.status === "approved" ? '<span class="gtxt-ok">✓ 승인됨 — 다음 학습 데이터셋 후보로 채택</span>' : "후보 — 아직 결정 전") +
+      " · " + esc(it.updated) + "</div>" +
+      '<div class="hd-sec">A. ' + esc(it.a) + "</div>" +
+      "<div>" + sig + "</div>" +
+      '<div class="hd-warn">⚠ 학습 후보의 승인·거절·학습 시작은 <b>이 화면에서 하지 않습니다</b> — ' +
+      "GPU 학습·모델 배포로 이어지는 조작은 전용 화면(학습 루프)에서만 합니다.</div>" +
+      '<div class="hd-acts"><button class="go">🔄 학습 루프 화면 열기</button></div>';
+  }
+
+  function renderRawDetail(it) {
+    detail.innerHTML =
+      '<div class="hd-title">' + esc(it.badge) + " " + esc(it.t) + "</div>" +
+      '<div class="hd-meta">반입 ' + esc(it.updated) + "</div>" +
+      '<div class="hd-sec">' + esc(it.detail) + "</div>" +
+      '<div class="hd-meta" style="color:var(--blue);font-weight:700">' + esc(it.link) + "</div>" +
+      '<div class="hd-acts"><button title="서버가 원본 파일을 얼마나 보존하는지는 이 시안 조사로 확인 못 했습니다 — 구현 전 확인 필요">📂 원본 다시 보기(조건부)</button></div>';
+  }
+
+  function render() {
+    var filter = (document.getElementById("hubSearch").value || "").trim().toLowerCase();
+    document.getElementById("hubCap").textContent = TAB_CAP[curTab] || "";
+    document.getElementById("hubSearch").placeholder = SEARCH_PH[curTab] || SEARCH_PH.all;
+    if (curTab === "all") renderAll(filter);
+    else if (curTab === "mine") renderMine(filter);
+    else if (curTab === "company") renderCompany(filter);
+    else if (curTab === "learn") renderLearn(filter);
+    else if (curTab === "raw") renderRaw(filter);
+  }
+
+  document.getElementById("hubTabs").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button");
+    if (!b) return;
+    Array.prototype.forEach.call(document.querySelectorAll("#hubTabs button"), function (x) { x.classList.remove("on"); });
+    b.classList.add("on");
+    curTab = b.getAttribute("data-t");
+    document.getElementById("hubSearch").value = "";
+    render();
+  });
+  document.getElementById("hubSearch").addEventListener("input", render);
+
+  // ── 업로드 목적지 선택 데모(학습 탭은 목적지가 아니다 — 대화에서 자동 수집되지, 파일로 안 올림) ──
+  var NOTE = {
+    mine: "파일 선택 대화상자가 열리고, 고른 파일이 즉시 <b>「내 것」</b>에 저장됩니다 — 내 질문에만 근거로 나옵니다. (mydocs.html 📥 가져오기와 동일 동작)",
+    company: "파일 선택 대화상자가 열립니다. <b>업무영역</b>과 <b>열람등급(공개/민감/기밀)</b>을 고른 뒤 " +
+      '<div style="border-left:3px solid var(--amber);background:var(--panel-2);border-radius:6px;padding:8px 11px;margin-top:6px;color:var(--amber);font-weight:700">' +
+      "⚠ 회사 지식으로 올리면 등급에 맞는 담당자와 AI가 함께 봅니다.</div>",
+    raw: "파일을 고르면 자동으로 유형을 판별합니다(취약점 리포트 · 보안 로그 원본 · 운영 리포트 · " +
+      "보안제품 자산) — 확신이 낮으면 대화창에서 고르게 물어봅니다(콘솔 ＋와 같은 판별 로직). " +
+      "등록된 뒤 이 화면의 <b>🩹 반입 원본</b> 탭에 영수증으로 남습니다. 학습 재료는 파일로 올리지 " +
+      "않습니다 — 대화에서 자동 수집됩니다."
+  };
+  var destPicker = document.getElementById("destPicker");
+  var destNote = document.getElementById("destNote");
+  document.getElementById("btnUpload").addEventListener("click", function () {
+    destPicker.classList.toggle("on");
+    if (!destPicker.classList.contains("on")) destNote.classList.remove("on");
+  });
+  destPicker.addEventListener("click", function (ev) {
+    var b = ev.target.closest(".dchip");
+    if (!b) return;
+    Array.prototype.forEach.call(destPicker.querySelectorAll(".dchip"), function (x) { x.classList.remove("on"); });
+    b.classList.add("on");
+    destNote.innerHTML = NOTE[b.getAttribute("data-d")] || "";
+    destNote.classList.add("on");
+  });
+
+  // ── 다크 성립 토글(시안 전용) ──────────────────────────────────────────────
+  var frame = document.getElementById("appFrame");
+  document.getElementById("thLight").addEventListener("click", function () {
+    frame.classList.remove("theme-dark");
+    this.classList.add("on"); document.getElementById("thDark").classList.remove("on");
+  });
+  document.getElementById("thDark").addEventListener("click", function () {
+    frame.classList.add("theme-dark");
+    this.classList.add("on"); document.getElementById("thLight").classList.remove("on");
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

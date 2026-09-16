@@ -1,0 +1,539 @@
+<title>GS텔레서비스 AICC PoC 제안요약 슬라이드</title>
+<style>
+  :root{
+    --paper:#EDF1F3;
+    --card:#FFFFFF;
+    --ink:#18242E;
+    --muted:#5A6B77;
+    --line:#D8E0E4;
+    --accent:#0E6E5C;
+    --accent-soft:#E3F0EC;
+    --hold:#A8681B;
+    --hold-soft:#F5EBDC;
+    --gpuA:#0E6E5C;
+    --gpuA2:#3A8E7C;
+    --gpuA3:#9DC6BB;
+    --gpuB:#4A6FA5;
+    --gpuB2:#7C99C0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0B1117;
+      --card:#161F29;
+      --ink:#E6EDF1;
+      --muted:#94A5B1;
+      --line:#2A3844;
+      --accent:#3FB79A;
+      --accent-soft:#15332C;
+      --hold:#D9A050;
+      --hold-soft:#33270F;
+      --gpuA:#2F8F78;
+      --gpuA2:#3FA98F;
+      --gpuA3:#5E8A7F;
+      --gpuB:#5B82B8;
+      --gpuB2:#48678F;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0B1117;
+    --card:#161F29;
+    --ink:#E6EDF1;
+    --muted:#94A5B1;
+    --line:#2A3844;
+    --accent:#3FB79A;
+    --accent-soft:#15332C;
+    --hold:#D9A050;
+    --hold-soft:#33270F;
+    --gpuA:#2F8F78;
+    --gpuA2:#3FA98F;
+    --gpuA3:#5E8A7F;
+    --gpuB:#5B82B8;
+    --gpuB2:#48678F;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    line-height:1.5;
+  }
+  .deck{max-width:1180px;margin:0 auto;padding:28px 16px 80px;display:flex;flex-direction:column;gap:26px}
+  .slide{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    aspect-ratio:16/9;min-height:0;position:relative;overflow:hidden;
+    padding:44px 52px 40px;display:flex;flex-direction:column;
+    box-shadow:0 2px 10px rgba(10,25,35,.06);
+  }
+  .slide .pageno{
+    position:absolute;bottom:14px;right:20px;font-size:11px;color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .slide .brand{
+    position:absolute;bottom:14px;left:20px;font-size:11px;color:var(--muted);
+    letter-spacing:.08em;
+  }
+  .kicker{font-size:12px;letter-spacing:.16em;color:var(--accent);font-weight:800;margin-bottom:8px;text-transform:uppercase}
+  h1{font-size:34px;font-weight:800;line-height:1.28;letter-spacing:-.02em;margin:0 0 16px;text-wrap:balance}
+  h2{font-size:24px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px;text-wrap:balance}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px;max-width:52em}
+  .body{flex:1;min-height:0;display:flex;flex-direction:column}
+  p{margin:0 0 10px}
+  .cols{display:grid;gap:16px;flex:1;min-height:0}
+  .cols.c3{grid-template-columns:repeat(3,1fr)}
+  .cols.c2{grid-template-columns:repeat(2,1fr)}
+  .panel{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--card)}
+  .panel b.t{display:block;font-size:14.5px;color:var(--accent);margin-bottom:6px}
+  .panel p{font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  .tbl{overflow:auto;border:1px solid var(--line);border-radius:8px;flex:1;min-height:0}
+  table{border-collapse:collapse;width:100%;font-size:11.5px}
+  th{
+    text-align:left;padding:6px 9px;border-bottom:2px solid var(--line);
+    font-size:10px;letter-spacing:.05em;color:var(--muted);font-weight:700;
+    background:var(--card);position:sticky;top:0;white-space:nowrap;
+  }
+  td{padding:4.5px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.id{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700;color:var(--muted)}
+  .st{
+    display:inline-block;padding:0 7px;border-radius:99px;font-size:10px;font-weight:800;
+    white-space:nowrap;line-height:1.7;
+  }
+  .st.ok{background:var(--accent-soft);color:var(--accent)}
+  .st.do{background:var(--line);color:var(--muted)}
+  .st.cond{background:var(--hold-soft);color:var(--hold)}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin:8px 0 0;flex-wrap:wrap}
+  .bar{display:flex;width:100%;height:44px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .bar div{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden}
+  .barlabel{font-size:12px;font-weight:700;margin:10px 0 6px}
+  .note{font-size:12px;color:var(--muted)}
+  .big{font-size:17px;font-weight:700;line-height:1.5;max-width:44em}
+  .accentline{border-left:3px solid var(--accent);padding-left:14px;margin:10px 0;font-size:13px;color:var(--muted)}
+  .accentline b{color:var(--ink)}
+  ul.tight{margin:0;padding-left:18px;font-size:13px}
+  ul.tight li{margin-bottom:7px}
+  .kpirow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:6px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:center}
+  .kpi .v{font-size:21px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:11px;color:var(--muted)}
+  .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  .tag.hold{background:var(--hold-soft);color:var(--hold)}
+  dfn.term{
+    font-style:normal;font-weight:700;
+    border-bottom:2px dotted var(--accent);cursor:help;
+  }
+  dfn.term::after{content:"※";font-size:9px;color:var(--accent);vertical-align:super;margin-left:1px}
+  @media (max-width:900px){
+    .slide{aspect-ratio:auto;padding:26px 22px 44px}
+    .cols.c3,.cols.c2,.kpirow{grid-template-columns:1fr}
+    h1{font-size:24px}h2{font-size:19px}
+  }
+  @media print{
+    body{background:#fff}
+    .deck{gap:0;padding:0;max-width:none}
+    .slide{border:none;border-radius:0;box-shadow:none;page-break-after:always;aspect-ratio:auto;height:100vh}
+  }
+</style>
+
+<div class="deck">
+
+<!-- S1 표지 -->
+<section class="slide">
+  <div class="body" style="justify-content:center">
+    <div class="kicker">제안요약 · GS텔레서비스 귀중 · 내부 검토용 초안 v0.5 (2026-08-09 제품 문서 대조 갱신)</div>
+    <h1>근거 없이는 답하지 않는 AI 데이터 HUB<br>완전 온프렘 로컬 LLM 근거답변 검증 PoC</h1>
+    <p class="big" style="color:var(--muted)">AICC 지식 구조화 기반 AI 데이터 HUB 및 정합성 검증 PoC 제안</p>
+    <div style="display:flex;gap:26px;margin-top:22px;font-size:13px;color:var(--muted);flex-wrap:wrap">
+      <span>사업기간 <b style="color:var(--ink)">12주</b></span>
+      <span>대상 <b style="color:var(--ink)">취소·반품·교환 SR 상담</b></span>
+      <span>구동 <b style="color:var(--ink)">발주사 내부 GPU · 데이터 외부 반출 0</b></span>
+      <span>환경 <b style="color:var(--ink)">읽기 전용 격리</b></span>
+    </div>
+  </div>
+  <div class="brand">제안사 (확정 후 기재)</div><div class="pageno">1</div>
+</section>
+
+<!-- S2 RFP 이해 -->
+<section class="slide">
+  <div class="kicker">RFP 이해</div>
+  <h2>이 사업의 본질 — "챗봇"이 아니라 "증명"</h2>
+  <p class="sub">모델 이름이나 데모가 아니라, 동일 데이터·비공개 검증셋 300건으로 결과를 증명해야 하는 사업으로 이해했습니다.</p>
+  <div class="body">
+    <div class="cols c3">
+      <div class="panel"><b class="t">① 데이터를 AI가 쓸 수 있게</b><p>고객·주문·결제·배송·클레임과 업무기준 문서를 식별자로 잇고, 시행일·버전·예외를 붙여 정비. 정비 없는 AI는 과거 기준과 현재 기준을 섞습니다.</p></div>
+      <div class="panel"><b class="t">② 답변마다 근거·출처·버전</b><p>처리방향과 함께 판단 근거, 출처 문서·구간, 적용 버전을 제시. 정보 부족·기준 충돌이면 추정 대신 보류→상담사 확인→상위 승인.</p></div>
+      <div class="panel"><b class="t">③ 비공개 검증으로 객관 판정</b><p>정확도 90%·근거일치 95%·중대오답 0건·P95 3초를 발주사 비공개 셋과 그림자 운영으로 검증. 산출물은 개방형 인수.</p></div>
+    </div>
+    <div class="kpirow">
+      <div class="kpi"><div class="v">90%↑</div><div class="l">업무정확도 (비공개 300건)</div></div>
+      <div class="kpi"><div class="v">95%↑</div><div class="l">근거일치 · 적정 보류</div></div>
+      <div class="kpi"><div class="v">0건</div><div class="l">중대오답 · 보안사고</div></div>
+      <div class="kpi"><div class="v">3.0초</div><div class="l">P95 최종응답 (20 동시세션)</div></div>
+    </div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">2</div>
+</section>
+
+<!-- S3 제안 요지 -->
+<section class="slide">
+  <div class="kicker">제안 요지</div>
+  <h2>세 가지 원칙 — 이미 운영 중인 아키텍처입니다</h2>
+  <p class="sub">자사 온프렘 AI 플랫폼(보안관제 도메인)에서 매일 가동·야간 자동회귀(147개 고정 상황)로 검증 중인 골격에, 취소·반품·교환 업무 데이터를 얹는 제안입니다.</p>
+  <div class="body">
+    <div class="cols c3">
+      <div class="panel"><b class="t">근거가 곧 답변이다</b><p>출처·구간·시행일·버전이 답변 구조의 <b>필수 필드</b> — 근거를 못 찾은 답은 화면에 나가지 못합니다.</p><p style="margin-top:8px"><span class="tag">FNR-04 · DSR-07</span></p></div>
+      <div class="panel"><b class="t">모르면 멈춘다</b><p>필수 정보 누락·기준 충돌·권한 밖 질문은 부족한 항목을 밝히며 <b>보류</b>. "틀린 확답"보다 "정당한 보류"가 항상 이기는 정책이 중대오답 0건을 만듭니다.</p><p style="margin-top:8px"><span class="tag">FNR-05 · S-07</span></p></div>
+      <div class="panel"><b class="t">데이터는 집 밖에 안 나간다</b><p>답변·검증·검색·임베딩 전 모델이 발주사 GPU 상주. 학습배제를 계약으로 약속하는 게 아니라 <b>통신 자체가 없어 원천 불가능</b>하게 만듭니다.</p><p style="margin-top:8px"><span class="tag">AQR-09 · SEC-01</span></p></div>
+    </div>
+    <div class="accentline"><b>차별점 요약:</b> 모델은 갈아끼우는 엔진이고, 저희가 제안하는 것은 <b>어떤 엔진을 꽂아도 근거 없이는 말 못 하게 만드는 차체</b>입니다 — 특정 모델·수행사 종속이 구조적으로 생기지 않습니다.</div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">3</div>
+</section>
+
+<!-- S4 아키텍처 -->
+<section class="slide">
+  <div class="kicker">아키텍처</div>
+  <h2>5계층 근거답변 구조 — 한 장으로</h2>
+  <div class="body" style="align-items:center;justify-content:center">
+    <svg viewBox="0 0 1020 400" role="img" aria-label="원천 데이터를 읽기 전용 수집해 정비하고, 버전 붙은 지식층을 만들고, 근거 검증 게이트를 통과한 답만 상담사 화면에 표시. 감사로그·관측·평가게이트가 전 구간 감시" style="width:100%;max-width:980px">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+        <marker id="a2g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        <marker id="a2h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--hold)"/></marker>
+      </defs>
+      <!-- 좌→우 흐름 5단 -->
+      <g fill="none" stroke="currentColor" stroke-width="1.3">
+        <rect x="10"  y="60" width="150" height="120" rx="9"/>
+        <rect x="215" y="60" width="150" height="120" rx="9"/>
+        <rect x="420" y="60" width="150" height="120" rx="9"/>
+        <rect x="625" y="40" width="170" height="160" rx="9"/>
+        <rect x="850" y="60" width="160" height="120" rx="9"/>
+      </g>
+      <g font-size="13" font-weight="700" fill="currentColor" text-anchor="middle">
+        <text x="85"  y="84">① 원천 데이터</text>
+        <text x="290" y="84">② 정비·연결 HUB</text>
+        <text x="495" y="84">③ 지식층</text>
+        <text x="710" y="64">④ 근거답변 엔진</text>
+        <text x="930" y="84">⑤ 상담지원 화면</text>
+      </g>
+      <g font-size="10.5" fill="currentColor" opacity="0.78" text-anchor="middle">
+        <text x="85" y="106">주문·결제·배송</text><text x="85" y="122">클레임·상담사례</text><text x="85" y="138">업무기준 문서</text><text x="85" y="160">읽기 전용 · 가명처리</text>
+        <text x="290" y="106">품질 측정·정제 이력</text><text x="290" y="122">식별자 연결·코드 매핑</text><text x="290" y="138">시행일·버전 구조화</text><text x="290" y="160">정비 통과분만 색인</text>
+        <text x="495" y="106">문서 저장소(버전)</text><text x="495" y="122">업무규칙 온톨로지</text><text x="495" y="138">하이브리드 색인</text><text x="495" y="160">유효 버전만 검색</text>
+        <text x="710" y="88">검색·상태 조회</text><text x="710" y="104">답변 생성(로컬 LLM)</text>
+        <text x="930" y="106">상황요약·처리방향</text><text x="930" y="122">근거 원문·버전 열람</text><text x="930" y="138">채택/수정/보류 기록</text><text x="930" y="160">AI 제안임을 명시</text>
+      </g>
+      <rect x="641" y="116" width="138" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="710" y="137" font-size="11.5" font-weight="800" fill="var(--accent)" text-anchor="middle">근거 검증 게이트</text>
+      <text x="710" y="168" font-size="10.5" fill="var(--accent)" text-anchor="middle">통과 → 근거답변+출처</text>
+      <text x="710" y="186" font-size="10.5" fill="var(--hold)" text-anchor="middle">부족·충돌 → 안전한 보류</text>
+      <line x1="160" y1="120" x2="211" y2="120" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+      <line x1="365" y1="120" x2="416" y2="120" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+      <line x1="570" y1="120" x2="621" y2="120" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+      <line x1="795" y1="112" x2="846" y2="112" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#a2g)"/>
+      <line x1="795" y1="132" x2="846" y2="132" stroke="var(--hold)" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#a2h)"/>
+      <!-- 하단 감시 기둥 -->
+      <rect x="10" y="250" width="1000" height="70" rx="9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="6 4"/>
+      <text x="510" y="278" font-size="12.5" font-weight="700" fill="currentColor" text-anchor="middle">전 구간 감시 — 감사로그(위변조 방지) · 성능 관측(P50·P95·P99 단계별) · 평가 게이트(회귀 통과 없이는 어떤 변경도 반영 금지)</text>
+      <text x="510" y="300" font-size="11" fill="var(--accent)" text-anchor="middle">상담사 피드백(채택·수정·보류)은 평가·개선 자료로 되돌아옵니다</text>
+      <line x1="930" y1="180" x2="930" y2="246" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#a2g)"/>
+      <text x="510" y="360" font-size="11.5" fill="currentColor" opacity="0.7" text-anchor="middle">운영계 쓰기 없음 · 고객 직접 응대 없음 — RFP 범위 준수 (읽기 전용 격리)</text>
+    </svg>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">4</div>
+</section>
+
+<!-- S5 왜 로컬 -->
+<section class="slide">
+  <div class="kicker">로컬 LLM 전략</div>
+  <h2>왜 전부 발주사 GPU에서 도는가</h2>
+  <div class="body">
+    <div class="cols c3">
+      <div class="panel"><b class="t">학습배제의 가장 강한 증빙</b><p>외부 API는 "재학습에 안 쓴다"는 계약·설정 증빙이 필요합니다(AQR-09). 로컬 구동은 <b>나갈 통신 자체가 없습니다.</b> 증빙 = 망 구성도 + 외부 발신 차단 로그.</p></div>
+      <div class="panel"><b class="t">비용 고정 · 종속 차단</b><p>글자 수 단위 과금이 없어 질의량이 늘어도 월 비용이 고정(AQR-10). 모델은 <dfn class="term" title="누구나 쓰는 표준 형식의 AI 모델 파일 — 특정 회사 전용 형식이 아님">표준 모델 파일(GGUF)</dfn> — 발주사가 직접 교체·재구동 가능(4.8 개방성).</p></div>
+      <div class="panel"><b class="t">3초를 우리가 통제</b><p>외부 API의 네트워크·대기열 변동이 사라지고 지연 전 구간이 내부에 있어 단계별 계측·통제 가능(PER-01·05). 장애 시 자동 재기동은 자사 제품 운영 기능(PER-06).</p></div>
+    </div>
+    <div class="accentline"><b>모델 채택 절차도 제안의 일부:</b> 특정 모델을 못박지 않고, G2(4주차)에 후보 2~3종(Qwen3-Next-80B, gpt-oss-120B 등 Apache 2.0 계열)을 동일 평가셋으로 공개 비교해 발주사와 채택 확정. 한국어 최상위 EXAONE은 <b>비상업 라이선스라 기본 구성에서 배제</b>하고 사유를 명시합니다(AQR-01 라이선스 공개 원칙).</div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">5</div>
+</section>
+
+<!-- S6 VRAM 구조 (내 설계) -->
+<section class="slide">
+  <div class="kicker">GPU 설계</div>
+  <h2>VRAM은 용량이 아니라 역할로 나눕니다 — 제안 구조: 2-GPU 분리, 총 96GB</h2>
+  <p class="sub">"큰 GPU 하나에 다 넣기"가 아니라, 직렬 대자원(답변 생성)과 병렬 소자원(검증·검색)을 <b>물리적으로 분리</b>해 서로 간섭하지 않게 하는 설계입니다. P95가 흔들리는 주원인이 자원 경합이기 때문입니다.</p>
+  <div class="body">
+    <div class="barlabel">GPU A — 80GB급 1장 · "말하는 GPU" (직렬 대자원)</div>
+    <div class="bar" role="img" aria-label="GPU A 80GB: 주력 답변 모델 55GB, 20 동시세션 문맥 캐시 12GB, 운영 여유 13GB">
+      <div style="width:69%;background:var(--gpuA)">주력 답변 모델 80B 전문가 분업형(MoE) ≈55GB</div>
+      <div style="width:15%;background:var(--gpuA2)">대화 기억 12GB</div>
+      <div style="width:16%;background:var(--gpuA3)">여유 13GB</div>
+    </div>
+    <div class="barlabel">GPU B — 16GB급 1장 · "검사하는 GPU" (병렬 소자원)</div>
+    <div class="bar" role="img" aria-label="GPU B 16GB: 검증 보조 모델 9GB, 임베딩 2.5GB, 리랭커 2.5GB, 여유 2GB">
+      <div style="width:56%;background:var(--gpuB)">검증·요약 보조 모델 8B ≈9GB</div>
+      <div style="width:16%;background:var(--gpuB2)">검색 눈 2.5</div>
+      <div style="width:16%;background:var(--gpuB)">재정렬기 2.5</div>
+      <div style="width:12%;background:var(--gpuB2)">여유</div>
+    </div>
+    <div class="cols c2" style="margin-top:14px;flex:initial">
+      <div class="panel"><b class="t">왜 이 구조인가</b><p>① 답을 만드는 일과 답을 검사하는 일이 GPU를 뺏고 뺏기지 않음 → 근거 대조를 생성과 <b>병행</b>해도 응답시간 안정 ② <dfn class="term" title="동시 접속자마다 대화 앞부분을 GPU에 기억해 두는 메모장(KV 캐시). 접속자 수만큼 자리가 필요해 미리 예산으로 떼야 함">대화 기억(세션 캐시)</dfn> 12GB를 미리 확보 → 20 동시 세션(PER-03)이 설계값 ③ 여유 13GB는 G2 후보 모델 교체 시험 공간.</p></div>
+      <div class="panel"><b class="t">규모 조정 가이드</b><p><span class="st cond">최소 48GB</span> 32B급 겸임 구조 — 합격선 도전의 하한, 복합·예외 시나리오 여유 없음<br><span class="st ok">제안 96GB</span> 속도·품질·동시성 균형점 — 발주사 가용 범위 내<br><span class="st do">확장 160GB+</span> 235B급·이중 A/B 상주 — 이득 완만, PoC엔 과투자.</p></div>
+    </div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">6</div>
+</section>
+
+<!-- S7 3초 예산 -->
+<section class="slide">
+  <div class="kicker">성능</div>
+  <h2>P95 3초 — 단계별 시간 예산으로 관리합니다</h2>
+  <p class="sub">"빨라졌다"가 아니라 어느 단계가 몇 초인지로 관리하고, 요청 ID별 원시로그를 그대로 제출합니다(응답시간 시험 방법 전 항목 수용 — 사전 고정답변·실패질의 삭제 없음).</p>
+  <div class="body">
+    <div class="tbl"><table>
+      <tr><th>단계</th><th>예산</th><th>수단</th><th>담당 자원</th></tr>
+      <tr><td>질문 이해·식별자 조회</td><td class="id">0.2초</td><td>상태 조회는 정비된 HUB에서 — 원천 시스템 왕복 없음</td><td>GPU B(경량 분류) + DB</td></tr>
+      <tr><td>하이브리드 검색 + 리랭킹</td><td class="id">0.4초</td><td>벡터+키워드 병렬, 유효 버전 사전 필터</td><td>GPU B</td></tr>
+      <tr><td>답변 생성</td><td class="id">1.7초</td><td>근거 Top-k만 투입(문맥 슬림화) + 구조 출력 + 스트리밍</td><td>GPU A</td></tr>
+      <tr><td>근거 검증</td><td class="id">0.4초</td><td>생성 스트림과 <b>병행</b> 대조 — 직렬 대기 없음, 실패 시 즉시 보류</td><td>GPU B</td></tr>
+      <tr><td>여유(P95 변동 흡수)</td><td class="id">0.3초</td><td>20 동시 세션 연속 배칭 지터 포함</td><td>—</td></tr>
+    </table></div>
+    <p class="note" style="margin-top:10px">주력이 <dfn class="term" title="큰 두뇌를 여러 전문가로 쪼개 질문마다 필요한 전문가만 깨우는 방식 — 큰 지식과 빠른 속도를 동시에 얻음">전문가 분업형(MoE)</dfn> 모델이라 70B급 지식을 소형 모델급 속도로 냅니다. 1~2주차에 발주사 실 GPU에서 생성 속도를 실측해 이 표를 실측치로 갱신하고, G3(8주차) 전에 20 동시 세션 부하시험을 자체 수행합니다.</p>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">7</div>
+</section>
+
+<!-- S8 대응표 DQR/DSR -->
+<section class="slide">
+  <div class="kicker">요구사항 1:1 대응 (1/4)</div>
+  <h2>데이터 품질(DQR) · 표준·연결(DSR)</h2>
+  <div class="body">
+    <div class="tbl"><table>
+      <tr><th>ID</th><th>요구</th><th>판정</th><th>당사 대응</th></tr>
+      <tr><td class="id">DQR-01</td><td>원천 목록</td><td><span class="st do">수행</span></td><td>1~2주차 원천별 소유자·형식·민감도 전수 조사 — 조사 템플릿 보유</td></tr>
+      <tr><td class="id">DQR-02</td><td>필수항목</td><td><span class="st do">수행</span></td><td>업무판정 필수항목 정의 + 누락 시 보류 규칙을 보류 엔진에 직결</td></tr>
+      <tr><td class="id">DQR-03</td><td>품질측정</td><td><span class="st ok">충족</span></td><td>완전성·유일성·유효성·일관성·최신성·참조무결성 6축 측정 도구</td></tr>
+      <tr><td class="id">DQR-04</td><td>기준선</td><td><span class="st do">수행</span></td><td>G1 시점 기준선 산출, 조치 전후 수치 비교 제출</td></tr>
+      <tr><td class="id">DQR-05</td><td>정제이력</td><td><span class="st ok">충족</span></td><td>변환·제외 규칙·건수·원본 연결키·승인자 기록 구조 운영 중</td></tr>
+      <tr><td class="id">DQR-06</td><td>개인정보</td><td><span class="st do">수행</span></td><td>최소수집·마스킹·가명처리 파이프라인 + 재식별 위험 점검</td></tr>
+      <tr><td class="id">DQR-07</td><td>시점관리</td><td><span class="st ok">충족</span></td><td>발생·갱신·수집 시각 구분 — 문서 해시·시각 추적 운영 중</td></tr>
+      <tr><td class="id">DQR-08</td><td>준비상태 관문</td><td><span class="st do">수행</span></td><td>2주차 확보율·품질·결손·대체안 보고로 G1 승인</td></tr>
+      <tr><td class="id">DSR-01</td><td>업무용어</td><td><span class="st ok">충족</span></td><td>용어사전+동의어 매핑 체계 운영 중 → 커머스 용어로 이식</td></tr>
+      <tr><td class="id">DSR-02</td><td>식별자</td><td><span class="st do">수행</span></td><td>고객→주문→라인→클레임 연결 우선순위 설계 (허브 정규화 패턴 재사용)</td></tr>
+      <tr><td class="id">DSR-03</td><td>코드정합</td><td><span class="st do">수행</span></td><td>공통 처리상태 매핑 + 미매핑 코드 자동 탐지 리포트</td></tr>
+      <tr><td class="id">DSR-04</td><td>문서버전</td><td><span class="st ok">충족</span></td><td>내용 해시 기반 버전 추적 — 1글자 변경도 재색인 강제, 운영 중</td></tr>
+      <tr><td class="id">DSR-05</td><td>예외규칙</td><td><span class="st ok">충족</span></td><td>온톨로지 관계망(약 2,000관계 운영 실적) — 예외·우선순위를 규칙으로</td></tr>
+      <tr><td class="id">DSR-06</td><td>충돌처리</td><td><span class="st ok">충족</span></td><td>기준 충돌 감지 → 우선순위 판정 또는 보류 전환 로직</td></tr>
+      <tr><td class="id">DSR-07</td><td>추적성</td><td><span class="st ok">충족</span></td><td>답변→근거→원본 레코드·변환이력 역추적 — 감사로그 연동</td></tr>
+      <tr><td class="id">DSR-08</td><td>개방형 산출</td><td><span class="st ok">충족</span></td><td>CSV·JSON·SQL 표준 형식 — 독점 형식 없음</td></tr>
+    </table></div>
+    <div class="legend"><span><span class="st ok">충족</span> 제품 보유 기능·구조</span><span><span class="st do">수행</span> PoC 기간 수행 항목(방법론 보유)</span><span><span class="st cond">조건부</span> 실측으로 확정</span></div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">8</div>
+</section>
+
+<!-- S9 대응표 FNR/AQR -->
+<section class="slide">
+  <div class="kicker">요구사항 1:1 대응 (2/4)</div>
+  <h2>검색·답변(FNR) · AI 모델 품질(AQR)</h2>
+  <div class="body">
+    <div class="tbl"><table>
+      <tr><th>ID</th><th>요구</th><th>판정</th><th>당사 대응</th></tr>
+      <tr><td class="id">FNR-01</td><td>질문입력</td><td><span class="st ok">충족</span></td><td>자연어 + 주문·클레임 식별자 연계 입력</td></tr>
+      <tr><td class="id">FNR-02</td><td>상황요약</td><td><span class="st ok">충족</span></td><td>사용 데이터·기준시각을 답변 상단 상태 카드로 표시</td></tr>
+      <tr><td class="id">FNR-03</td><td>처리안내</td><td><span class="st ok">충족</span></td><td>가능 여부·순서·필수 확인·승인 필요를 구조화 출력으로 구분</td></tr>
+      <tr><td class="id">FNR-04</td><td>근거제시</td><td><span class="st ok">충족</span></td><td>출처·구간·시행일·버전 = 필수 필드 (근거 배지 운영 중)</td></tr>
+      <tr><td class="id">FNR-05</td><td>안전한 보류</td><td><span class="st ok">충족</span></td><td>무근거 감지 시 재작성 금지·보류 전환 — 제품 핵심 로직</td></tr>
+      <tr><td class="id">FNR-06</td><td>피드백</td><td><span class="st ok">충족</span></td><td>채택·수정·부정확·근거부족·보류적절 + 사유 기록</td></tr>
+      <tr><td class="id">FNR-07</td><td>재현</td><td><span class="st ok">충족</span></td><td>동일 입력·동일 버전 재현 — 감사로그에 전 버전 기록</td></tr>
+      <tr><td class="id">FNR-08</td><td>관리자</td><td><span class="st ok">충족</span></td><td>데이터·문서·규칙·모델·프롬프트 버전과 오류 통계 조회 화면</td></tr>
+      <tr><td class="id">AQR-01</td><td>모델공개</td><td><span class="st ok">충족</span></td><td>전 모델 이름·버전·라이선스·출처 공개 (비상업 라이선스 배제 원칙)</td></tr>
+      <tr><td class="id">AQR-02</td><td>기준비교</td><td><span class="st do">수행</span></td><td>동일 데이터·도구·평가셋 비교 — 자사 3축 평가 게이트로 G2 수행</td></tr>
+      <tr><td class="id">AQR-03</td><td>비열위 95%</td><td><span class="st cond">조건부</span></td><td>G2 조기 실측 자청 — 미달 시 승인 상용모델 대체경로 이중화 (9쪽)</td></tr>
+      <tr><td class="id">AQR-04</td><td>한국어</td><td><span class="st ok">충족</span></td><td>한국어 성능 실측 비교로 후보 선정 + 숫자·날짜·경어 검증셋 포함</td></tr>
+      <tr><td class="id">AQR-05</td><td>근거제약</td><td><span class="st ok">충족</span></td><td>승인 데이터·기준 밖 사실 생성 차단 — 그라운딩 제약 운영 중</td></tr>
+      <tr><td class="id">AQR-06</td><td>구조출력</td><td><span class="st ok">충족</span></td><td>합의 구조 반환 — 모델 출력을 <b>문법 수준에서 강제</b>(형식 이탈 자체가 불가)</td></tr>
+      <tr><td class="id">AQR-07</td><td>변경통제</td><td><span class="st ok">충족</span></td><td>회귀 게이트 통과 없이 어떤 변경도 반영 금지 — 매일 자동회귀 운영 실적</td></tr>
+      <tr><td class="id">AQR-08</td><td>대체경로</td><td><span class="st ok">충족</span></td><td>모델 풀·대체 라우팅·안전한 중단(품질 저하 표시) — 제품 기능</td></tr>
+      <tr><td class="id">AQR-09</td><td>학습배제</td><td><span class="st ok">충족</span></td><td>로컬 구동 — 외부 전송 자체 없음. 망 구성도+차단 로그로 증빙</td></tr>
+      <tr><td class="id">AQR-10</td><td>비용측정</td><td><span class="st ok">충족</span></td><td>질의당 토큰·자원 계측 + 전력 기반 월간 고정비 산식 제시</td></tr>
+    </table></div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">9</div>
+</section>
+
+<!-- S10 대응표 PER/SEC -->
+<section class="slide">
+  <div class="kicker">요구사항 1:1 대응 (3/4)</div>
+  <h2>성능·안정성(PER) · 보안·개인정보(SEC)</h2>
+  <div class="body">
+    <div class="tbl"><table>
+      <tr><th>ID</th><th>요구</th><th>판정</th><th>당사 대응</th></tr>
+      <tr><td class="id">PER-01</td><td>P95 3.0초</td><td><span class="st cond">조건부</span></td><td>단계별 예산 3.0초 설계(7쪽) — 1~2주차 실 GPU 실측으로 확정</td></tr>
+      <tr><td class="id">PER-02</td><td>P99 5초·초과율</td><td><span class="st ok">충족</span></td><td>임계 초과 시 안전한 안내 전환 로직 운영 중</td></tr>
+      <tr><td class="id">PER-03</td><td>20 동시세션</td><td><span class="st cond">조건부</span></td><td>세션 캐시 12GB 선예산 + 연속 배칭 — G3 전 부하시험으로 증명</td></tr>
+      <tr><td class="id">PER-04</td><td>측정조건</td><td><span class="st ok">충족</span></td><td>300질의·3회 반복·30% 비캐시·고정답변 금지 전면 수용</td></tr>
+      <tr><td class="id">PER-05</td><td>종단간 측정</td><td><span class="st ok">충족</span></td><td>화면→검색→모델→후처리 요청 ID별 단계 계측 — 서버 원시로그 제출</td></tr>
+      <tr><td class="id">PER-06</td><td>가용성 99.5%</td><td><span class="st ok">충족</span></td><td>모델 프로세스 감시·자동 재기동 — 제품 운영 기능, 장애 이력 보고</td></tr>
+      <tr><td class="id">PER-07</td><td>열화통제</td><td><span class="st ok">충족</span></td><td>재시도 제한·중복요청 방지·안전한 중단</td></tr>
+      <tr><td class="id">PER-08</td><td>관측</td><td><span class="st ok">충족</span></td><td>P50·P95·P99·오류율·단계별 소요 대시보드 운영 중</td></tr>
+      <tr><td class="id">SEC-01</td><td>격리</td><td><span class="st ok">충족</span></td><td>전용 계정·망·저장소 + 외부 발신 전면 차단(에어갭) 모드 — 제품 기능</td></tr>
+      <tr><td class="id">SEC-02</td><td>최소권한</td><td><span class="st ok">충족</span></td><td>역할 기반 접근 + 폐쇄망 동작 2차 인증(TOTP) + 세션 통제</td></tr>
+      <tr><td class="id">SEC-03</td><td>암호화</td><td><span class="st ok">충족</span></td><td>저장 AES-256(선택형) — <b>키는 발주사 서버 생성·보관(공급사 미보유)</b> + 전송 암호화</td></tr>
+      <tr><td class="id">SEC-04</td><td>개인정보</td><td><span class="st do">수행</span></td><td>사전 승인 절차 + <b>주민번호·카드번호 자동 마스킹 내장</b>(가림 기록) — 국외이전 없음</td></tr>
+      <tr><td class="id">SEC-05</td><td>로그</td><td><span class="st ok">충족</span></td><td>위변조 방지 기록 — <b>끌 수 없음</b> · 기본 3년 보관 · 정리 사실도 기록</td></tr>
+      <tr><td class="id">SEC-06</td><td>공격방어</td><td><span class="st ok">충족</span></td><td><b>3중 방어</b>(입구 가드레일·반입 문서 살균·출구 자격증명 가림) + 자동 레드팀 상시</td></tr>
+      <tr><td class="id">SEC-07</td><td>취약점</td><td><span class="st do">수행</span></td><td>구성요소 목록·취약점 점검·라이선스 검토 결과 제출</td></tr>
+      <tr><td class="id">SEC-08</td><td>반출·삭제</td><td><span class="st ok">충족</span></td><td>데이터·로그·백업·모델 캐시 완전삭제 + "복구되는 백업인지" 검증 절차</td></tr>
+      <tr><td class="id">SEC-09</td><td>사고대응</td><td><span class="st do">수행</span></td><td>즉시 차단·통보·보존·조사·재발방지 절차서 제출</td></tr>
+      <tr><td class="id">SEC-10</td><td>외부업체</td><td><span class="st ok">충족</span></td><td>모델·데이터 외부 처리 없음(로컬) — 하도급 발생 시 사전 공개</td></tr>
+    </table></div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">10</div>
+</section>
+
+<!-- S11 대응표 UXR/OPS -->
+<section class="slide">
+  <div class="kicker">요구사항 1:1 대응 (4/4)</div>
+  <h2>사용자 화면(UXR) · 운영관리(OPS) — 및 판정 요약</h2>
+  <div class="body">
+    <div class="tbl" style="flex:initial;max-height:52%"><table>
+      <tr><th>ID</th><th>요구</th><th>판정</th><th>당사 대응</th></tr>
+      <tr><td class="id">UXR-01</td><td>한 화면 구성</td><td><span class="st ok">충족</span></td><td>질문·요약·처리방향·근거·예외·보류사유 단일 화면</td></tr>
+      <tr><td class="id">UXR-02</td><td>근거열기</td><td><span class="st ok">충족</span></td><td>출처 문서 해당 구간+버전 원클릭 열람 (별도 탐색 없음)</td></tr>
+      <tr><td class="id">UXR-03</td><td>오인방지</td><td><span class="st ok">충족</span></td><td>AI 제안 표시·확정 분리(승인 카드) + 실행된 변경 원클릭 되돌리기 — 운영 중</td></tr>
+      <tr><td class="id">UXR-04</td><td>피드백 2회 조작</td><td><span class="st ok">충족</span></td><td>답변 카드 내 원클릭 채택·수정·오류유형 기록</td></tr>
+      <tr><td class="id">UXR-05</td><td>관리기능</td><td><span class="st ok">충족</span></td><td>승인 담당자의 문서·규칙·버전 변경 + 이력 조회</td></tr>
+      <tr><td class="id">OPS-01</td><td>배포</td><td><span class="st ok">충족</span></td><td>개발·검증·인수 환경 분리, 버전·배포·복구 절차 제공</td></tr>
+      <tr><td class="id">OPS-02</td><td>모니터링</td><td><span class="st ok">충족</span></td><td>정확도·근거누락·보류·지연·오류·사용량 추이 대시보드</td></tr>
+      <tr><td class="id">OPS-03</td><td>지식이전</td><td><span class="st do">수행</span></td><td>담당자 교육·운영 실습·장애 모의훈련 (G6)</td></tr>
+      <tr><td class="id">OPS-04</td><td>인수성</td><td><span class="st ok">충족</span></td><td>발주사 저장소에 소스·설정·문서·시험자료 이력 포함 제출</td></tr>
+    </table></div>
+    <div class="kpirow" style="margin-top:14px">
+      <div class="kpi"><div class="v">44</div><div class="l">충족 — 제품 보유 기능·구조</div></div>
+      <div class="kpi"><div class="v">14</div><div class="l">수행 — 방법론 보유, PoC 기간 수행</div></div>
+      <div class="kpi"><div class="v">3</div><div class="l">조건부 — 실측으로 확정 (AQR-03·PER-01·03)</div></div>
+      <div class="kpi"><div class="v">0</div><div class="l">미충족</div></div>
+    </div>
+    <p class="note" style="margin-top:8px">RFP 4장 원칙("가능·지원 예정·협의 필요 표현 금지")에 따라, 실측 없이 확정할 수 없는 3건은 정직하게 조건부로 표기하고 확정 시점(G1~G3)을 명시했습니다.</p>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">11</div>
+</section>
+
+<!-- S12 정량 목표 -->
+<section class="slide">
+  <div class="kicker">검증 기준 대응</div>
+  <h2>정량 목표 — 지표마다 책임지는 부품이 있습니다</h2>
+  <div class="body">
+    <div class="tbl"><table>
+      <tr><th>지표</th><th>합격선</th><th>책임 부품</th><th>달성 방법</th></tr>
+      <tr><td>업무정확도</td><td class="id">90%↑</td><td>지식층 + 주력 모델</td><td><dfn class="term" title="AI가 제공된 자료 밖의 내용을 지어내지 못하게 근거에 묶어 두는 기법">근거 묶기(그라운딩)</dfn> + <dfn class="term" title="규정·예외·우선순위를 그물처럼 연결해 둔 지식 관계망 — AI의 재량이 아닌 규칙으로 판단">규정 관계망(온톨로지)</dfn> + 모범 사례 예시</td></tr>
+      <tr><td>근거일치</td><td class="id">95%↑</td><td>검증 보조 모델(GPU B)</td><td>문장 단위 근거 대조 — 근거 없는 문장은 화면 표시 전 차단</td></tr>
+      <tr><td>출처·버전 표시</td><td class="id">100%</td><td>구조 출력 스키마</td><td>출처·시행일·버전 = 필수 필드, 누락 시 답변 조립 자체가 불가</td></tr>
+      <tr><td>정답 근거 Top-5</td><td class="id">90%↑</td><td><dfn class="term" title="뜻이 비슷한 문서를 찾는 의미 검색과 정확한 단어·코드를 찾는 키워드 검색을 동시에 쓰는 방식">겹검색(하이브리드)</dfn>+<dfn class="term" title="검색이 찾아온 후보들을 '진짜 근거 순'으로 다시 줄 세우는 정밀 심사관">재정렬기(리랭커)</dfn></td><td>의미+키워드 병행 검색 후 정밀 재정렬</td></tr>
+      <tr><td>중대오답</td><td class="id">0건</td><td>보류 정책 + 거짓 완료 차단</td><td>금전·약정 판단은 보류 우선 + 안 한 처리를 "했다"고 말하면 <b>실제 데이터와 대조해 출구에서 차단</b>(운영 중 기능)</td></tr>
+      <tr><td>적정 보류</td><td class="id">95%↑</td><td>보류 엔진</td><td>필수항목 체크(S-07) + 충돌 감지(DSR-06) + 보류 사유 명시</td></tr>
+      <tr><td>P95 응답</td><td class="id">3.0초</td><td>2-GPU 분리 배치</td><td>단계별 예산(7쪽) + 생성·검증 병행 + 연속 배칭</td></tr>
+      <tr><td>검색·확인시간</td><td class="id">30%↓</td><td>한 화면 통합 UI</td><td>그림자 운영 중앙값 측정 — 탐색 시간 자체를 제거</td></tr>
+    </table></div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">12</div>
+</section>
+
+<!-- S13 일정 -->
+<section class="slide">
+  <div class="kicker">수행 일정</div>
+  <h2>12주 — 누가 무엇을 언제: 실작업·협조·달력 시간을 갈라서 관리합니다</h2>
+  <p class="sub">RFP 3.6절 역할 분담을 일정에 그대로 매핑했습니다. 당사 실작업이 짧은 만큼, 남는 시간은 같은 12주 안에서 검증 반복(2~3회전)과 시연 준비에 재투자됩니다.</p>
+  <div class="body">
+    <div class="tbl"><table>
+      <tr><th>주차</th><th>관문</th><th>🟢 제안사 실작업</th><th>🤝 발주사 협조 (요청 기한)</th><th>⏳ 달력 시간</th></tr>
+      <tr><td class="id">1~2주</td><td><span class="tag">G1</span> 데이터 준비</td><td>원천 조사·품질 측정 가동, GPU 속도 실측 — <b>실작업 ~3일</b></td><td>계정·망 접근 발급(착수+3일), 데이터 제공 승인(+7일), 업무담당자 배정(+10일)</td><td>부서 결재 대기</td></tr>
+      <tr><td class="id">3~4주</td><td><span class="tag">G2</span> 기준·평가설계</td><td>용어·코드 매핑, 평가셋 100건 초안, 모델 공개 비교 — <b>~4일</b></td><td>업무전문가 2인 정답 검토·승인, 기준 문서 최신본 확정</td><td>전문가 검토 회차</td></tr>
+      <tr><td class="id">5~8주</td><td><span class="tag">G3</span> 기능·보안 준비</td><td><b>구현 전체</b>(커넥터·지식층·화면·레드팀·부하시험) — 당사 최단 구간</td><td>중간점검 참석</td><td>—</td></tr>
+      <tr><td class="id">9~10주</td><td><span class="tag">G4</span> 비공개 평가</td><td>오류분석·수정·회귀 재시험 — <b>반복 2~3회전</b></td><td>비공개 300건 평가는 발주사 주관</td><td>평가 회차 일정</td></tr>
+      <tr><td class="id">11주</td><td><span class="tag">G5</span> 그림자 운영</td><td>관찰·즉시 수정</td><td>상담사 투입 편성(10주차까지 확정)</td><td><b>실사용 1주 = 달력 그 자체</b></td></tr>
+      <tr><td class="id">12주</td><td><span class="tag">G6</span> 최종 인수</td><td>산출물 정리·재현시험</td><td>인수 확인·교육 참석</td><td>—</td></tr>
+    </table></div>
+    <div class="accentline" style="margin-top:10px"><b>발주사 협조 캘린더(착수계획서 명문화):</b> ① 계정·망 접근 착수+3일 ② 데이터 제공 승인 +7일 ③ 업무전문가 2인 배정 +10일 ④ 그림자 운영 상담사 편성 10주차까지 — 기한 경과 시 해당 관문 일정은 경과일만큼 이동(범위·기준은 불변).</div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">13</div>
+</section>
+
+<!-- S14 리스크 -->
+<section class="slide">
+  <div class="kicker">위험 관리</div>
+  <h2>위험을 숨기지 않습니다 — 조건부 3건의 관리 계획</h2>
+  <div class="body">
+    <div class="cols c3">
+      <div class="panel"><b class="t" style="color:var(--hold)">AQR-03 비열위 95%</b><p>로컬 오픈 모델은 최상위 상용 모델과 맨몸 격차가 있습니다. 저희 전략은 격차를 <b>데이터로 메우는 것</b> — 정비 데이터·온톨로지·근거 게이트가 붙은 로컬 구성 대(對) 맨몸 기준모델 비교입니다(자사 실측: 그라운딩 강화 &gt; 모델 2배 확대).</p><p><b style="color:var(--ink)">통제:</b> G2(4주차) 조기 비교 자청 · 미달 시 승인 상용모델 대체경로 이중화(근거·보류·감사 골격은 동일 유지).</p></div>
+      <div class="panel"><b class="t" style="color:var(--hold)">PER-01·03 성능</b><p>3초·20세션은 발주사 GPU 기종·장수에 따라 달라지는 실측 값입니다. 설계상 여유(MoE 주력 + 병행 검증 + 캐시 선예산)를 뒀지만 확정은 측정으로만 합니다.</p><p><b style="color:var(--ink)">통제:</b> 1~2주차 실 GPU 실측 → 예산표 갱신 · 미달 시 양자화·모델 크기 조정(전부 회귀 게이트 통과 조건) · G3 전 자체 부하시험.</p></div>
+      <div class="panel"><b class="t" style="color:var(--hold)">데이터 품질 의존</b><p>정확도 90%는 원천 데이터가 받쳐줘야 합니다. 핵심 결손이 있으면 어떤 모델도 못 메웁니다.</p><p><b style="color:var(--ink)">통제:</b> G1 관문에서 결손을 숫자로 보고 — 추정으로 메우지 않고 대체안 또는 범위 조정을 서면 제안. 이 원칙 자체가 저희 보류 철학입니다. 커머스 커넥터는 신규 개발이나 정규화 허브 골격 재사용으로 파서 계층에 국한.</p></div>
+    </div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">14</div>
+</section>
+
+<!-- S15 맺음 -->
+<section class="slide">
+  <div class="kicker">산출물 · 맺음</div>
+  <h2>남기고 가는 것 — 발주사가 직접 굴릴 수 있는 상태로</h2>
+  <div class="body">
+    <div class="cols c2">
+      <div class="panel"><b class="t">개방형 인수 (D-01~12)</b>
+        <ul class="tight">
+          <li>데이터·규칙·평가셋: CSV / JSON / SQL — 원본 구조·의미 유지</li>
+          <li>소스·설정·프롬프트: 발주사 저장소, 이력·재현 절차 포함</li>
+          <li>모델: GGUF 표준 파일 + 정확한 출처·버전·라이선스 명세</li>
+          <li><b>제출물만으로 핵심 평가 재현 가능</b>을 인수 조건으로 수용</li>
+          <li>종료 시 데이터·로그·백업·모델 캐시 완전삭제 + 확인서</li>
+        </ul>
+      </div>
+      <div class="panel"><b class="t">이 제안이 다른 이유</b>
+        <ul class="tight">
+          <li>근거·보류·회귀 골격을 <b>이미 제품으로 매일 운영</b> — 12주를 엔진 개발이 아니라 업무·데이터에 씁니다</li>
+          <li>데이터 외부 반출 0 — 학습배제·개인정보 증빙이 가장 단순한 구조</li>
+          <li>모델·수행사 교체 절차까지 인수 — 종속이 생기지 않는 설계</li>
+          <li>불확실한 3건은 조건부로 정직하게 표기, 확정 시점 명시</li>
+        </ul>
+      </div>
+    </div>
+    <div class="accentline" style="margin-top:14px"><b>요약:</b> 상담사가 3초 안에 "된다/안 된다 + 왜 + 어느 규정 몇 판"을 받고, AI가 모르면 모른다고 말하는 시스템 — 그 증명을 12주 안에, 발주사 장비 안에서 끝내겠습니다.</div>
+  </div>
+  <div class="brand">제안사 (확정 후 기재) · 실적·인력·가격은 제출본 별도 작성</div><div class="pageno">15</div>
+</section>
+
+<!-- S16 용어 풀이 -->
+<section class="slide">
+  <div class="kicker">부록</div>
+  <h2>용어 풀이 — 본문의 <dfn class="term" title="이 표시가 붙은 말은 이 페이지에 풀이가 있습니다">점선 표시(※)</dfn> 용어를 쉬운 말로</h2>
+  <p class="sub">RFP 8.2항(영문 약어는 최초 사용 시 설명) 취지에 따라, 본문에서는 쉬운 말을 앞세우고 원어를 괄호로 붙였으며 전체 풀이를 여기 모았습니다.</p>
+  <div class="body">
+    <div class="cols c2" style="flex:1;min-height:0">
+      <div class="tbl"><table style="min-width:0">
+        <tr><th>용어</th><th>쉬운 풀이</th></tr>
+        <tr><td class="id">로컬 LLM</td><td>외부 서비스가 아니라 회사 안 GPU에서 직접 돌리는 AI 모델 — 데이터가 밖으로 안 나감</td></tr>
+        <tr><td class="id">전문가 분업형(MoE)</td><td>큰 두뇌를 여러 전문가로 쪼개 질문마다 필요한 전문가만 깨우는 방식 — 큰 지식 + 빠른 속도</td></tr>
+        <tr><td class="id">5비트/8비트 압축(양자화)</td><td>모델 무게를 압축해 GPU 메모리를 아끼는 기술 — 숫자가 작을수록 가볍지만 미세하게 덜 정밀</td></tr>
+        <tr><td class="id">표준 모델 파일(GGUF)</td><td>누구나 쓰는 표준 형식의 AI 모델 파일 — 특정 회사 전용이 아니라 직접 교체 가능</td></tr>
+        <tr><td class="id">대화 기억(세션 캐시)</td><td>동시 접속자마다 대화 앞부분을 GPU에 기억해 두는 메모장 — 접속자 수만큼 자리 필요</td></tr>
+        <tr><td class="id">검색 눈(임베딩)</td><td>문서와 질문을 "의미 좌표"로 바꿔 비슷한 규정을 찾게 하는 부품</td></tr>
+        <tr><td class="id">재정렬기(리랭커)</td><td>검색이 찾아온 후보들을 "진짜 근거 순"으로 다시 줄 세우는 정밀 심사관</td></tr>
+        <tr><td class="id">겹검색(하이브리드 검색)</td><td>의미로 찾는 검색과 정확한 단어·코드로 찾는 검색을 동시에 쓰는 방식</td></tr>
+      </table></div>
+      <div class="tbl"><table style="min-width:0">
+        <tr><th>용어</th><th>쉬운 풀이</th></tr>
+        <tr><td class="id">근거 묶기(그라운딩)</td><td>AI가 제공된 자료 밖의 내용을 지어내지 못하게 근거에 묶어 두는 기법</td></tr>
+        <tr><td class="id">규정 관계망(온톨로지)</td><td>규정·예외·우선순위를 그물처럼 연결한 지식 지도 — AI 재량이 아닌 규칙으로 판단</td></tr>
+        <tr><td class="id">P95 / P99</td><td>100번 중 95번째(99번째)로 느린 응답의 시간 — "평균은 빠른데 가끔 느림"을 잡는 기준</td></tr>
+        <tr><td class="id">겹쳐 처리(연속 배칭)</td><td>여러 사용자의 요청을 GPU에서 겹쳐 처리해 동시 접속에도 속도를 지키는 기법</td></tr>
+        <tr><td class="id">회귀 평가</td><td>뭔가 바꿀 때마다 같은 시험지를 다시 풀게 해 "고치다가 다른 게 망가짐"을 잡는 절차</td></tr>
+        <tr><td class="id">레드팀 / 가드레일</td><td>일부러 공격해 보는 모의 해킹 시험 / 이상한 지시를 실행 전에 막는 안전장치</td></tr>
+        <tr><td class="id">외부 차단 모드(에어갭)</td><td>승인된 통로 외 모든 외부 통신을 코드 수준에서 막는 폐쇄 운전 모드</td></tr>
+        <tr><td class="id">그림자 운영</td><td>AI를 실제 업무에 바로 쓰지 않고, 상담사가 현행 방식과 병행하며 효과만 재는 방식</td></tr>
+      </table></div>
+    </div>
+  </div>
+  <div class="brand">GS텔레서비스 AICC PoC 제안</div><div class="pageno">16</div>
+</section>
+
+</div>

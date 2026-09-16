@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 「고칠 것」을 세 갈래로 나눠 결재판으로 보낸다</title>
+<!--
+  시안: mockups/fix-board/시안.html  (2026-09-07 · 추천 1개)
+  근거: 2026-09-07 사장님 「크로드 너가 할 수 있는 것까진 다 해주고, 사용자와 내부 LLM+사용자가
+        이용해서 제품 운용할 수 있도록 하자」 · 「우리 결재판도 있으니」
+        + 2026-08-22 「시안은 추천안으로 바로 진행」 결정.
+  계획서 자리: 중-1(파일럿 실사용 피드백 루프 — 오답·미답 지적을 회귀셋으로 흡수)의 **화면 몫**.
+               전-4(답 표본 측정)가 깔아 놓은 신호를 사람이 처리할 수 있게 잇는다.
+
+  성격: 기록이자 구현 지침. **제품 코드는 한 줄도 안 건드렸다**(시안공 권한 — mockups/ 아래만).
+  ⚠ 「실물」 구역의 CSS는 supervision.html·approvals.html·fold.js에서 **글자 그대로** 옮겼고,
+     폭도 제품과 같은 1132px(.main max-width 1180 − padding 24×2)로 고정했다. 좁은 칸에 나란히
+     놓고 재면 줄바꿈이 생겨 「늘었다」·「줄었다」가 둘 다 거짓이 된다.
+  ⚠ 코드 자리는 **파일·함수 이름**으로만 가리킨다 — llm.ts·memory.ts·noevidence.ts는 지금
+     다른 실행자(Q1·Q2)가 고치는 중이라 줄 번호가 밀린다.
+  ⚠ 아래 px는 **이 목업에서 잰 값**이다. 제품에서 다시 잰다(설치본을 못 여는 상태라 실측 불가).
+-->
+<style>
+/* ── 제품 토큰(supervision.html :root 그대로 — 새 토큰 0개) ────────────────── */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+/* ── 시안 문서 껍데기(제품 아님) ───────────────────────────────────────────── */
+.doc{max-width:1180px;margin:0 auto;padding:22px 24px 60px;line-height:1.7;}
+.doc h1{font-size:21px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+.doc .lead{font-size:12.75px;color:var(--muted);margin-top:6px;}
+.doc h2{font-size:15px;font-weight:800;color:#fff;margin:30px 0 8px;padding-top:16px;border-top:1px solid var(--border);}
+.doc h3{font-size:13px;font-weight:800;color:var(--blue-light);margin:16px 0 6px;}
+.doc p,.doc li{font-size:12.75px;color:var(--muted);}
+.doc li{margin:3px 0 3px 18px;}
+.doc b.k{color:var(--text);font-weight:700;}
+.doc code{font-family:"Consolas","Menlo",monospace;font-size:11.75px;color:#c9c3ff;background:rgba(139,124,240,.10);
+  border:1px solid rgba(139,124,240,.22);border-radius:5px;padding:0 4px;}
+.doc table{border-collapse:collapse;width:100%;margin:8px 0 4px;}
+.doc th,.doc td{border:1px solid var(--border);padding:5px 9px;font-size:12.25px;text-align:left;vertical-align:top;color:var(--muted);}
+.doc th{background:var(--panel-2);color:var(--text);font-weight:800;}
+.doc td b{color:var(--text);font-weight:700;}
+.warn{background:rgba(240,160,32,.09);border:1px solid rgba(240,160,32,.32);border-radius:9px;padding:9px 12px;margin:10px 0;font-size:12.5px;color:var(--text);line-height:1.65;}
+.bad{background:rgba(226,72,61,.09);border:1px solid rgba(226,72,61,.32);border-radius:9px;padding:9px 12px;margin:10px 0;font-size:12.5px;color:var(--text);line-height:1.65;}
+.good{background:rgba(30,185,128,.08);border:1px solid rgba(30,185,128,.30);border-radius:9px;padding:9px 12px;margin:10px 0;font-size:12.5px;color:var(--text);line-height:1.65;}
+.stage{background:var(--panel-2);border:1px dashed var(--border-strong);border-radius:12px;padding:14px;margin:10px 0 4px;}
+.stage-lb{font-size:11.75px;font-weight:800;color:var(--muted-2);letter-spacing:.6px;margin-bottom:8px;}
+/* ⚠ 실물 구역은 **문서 껍데기의 line-height를 끊는다.** .doc이 1.7을 물려주면 제품 CSS
+   그대로여도 줄이 저절로 높아져 「지금 판」부터 거짓이 된다(실측: .sup-line 31.0 → 34.7px).
+   supervision.html의 body는 line-height를 안 정한다(=normal) — 그 상태로 되돌린다.
+   이 한 줄이 없으면 이 시안의 모든 px가 3~4px씩 부풀어 있다. */
+.real{width:1132px;max-width:100%;line-height:normal;}
+
+/* ── 실물 CSS: supervision.html에서 글자 그대로 ────────────────────────────── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.panel h2{font-size:14px;font-weight:800;color:var(--text-strong, #fff);margin-bottom:10px;padding:0;border:0;}
+.sup-line{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.75px;}
+.sup-line:last-child{border-bottom:0;}
+.sup-line .tag{flex:0 0 auto;font-size:11.75px;font-weight:800;padding:1px 8px;border-radius:10px;}
+.tag.idle{background:rgba(255,255,255,.08);color:var(--muted);}
+.tag.err{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}
+.tag.ok{background:rgba(30,185,128,.14);color:var(--teal);}
+.tag.cite{background:rgba(139,124,240,.18);color:var(--purple-ink, #b6a9ff);}
+.sup-line .dim{color:var(--muted-2);}
+.note{font-size:11.75px;color:var(--muted-2);margin-top:10px;}
+
+/* ── 실물 CSS: fold.js가 만드는 구역 머리(글자 그대로) ─────────────────────── */
+.gjf-h{display:flex;align-items:center;gap:9px;padding:5px 12px;margin-bottom:5px;cursor:pointer;
+  border:1px solid var(--border,#3d3c38);border-radius:9px;background:var(--panel-2,#1f1e1d);user-select:none;}
+.gjf-h .car{color:var(--muted-2,#a49d95);font-size:11.75px;width:11px;flex:0 0 auto;transition:transform .15s;}
+.gjf-h.on .car{transform:rotate(90deg);}
+.gjf-h .nm{font-size:12.5px;font-weight:700;color:var(--text-strong,#dfe6ff);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gjf-b{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);
+  color:var(--muted,#b3ada4);flex:0 0 auto;}
+.gjf-b.hot{background:rgba(226,72,61,.16);color:var(--red-ink, #f5928a);}
+.gjf-b.warn{background:rgba(240,160,32,.16);color:var(--amber,#f0a020);}
+
+/* ── 새로 제안하는 것 (기존 값의 재조합 — 새 색 토큰 0개) ──────────────────── */
+/* 갈래 태그: .sup-line .tag와 **같은 꼴**(11.75px/800/1px 8px/radius 10px). 색은 이미 쓰는
+   --teal · --purple · --amber 셋을 .tag.cite와 같은 rgba 패턴으로 재사용한다. */
+.fx-k{flex:0 0 auto;font-size:11.75px;font-weight:800;padding:1px 8px;border-radius:10px;white-space:nowrap;}
+.fx-k.doc{background:rgba(30,185,128,.14);color:var(--teal);}
+.fx-k.rule{background:rgba(139,124,240,.18);color:var(--purple-ink, #b6a9ff);}
+.fx-k.prod{background:rgba(240,160,32,.16);color:var(--amber);}
+/* 최근 행 — 「실동작 기록」 행(.terminal 12.5px × line-height 1.9 = 23.75px)보다 낮게 잡는다.
+   ⚠ align-items는 center다(approvals.html .rv-row와 같은 꼴). baseline으로 두면 글자 크기가
+   다른 두 아이(12.5px 본문 · 11.75px 갈래 태그)의 위·아래 여백이 **더해져** 행이 1~2px 높아진다. */
+.fx-row{display:flex;gap:7px;align-items:center;padding:2px 0;font-size:12.5px;line-height:1.3;color:var(--muted);}
+.fx-row .q{flex:1 1 auto;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fx-row .when{flex:0 0 auto;font-size:11.75px;color:var(--muted-2);}
+.fx-go{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;
+  padding:3px 9px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.fx-go:hover{border-color:var(--blue);color:var(--blue-light);}
+.fx-sum{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.75px;flex-wrap:wrap;}
+.fx-sum b{color:var(--text);font-weight:700;}
+
+/* ── 실물 CSS: approvals.html 목록/칩(글자 그대로) ─────────────────────────── */
+.fchip{font-size:12.25px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;display:inline-block;}
+.fchip b{margin-left:3px;color:var(--text);font-weight:800;}
+.fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;}
+.rv-list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:7px 10px;}
+.rv-row{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
+.rv-row.on{border-color:var(--blue);background:rgba(59,130,246,.10);}
+.rv-rt{font-size:12.5px;font-weight:700;color:var(--text-strong, #fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rv-rs{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rv-detail{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px 22px;}
+.dt-title{font-size:17px;font-weight:800;color:var(--text-strong, #fff);}
+.sec-h{font-size:12.25px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase;}
+.field label{font-size:12px;color:var(--muted-2);font-weight:700;display:block;margin-bottom:4px;}
+.inp{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px 10px;color:var(--text);font-size:12.5px;outline:none;}
+.btn{font-size:12px;font-weight:700;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff;}
+.dt-evid{font-size:12.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.6;margin-bottom:12px;}
+.hint{font-size:11.75px;color:var(--muted-2);margin-top:4px;}
+.two{display:grid;grid-template-columns:360px 1fr;gap:12px;}
+.mnum{font-family:"Consolas","Menlo",monospace;color:var(--blue-light);font-weight:700;}
+</style>
+</head>
+<body>
+<div class="doc">
+
+<h1>시안 — 「고칠 것」을 세 갈래로 나눠 <b class="k">결재판</b>으로 보낸다</h1>
+<p class="lead">
+  담당자가 대화창에서 <b class="k">「▶ 이 답 이상해요」</b>를 누르면 그 지적이
+  <b class="k">자료 부족 · 사내 규정 · 제품이 고칠 것</b> 세 갈래로 나뉘어
+  <b class="k">기존 결재판</b>에 항목으로 선다. 감독 화면은 <b class="k">집계와 입구</b>만 갖는다 —
+  새 목록 화면도, 새 승인 창구도 만들지 않는다.
+  <br>추천 시안 1개 · 2026-09-07 · 계획서 <b class="k">중-1</b>(실사용 피드백 루프)의 화면 몫.
+</p>
+
+<div class="good">
+  <b>한 줄 요약</b> — 「틀렸어요」를 받는 표(<code>answer_feedback</code>)는 <b>2026-07-29부터 이미 있고</b>,
+  거기 쌓인 지적을 <b>사람이 볼 수 있는 화면이 하나도 없다</b>. 이 시안은 표를 새로 만들지 않고
+  <b>칸 하나(<code>fixkind</code>)</b>를 더해 그 표를 결재판에 띄운다. 자율 운용 루프는 그 자리에서 닫힌다.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>① 왜 이 안인가 — 다른 길을 왜 안 골랐나</h2>
+
+<h3>지금 무슨 일이 벌어지고 있나 (소스 실측)</h3>
+<table>
+<tr><th style="width:180px">자리</th><th>지금</th></tr>
+<tr><td><b>지적을 넣는 곳</b></td><td><code>console.js</code> <code>attachFlag()</code> → <code>「▶ 이 답 이상해요」</code> 버튼 →
+  <code>sendAnswerFeedback({kind,question,answer,note,expected,screen})</code> → <code>POST /api/answer-feedback</code>. <b>있다.</b></td></tr>
+<tr><td><b>지적이 쌓이는 곳</b></td><td><code>answer_feedback</code> 표 —
+  <code>kind</code>(wrong·missing·style) · <code>status</code>(open·promoted·dismissed) · question · answer · note · expected · screen · actor. <b>있다.</b></td></tr>
+<tr><td><b>지적을 보는 화면</b></td><td><b style="color:var(--red)">없다.</b> <code>answerFeedbackApi.list</code>는 <code>client/src/api/knowledge.ts</code>에
+  있는데 <code>preload.ts</code>가 <b>내보내지 않는다</b>(455줄에 <code>sendAnswerFeedback</code> 하나뿐).
+  어떤 화면도 이 표를 읽을 수 없다.</td></tr>
+<tr><td><b>지적을 처리하는 곳</b></td><td>대화창 도구 <code>answer_feedback_status</code>가 <b>글로 읽어 주는 것</b>이 전부.
+  상태 바꾸기(<code>POST /api/answer-feedback/:id/status</code>)는 <b>admin API만 있고 누르는 자리가 없다.</b></td></tr>
+</table>
+
+<div class="bad">
+  <b>그래서 지금 루프가 끊겨 있다.</b> 담당자가 「이 답 이상해요」를 눌러도 그 지적은
+  <b>아무도 안 여는 표</b>로 들어간다. 「접수했습니다. 사람이 검토 후 검사 문항으로 씁니다」라고
+  화면이 약속하는데(<code>console.js</code>), <b>그 검토를 할 화면이 없다.</b>
+  이 저장소가 반복해 겪은 <b>「약속-코드 불일치」</b>가 그대로 서 있는 자리다.
+</div>
+
+<h3>고른 길 — 결재판을 화면으로 재사용하고, 표는 안 섞는다</h3>
+<p>
+  사장님 지시는 「우리 결재판도 있으니」였고, 규율은 「<b class="k">새 승인 창구를 만들지 않는다 —
+  결재판 항목 종류를 늘린다</b>」다. 그래서 <b>창구(화면)는 결재판 하나</b>로 두되,
+  <b>원장(표)은 섞지 않는다.</b>
+</p>
+
+<div class="warn">
+  <b>왜 표를 안 섞나 — <code>finding_approvals</code>에 넣으면 무엇이 깨지나</b>(소스로 확인)
+  <ul>
+    <li><code>approvals.ts</code>의 항목 키는 <code>(assetId, findingKey)</code>다. 「고칠 것」에는
+      <b>assetId도 finding도 없다</b> — 키를 지어내야 한다.</li>
+    <li><code>sbom.ts</code> 148·386줄이 <code>isFindingRejected(assetId, f)</code>를 부른다.
+      자산 없는 행이 들어오면 <b>SBOM 취약점 셈이 어긋난다.</b></li>
+    <li><code>vexexport.ts</code>가 <code>rejected → not_affected</code>로 <b>남에게 「영향 없음」을 선언</b>한다.
+      대화 지적 하나를 반려했다고 VEX가 「영향 없음」을 내보내면 <b>거짓 선언</b>이다.</li>
+    <li><code>approvals.html</code> 396~398줄이 <code>r.finding.severity</code>로 심각도를 센다 —
+      finding이 없는 행에서 <b>즉사(TypeError)</b>하거나 조용히 0으로 샌다.</li>
+    <li>칩 <code>지연</code>·<code>미배정</code>은 SLA 개념(<code>isOverdueReview</code>·<code>isUnassignedReview</code>)이라
+      대화 지적에는 <b>뜻이 없다</b>.</li>
+  </ul>
+  → <b>결론</b>: 화면은 합치고 표는 가른다. 결재판은 <b>두 원장을 가진 한 창구</b>가 된다.
+</div>
+
+<h3>갈래 셋은 「누가 닫을 수 있나」로 갈랐다</h3>
+<table>
+<tr><th style="width:120px">갈래</th><th style="width:230px">뜻</th><th>닫는 방법(= 자율 운용 루프)</th></tr>
+<tr><td><span class="fx-k doc">자료 부족</span></td><td>답할 근거 문서가 사내에 없다</td>
+  <td>담당자가 <b>문서를 올리면</b> 닫힌다 — 결재판에서 「＋ 자료 올리기」로 내 문서/지식 반입으로 간다.
+    <b>사람도 LLM도 코드를 안 고친다.</b></td></tr>
+<tr><td><span class="fx-k rule">사내 규정</span></td><td>일반 지식으로는 맞는데 <b>우리 회사 규정과 다르다</b></td>
+  <td>담당자가 <b>승인 문답을 고치면</b> 닫힌다 — 초안을 LLM이 쓰고 사람이 승인해
+    <code>approved-qa</code> 문서(<code>docorigin.제품자동_ORIGIN</code>)로 들어간다.</td></tr>
+<tr><td><span class="fx-k prod">제품</span></td><td>가드가 뗀 것 · 도구 답이 틀림 · 근거가 강한데 틀림 · 그냥 틀림</td>
+  <td><b>코드를 고쳐야 한다</b> → 개발팀으로 보낸다(회귀 문항 초안 + 개발 인계 메모).</td></tr>
+</table>
+<p>
+  이 셋은 <b>「자율 운용」의 정의 그 자체</b>다 — 앞의 둘은 담당자가 제품 안에서 끝내고,
+  <b>세 번째만 우리에게 온다.</b> 갈래를 이렇게 가르지 않으면 모든 지적이 개발팀으로 오고,
+  그러면 「자율」이 아니다.
+</p>
+
+<h3>분류는 규칙이 먼저 — LLM은 갈래를 못 바꾼다</h3>
+<table>
+<tr><th style="width:150px">판정</th><th style="width:250px">재료(누가 넣는가)</th><th>결과</th></tr>
+<tr><td><b>규칙 ①</b></td>
+  <td><code>noevidence.근거없음종류판정(answer)</code> — <b>이미 있는 순수 함수</b>.
+    답 앞머리의 배너 5종(자료없음·자료요청·지정범위·근거약함·숫자무근거)을 읽는다.</td>
+  <td>하나라도 걸리면 → <span class="fx-k doc">자료 부족</span></td></tr>
+<tr><td><b>규칙 ②</b></td><td>①에 안 걸린 나머지 전부</td>
+  <td>→ <span class="fx-k prod">제품</span></td></tr>
+<tr><td><b>사람만</b></td><td>담당자가 결재판에서 갈래를 바꾼다</td>
+  <td>→ <span class="fx-k rule">사내 규정</span> (또는 셋 사이 어디로든)</td></tr>
+<tr><td><b>LLM</b></td><td>담당자가 <b>버튼을 누를 때만</b> 부른다</td>
+  <td><b>한 줄 사유</b>와 <b>수정 초안</b>만. 갈래·상태는 <b>못 건드린다.</b></td></tr>
+</table>
+
+<div class="warn">
+  <b>「사내 규정」을 자동으로 안 정하는 이유 — 그 값을 넣는 사람이 없다.</b><br>
+  「근거가 전부 승인 문답(<code>docorigin</code> 가족)이었나」를 알려면 그 답이 <b>어떤 문서를 인용했는지</b>가
+  저장돼 있어야 한다. 그런데 <code>answer_feedback</code>에는 sources 칸이 없고,
+  <code>answer_samples</code>는 <b>본문을 일부러 안 담는다</b>(그 파일의 가장 중요한 계약).
+  <b>없는 재료로 갈래를 정하느니 사람이 고르게 둔다</b> — 이 저장소의 「생산자 없는 값」 계열을
+  또 만들지 않는다. 자동화하고 싶으면 <b>2단계</b>(아래 ⑤ 표 마지막 줄)에서 producer를 먼저 만든다.
+</div>
+
+<h3>규칙 ①의 재료가 실제로 있는지 — 실코드로 확인했다</h3>
+<table>
+<tr><th style="width:230px">칸</th><th>생산자(실코드)</th><th>소비자(이 시안)</th></tr>
+<tr><td><code>answer_feedback.answer</code></td>
+  <td><code>console.js:1812</code> <code>attachFlag(replyEl, text, (r && r.output) || "")</code> —
+    <b>서버 답 원문 <code>r.output</code> 그대로</b></td>
+  <td><code>근거없음종류판정()</code>이 <b>앞머리 배너</b>를 읽는다(<code>startsWith</code>)</td></tr>
+<tr><td><code>answer_samples.sha</code></td>
+  <td><code>dispatcher.ts:774</code> <code>recordAnswerSample({본문: 걸러진.output})</code> —
+    <b>같은 문자열</b>의 sha256 앞 12자</td>
+  <td><b>선택 보강</b>: 같은 sha를 찾으면 <code>evidence</code>(강함/약함)·<code>route</code>·<code>tool</code>을
+    덧붙여 사유 한 줄을 더 정확히 쓴다. <b>못 찾아도 분류는 된다.</b></td></tr>
+</table>
+<p>
+  두 값이 <b>같은 문자열에서 나온다</b>는 것을 소스로 확인했다(<code>r.output</code> ↔ <code>걸러진.output</code>).
+  그래도 <b>sha 일치는 주 경로로 쓰지 않는다</b> — 스트리밍 경로·보존 30일 만료·본문 후처리 중
+  <b>하나만 어긋나도 조용히 0건</b>이 되기 때문이다. 주 경로는 <b>답 본문에서 배너를 읽는 것</b>이고,
+  sha는 <b>있으면 더 좋은 것</b>이다.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>② 포기한 것</h2>
+<table>
+<tr><th style="width:250px">안 한 것</th><th>왜</th></tr>
+<tr><td><b>새 목록 화면(fixboard.html)</b></td>
+  <td>지시에 명시된 금지. 그리고 <code>wiringcontract.test</code>가 새 <code>.html</code>마다
+    선택 배선 분류를 강제한다 — 화면을 안 만들면 그 대장을 <b>한 줄도 안 건드린다</b>.</td></tr>
+<tr><td><b><code>finding_approvals</code>에 항목 섞기</b></td><td>위 ①의 다섯 가지가 깨진다. VEX 거짓 선언이 특히 나쁘다.</td></tr>
+<tr><td><b>감독 화면에서 바로 승인·수정</b></td>
+  <td>제품 원칙 「메뉴는 보기용 · 지시는 대화창에서」. 감독 화면은 <b>집계와 입구</b>만 갖는다.
+    입력칸이 원래 있는 창구는 <b>결재판 하나</b>다.</td></tr>
+<tr><td><b>지적 접수 순간 LLM 호출</b></td>
+  <td>쓰기 경로가 GPU를 기다리게 된다. <code>recordAnswerSample</code>이 「측정이 제품을 죽이면 안 된다」로
+    <code>try/catch</code>를 두른 것과 같은 이유. <b>초안은 담당자가 누를 때만.</b></td></tr>
+<tr><td><b>LLM이 갈래를 정하거나 뒤집기</b></td>
+  <td>「등록하였습니다」를 지어낸 전례. 갈래는 <b>규칙과 사람만</b> 정한다.</td></tr>
+<tr><td><b>「사내 규정」 자동 분류</b></td><td>재료(인용 출처)가 저장돼 있지 않다. ①의 경고 상자 참조.</td></tr>
+<tr><td><b>감독 화면에 「다시 분류」 버튼</b></td>
+  <td>같은 조작이 두 화면에 생기면 어긋난다. 갈래 바꾸기는 <b>결재판 상세 한 곳</b>에서만.</td></tr>
+<tr><td><b>기간 칩(오늘/7일/30일)을 새 구역에 따로 두기</b></td>
+  <td>화면 위의 <code>#range</code>를 <b>그대로 따라간다</b>. 두 개면 「어느 기간인가」가 화면 안에서 갈린다.</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>③ 실물 — 지금 판 / 제안 판</h2>
+<p>아래 두 판은 <b>제품 CSS 그대로</b>이고 폭도 제품과 같은 1132px다. 스크립트가 스스로 높이를 재서 ④ 표에 채운다.</p>
+
+<div class="stage">
+  <div class="stage-lb">지금 — supervision.html 「감독 관점」 판 (손대지 않음)</div>
+  <div class="real" id="nowWrap">
+    <div class="panel" id="nowPanel">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div>
+        <div class="sup-line" id="probeSupLine"><span class="tag idle">무호출</span><span>부품 · 사서 — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>
+        <div class="sup-line"><span class="tag err">오류 상위</span><span>해석 2건(4%) · 보고 1건(2%)</span></div>
+        <div class="sup-line"><span class="tag cite">✂ 인용 제거</span><span>답 3개에서 근거 없는 인용을 뗐습니다 — 해석 2 · 보고 1<span class="dim"> · 사유 4건 ▸</span></span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="stage-lb">제안 — 같은 화면 아래에 구역 하나(fold.js 관례). <b>「제품」 열림 ≥ 1이면 접지 않는다</b></div>
+  <div class="real" id="newWrap">
+    <div class="panel" id="nowPanelCopy" style="margin-bottom:12px">
+      <h2>감독 관점 — 규칙 계산(AI 문장 아님)</h2>
+      <div>
+        <div class="sup-line"><span class="tag idle">무호출</span><span>부품 · 사서 — 이 기간 대화 호출이 없었습니다(구성 재검토 후보)</span></div>
+        <div class="sup-line"><span class="tag err">오류 상위</span><span>해석 2건(4%) · 보고 1건(2%)</span></div>
+        <div class="sup-line"><span class="tag cite">✂ 인용 제거</span><span>답 3개에서 근거 없는 인용을 뗐습니다 — 해석 2 · 보고 1<span class="dim"> · 사유 4건 ▸</span></span></div>
+      </div>
+      <div class="note">응답 시간·오류는 2026-08-20(감독 도입일)부터 쌓입니다 — 그 전 기간은 "-"로 보입니다. 최근 오류 문구는 서버가 켜진 뒤의 것만 보입니다(개수는 영속 집계).</div>
+    </div>
+
+    <div id="fxSection">
+      <!-- fold.js가 만드는 머리 그대로. data-gijo-fold-badges로 「제품 열림」을 hot 배지로 노출 →
+           fold.js의 「hot 배지가 0이 아니면 접힌 구역도 다시 펼친다」 규칙이 저절로 걸린다. -->
+      <div class="gjf-h on" id="fxHead">
+        <span class="car">▸</span>
+        <span class="nm">🔧 고칠 것 — 담당자가 「틀렸어요」라고 한 답</span>
+        <span class="gjf-b hot" id="fxBadgeHot">제품 2</span>
+        <span class="gjf-b warn">자료 5</span>
+        <span class="gjf-b">규정 1</span>
+      </div>
+      <div class="panel" id="fxBody">
+        <div class="fx-sum">
+          <span class="fx-k doc">자료 부족</span><span>열림 <b>5</b> · 닫힘 <b>12</b></span>
+          <span class="fx-k rule">사내 규정</span><span>열림 <b>1</b> · 닫힘 <b>4</b></span>
+          <span class="fx-k prod">제품</span><span>열림 <b>2</b> · 닫힘 <b>3</b></span>
+          <span class="dim" style="margin-left:auto;font-size:11.75px">기간은 위 오늘/7일/30일을 따릅니다</span>
+        </div>
+        <div id="fxRows">
+          <div class="fx-row"><span class="fx-k prod">제품</span><span class="q">"KEV 목록 몇 건이야?" — 숫자가 화면과 다릅니다</span><span class="when">2일 전 · 열림</span></div>
+          <div class="fx-row"><span class="fx-k doc">자료 부족</span><span class="q">"우리 백업 보관 기간 규정이 뭐야?"</span><span class="when">2일 전 · 열림</span></div>
+          <div class="fx-row"><span class="fx-k prod">제품</span><span class="q">"어제 스캔 결과 요약해줘" — 없는 자산을 말합니다</span><span class="when">3일 전 · 열림</span></div>
+          <div class="fx-row"><span class="fx-k rule">사내 규정</span><span class="q">"비밀번호 몇 자 이상이어야 해?" — 사내 기준과 다릅니다</span><span class="when">4일 전 · 열림</span></div>
+          <div class="fx-row"><span class="fx-k doc">자료 부족</span><span class="q">"VPN 장애 났을 때 절차 알려줘"</span><span class="when">5일 전 · 닫힘</span></div>
+        </div>
+        <div class="note" style="display:flex;align-items:center;gap:8px">
+          <span style="flex:1">항목은 <b>결재판</b>에 있습니다 — 여기서는 <b>보기만</b> 합니다. 처리(갈래 바꾸기·승인·초안)는 결재판에서 합니다.</span>
+          <button class="fx-go">🗔 결재판에서 처리</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="warn">
+  <b>접힘 규칙</b> — <code>data-gijo-fold-badges="fxProdOpen:제품:hot, fxDocOpen:자료:warn, fxRuleOpen:규정"</code>.
+  fold.js는 「위험 신호(hot 배지가 0이 아님)가 있으면 접힌 구역도 다시 펼친다」를 <b>이미 하고 있다</b> —
+  새 규칙을 만들 필요가 없다. <b>「제품이 고칠 것」 열림 ≥ 1이면 저절로 펼쳐진다.</b>
+  <br>⚠ 그리고 <b>0이어도 구역을 숨기지 않는다</b> — 숨기면 「지적이 없었던 것」과 「이 기능이 안 도는 것」이
+  화면에서 같아 보인다(supervision.html의 ✂ 줄이 0에도 서 있는 것과 같은 이유).
+</div>
+
+<h3>「결재판에서 처리」가 여는 주소</h3>
+<p>
+  <code>window.top.postMessage({type:"gijo:openTab", page:"approvals.html?fix=prod", label:"조치 결재판"}, "*")</code>
+  — supervision.html의 <code>goRedteam</code>이 <code>redteam.html?hub=1</code>로 여는 것과 <b>같은 꼴</b>이다.
+</p>
+<div class="good">
+  <b>리다이렉트를 안 탄다 — 실코드로 확인.</b> <code>nav.js</code>에 <code>"approvals.html": "fix.html?panel=approvals"</code>가
+  있지만, 적용부(<code>nav.js</code> 1714줄)가
+  <code>TAB_REDIRECT[currentPage() + (location.search || "")] || (location.search ? null : TAB_REDIRECT[currentPage()])</code>다 —
+  <b>쿼리가 붙어 있으면 흡수하지 않는다.</b> <code>approvals.html?asset=…</code> 딥링크가 이미 이 규칙으로 산다.
+  그래서 <code>?fix=</code>도 <b>따로 예외를 만들지 않고</b> 그대로 열린다.
+</div>
+
+<h3>결재판 — 칩 3개가 늘고, 상세 한 장이 는다</h3>
+<div class="stage">
+  <div class="stage-lb">approvals.html — 칩줄(#rvFilt). 기존 9개 뒤에 <b>세로줄 하나 두고</b> 3개를 더한다</div>
+  <div class="real">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span class="fchip on">조치대상 <b>18</b></span><span class="fchip">진행중 <b>4</b></span>
+      <span class="fchip">검증 <b>2</b></span><span class="fchip">반려 <b>7</b></span>
+      <span class="fchip">위험수용 <b>1</b></span><span class="fchip">완료 <b>31</b></span>
+      <span class="fchip">미검토 <b>12</b></span><span class="fchip">미배정 <b>5</b></span>
+      <span class="fchip">지연 <b>3</b></span>
+      <span style="width:1px;height:20px;background:var(--border-strong);margin:0 4px"></span>
+      <span class="fchip">🔧 자료 부족 <b>5</b></span>
+      <span class="fchip">🔧 사내 규정 <b>1</b></span>
+      <span class="fchip">🔧 제품 <b>2</b></span>
+    </div>
+    <div class="two" style="margin-top:10px">
+      <div class="rv-list-pane">
+        <div class="rv-row on"><span class="fx-k prod">제품</span><div style="flex:1;min-width:0">
+          <div class="rv-rt">"KEV 목록 몇 건이야?"</div>
+          <div class="rv-rs">숫자가 화면과 다릅니다 · 김보안 · 2일 전</div></div></div>
+        <div class="rv-row"><span class="fx-k prod">제품</span><div style="flex:1;min-width:0">
+          <div class="rv-rt">"어제 스캔 결과 요약해줘"</div>
+          <div class="rv-rs">없는 자산을 말합니다 · 이담당 · 3일 전</div></div></div>
+      </div>
+      <div class="rv-detail">
+        <div class="dt-title">"KEV 목록 몇 건이야?"</div>
+        <div style="margin:4px 0 12px"><span class="fx-k prod">제품이 고칠 것</span>
+          <span class="hint" style="display:inline;margin-left:6px">규칙 분류 — 근거 없음 배너가 없고 도구 답(<code>kev_list</code>)이라 제품 갈래입니다</span></div>
+        <div class="sec-h">그때 나간 답</div>
+        <div class="dt-evid">사내 KEV 대상은 <b>18건</b>입니다. …</div>
+        <div class="sec-h">담당자가 적은 것</div>
+        <div class="dt-evid">화면에는 12건인데 답은 18건이라고 합니다.<br><b>아는 정답</b> — 12건</div>
+
+        <div class="sec-h">갈래</div>
+        <div style="display:flex;gap:6px;margin-bottom:12px">
+          <span class="fchip">자료 부족</span><span class="fchip">사내 규정</span><span class="fchip on">제품</span>
+        </div>
+        <div class="hint" style="margin:-8px 0 12px">갈래는 <b>담당자만</b> 바꿉니다. AI는 못 바꿉니다.</div>
+
+        <div class="sec-h">AI 초안 <span style="font-weight:600;text-transform:none;letter-spacing:0">— 누를 때만 만듭니다</span></div>
+        <div class="dt-evid" style="border-color:rgba(139,124,240,.3);background:rgba(139,124,240,.06)">
+          <b style="color:var(--purple-ink,#b6a9ff)">🤖 한 줄 사유</b> — 도구 <code>kev_list</code>가 「해결됨」 건까지 세는 것으로 보입니다.
+          답에는 근거 없음 배너가 없어 자료 문제가 아닙니다.<br>
+          <b style="color:var(--purple-ink,#b6a9ff)">🤖 회귀 문항 초안</b> —
+          <code>{"id":"feedback-41","q":"KEV 목록 몇 건이야?","expect":["12"]}</code>
+          <div class="hint">사람이 고쳐서 씁니다. 이대로 편입되지 않습니다.</div>
+        </div>
+
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <button class="btn">🤖 초안 만들기</button>
+          <button class="btn pri">개발팀으로 보냄(처리)</button>
+          <button class="btn">문항 감 아님(접기)</button>
+        </div>
+        <div class="hint">「자료 부족」 갈래에서는 왼쪽 버튼이 <b>「＋ 자료 올리기」</b>,
+          「사내 규정」에서는 <b>「승인 문답 고치기」</b>로 바뀝니다 — 갈래마다 <b>닫는 길이 하나</b>씩 있습니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>④ 밀도 숫자</h2>
+<div class="warn">
+  ⚠ <b>아래 px는 이 목업에서 잰 값이다</b>(설치본을 못 여는 상태라 실측 불가).
+  <b>제품에서 다시 잰다</b> — 「실측 없이 줄었다·늘었다 금지」(정적 분석 2회 오판 전례).
+  다만 폭(1132px)·글자 크기·padding·line-height는 <b>제품 소스에서 그대로 옮긴 값</b>이라
+  줄바꿈이 같은 자리에서 일어난다.
+  <br>⚠ <b>이 시안 자체의 자를 한 번 검증한다</b> — 실물 구역에 <code>line-height:normal</code>을 걸어
+  문서 껍데기의 1.7이 안 새게 했다(안 걸면 <code>.sup-line</code>이 31.0 → 34.7px로 부푼다).
+  <b>첫 줄의 <code>.sup-line</code> 값이 제품 주석의 31.0px 근처가 아니면 아래 숫자를 전부 버린다</b> —
+  자가 틀린 상태로 「줄었다」를 말하지 않는다.
+</div>
+<table>
+<tr><th style="width:300px">잣대</th><th style="width:120px">값</th><th>근거 · 비교</th></tr>
+<tr><td>기존 <code>.sup-line</code> 줄 높이</td><td class="mnum" id="mSup">–</td>
+  <td>제품 주석의 실측 <b>31.0px</b>과 대조한다(supervision.html ✂ 사유 토글 주석). 같으면 이 목업의 자가 맞다.</td></tr>
+<tr><td>새 <code>.fx-row</code> 줄 높이</td><td class="mnum" id="mRow">–</td>
+  <td><b>목표: 「실동작 기록」 행 이하.</b> 그 행 = <code>.terminal</code> 12.5px × line-height 1.9 = <b>23.75px</b>
+    (agent.html 86줄). <span id="mRowVerdict"></span></td></tr>
+<tr><td>새 구역 — 접힘</td><td class="mnum" id="mFoldClosed">–</td>
+  <td>fold.js 머리 <code>.gjf-h</code>만(padding 5+5 · border 2 · 12.5px 글줄 · margin-bottom 5). 제품 주석의 <b>32px 남짓</b>과 대조.</td></tr>
+<tr><td>새 구역 — 펼침(집계 1줄 + 5행 + 안내)</td><td class="mnum" id="mFoldOpen">–</td><td>「제품 열림 ≥ 1」이면 이 높이로 뜬다.</td></tr>
+<tr><td>감독 화면 세로 총합 — <b>지금</b></td><td class="mnum" id="mNow">–</td><td>「감독 관점」 판만(위 KPI·팀 카드는 안 건드리므로 뺐다)</td></tr>
+<tr><td>감독 화면 세로 총합 — <b>제안(펼침)</b></td><td class="mnum" id="mNew">–</td><td class="mnum" id="mDelta">–</td></tr>
+<tr><td>감독 화면 세로 총합 — <b>제안(접힘)</b></td><td class="mnum" id="mNewClosed">–</td><td class="mnum" id="mDeltaClosed">–</td></tr>
+<tr><td>결재판 칩줄</td><td class="mnum" id="mChips">–</td>
+  <td>기존 9칩 → <b>12칩 + 가름줄</b>. 1132px에서 <span id="mChipWrap"></span></td></tr>
+</table>
+<p>
+  <b>세로가 느는 것을 숨기지 않는다.</b> 이 구역은 <b>없던 정보를 새로 보여 주는 것</b>이라
+  0px으로는 못 만든다. 대신 ⓐ 접힘 기본값을 두어 평소엔 머리 한 줄만 먹고,
+  ⓑ 행 높이를 화면에서 <b>가장 촘촘한 행(실동작 기록)</b> 이하로 잡고,
+  ⓒ 최근을 <b>5행으로 못 박아</b> 늘어나지 않게 한다(전체는 결재판에서 본다).
+</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>⑤ 구현 때 만질 자리</h2>
+<table>
+<tr><th style="width:250px">파일</th><th style="width:200px">함수·자리</th><th>무엇을</th></tr>
+<tr><td><code>server/src/engine/fixboard.ts</code> <b>(새 파일)</b></td>
+  <td><code>고칠것갈래()</code> · <code>고칠것요약()</code></td>
+  <td><b>잣대 한 곳.</b> 갈래 판정 순수 함수 + 기간별 집계. <code>docorigin.ts</code>처럼 <b>import 0에 가까운 잎</b>으로
+    (<code>noevidence</code>만 쓴다). <code>answerfeedback.ts</code>에 넣지 않는 이유: 그 파일은 표·라우트를 갖고,
+    갈래는 <b>감독 화면·결재판·대화 도구 셋이 같이 쓸 잣대</b>라 잎으로 빼야 셋이 안 어긋난다.</td></tr>
+<tr><td><code>server/src/engine/answerfeedback.ts</code></td>
+  <td><code>migrate("answer-feedback-fixkind-2026-09-…")</code></td>
+  <td><code>ALTER TABLE answer_feedback ADD COLUMN fixkind TEXT</code>(doc·rule·prod, NULL 허용).
+    <b>기존 행은 NULL</b> — 읽을 때 <code>고칠것갈래()</code>로 채워 보여 준다(소급 UPDATE 안 한다: 옛 답 본문으로
+    다시 판정하는 것이 더 정직하고, 사람이 고친 갈래를 덮어쓸 위험이 없다).</td></tr>
+<tr><td>〃</td><td><code>recordFeedback()</code></td>
+  <td>넣을 때 <code>fixkind = 고칠것갈래(e.answer)</code>를 <b>같은 INSERT에</b> 담는다.
+    LLM을 <b>안 부른다</b>(규칙만).</td></tr>
+<tr><td>〃</td><td><code>listFeedback()</code></td><td><code>fixkind</code> 필터 인자 추가(없으면 종전 그대로).</td></tr>
+<tr><td>〃</td><td><code>setFeedbackStatus()</code> 옆에 <code>setFeedbackKind()</code></td>
+  <td>담당자가 갈래를 바꾼다. <code>recordAudit</code>에 <b>「누가 무엇에서 무엇으로」</b>를 남긴다
+    (기존 <code>setFeedbackStatus</code>와 같은 꼴).</td></tr>
+<tr><td>〃</td><td><code>registerAnswerFeedbackRoutes()</code></td>
+  <td><code>POST /api/answer-feedback/:id/fixkind</code> 추가(없는 id는 <b>404</b> — 종전 status 라우트와 같은 규약).
+    <b>새 API 묶음을 만들지 않는다.</b></td></tr>
+<tr><td>〃</td><td>status 값</td>
+  <td><b>결정 필요</b> — <code>open|promoted|dismissed</code>에 <code>resolved</code>(처리됨)를 더할지.
+    「문서를 올려 닫았다」는 <code>promoted</code>(회귀 문항 편입)도 <code>dismissed</code>(부적합)도 아니다.
+    <b>추천: 더한다</b>(한 줄 + 시험 한 줄). ⑧·open question ① 참조.</td></tr>
+<tr><td><code>server/src/engine/llmactivity.ts</code></td>
+  <td><code>registerLlmActivityRoutes()</code> → <code>/api/aiteam/supervision</code></td>
+  <td>응답에 <code>fixboard</code> 칸 하나 추가(<code>citeReasons</code> 선례 그대로 — <b>새 API 안 만든다</b>).
+    값은 <code>고칠것요약(days)</code>.
+    <b class="k">⚠ <code>LlmActivityEvent.kind</code>는 안 건드린다</b> — <code>wiringcontract.test</code>가
+    <code>"search" | "guard"</code> 연접을 <b>글자로</b> 본다. 「고칠 것」은 실시간 이벤트가 아니라
+    <b>사람이 누른 표</b>라 애초에 그 스트림에 실을 것이 아니다.</td></tr>
+<tr><td><code>client/src/api/knowledge.ts</code></td><td><code>answerFeedbackApi</code></td>
+  <td><code>setStatus</code> · <code>setKind</code> · <code>draft</code> 추가(<code>list</code>는 <b>이미 있다</b>).</td></tr>
+<tr><td><code>client/src/preload.ts</code></td><td>455줄 근처</td>
+  <td><code>listAnswerFeedback</code> · <code>setAnswerFeedbackStatus</code> · <code>setAnswerFeedbackKind</code> ·
+    <code>answerFeedbackDraft</code> 내보내기. <b>지금은 <code>sendAnswerFeedback</code> 하나뿐이라
+    어떤 화면도 이 표를 못 읽는다</b> — 이 줄이 빠지면 화면이 통째로 죽는다.</td></tr>
+<tr><td><code>client/src/renderer/pages/supervision.html</code></td>
+  <td><code>load()</code> 끝 + 새 <code>고칠것그리기()</code></td>
+  <td>「감독 관점」 판 <b>아래</b>에 <code>data-gijo-fold</code> 구역 하나.
+    <b>기간은 화면의 <code>days</code>를 그대로 쓴다</b>(새 기간 칩 안 만든다).
+    <code>#range</code> 클릭 핸들러가 이미 <code>load()</code>를 다시 부르므로 <b>배선 추가 없음</b>.</td></tr>
+<tr><td>〃</td><td><code>&lt;script src="fold.js"&gt;</code></td>
+  <td><b>지금 이 화면은 fold.js를 안 싣는다</b> — 한 줄 추가. ⚠ 안 실으면 <code>data-gijo-fold</code>가
+    <b>조용히 아무 일도 안 한다</b>(구역이 늘 펼쳐진 채로 뜨고 배지도 안 뜬다 —
+    「부품 로드 누락 5화면 = 거짓 초록」 전례).</td></tr>
+<tr><td><code>client/src/renderer/pages/approvals.html</code></td>
+  <td><code>#rvFilt</code> · <code>loadReviews()</code> · <code>renderList()</code> · <code>renderDetail()</code> · <code>init()</code></td>
+  <td>칩 3개 + <b>두 번째 원장</b>(<code>allFix</code>)을 나란히 둔다.
+    <b>⚠ <code>matchFilter</code>·심각도 셈·VEX 칩은 <code>allReviews</code>만 본다</b> —
+    두 배열을 절대 합치지 않는다(①의 다섯 가지가 그래서 안 깨진다).
+    <code>?fix=</code> 쿼리 처리는 기존 <code>?status=</code> 블록 <b>바로 아래</b>에 같은 꼴로
+    (「화면에 실제로 있는 칩만 받는다」 규약 그대로).</td></tr>
+<tr><td><code>server/src/engine/screenguide.ts</code></td>
+  <td><code>"supervision.html"</code> · <code>"approvals.html"</code>의 <code>panels</code></td>
+  <td>설명은 <b>전부 여기</b>(화면엔 정체성 한 줄과 ⚠만).
+    <b>⚠ 서버 먼저 배포 → 클라 게시를 같은 라운드로 짝지을 것</b> — 그 사이엔 안내만 맞는 말을 한다
+    (2026-09-06 검토관 gate가 짚은 자리).</td></tr>
+<tr><td><code>server/src/engine/datacard.ts</code></td>
+  <td><code>supervisionStatusAnswer()</code></td>
+  <td><b>선택.</b> KPI 4칸은 <b>안 늘린다</b>(골든 시그널 넷이 계약).
+    「고칠 것 알려줘」는 <b>기존 도구 <code>answer_feedback_status</code></b>가 이미 답한다 —
+    <code>feedbackSummaryText</code>에 갈래별 줄만 더한다. <b>새 도구·새 카드 안 만든다.</b></td></tr>
+<tr><td><b>2단계(선택 · 이번 아님)</b></td><td><code>console.js</code> · <code>answerfeedback.ts</code></td>
+  <td>「사내 규정」 자동 후보를 만들려면 지적 접수 때 <b>그 답이 인용한 문서 목록</b>을 함께 보내
+    <code>sources</code> 칸에 담아야 한다. <b>producer를 먼저 만들고</b> 그 다음에 규칙을 쓴다 —
+    순서를 뒤집으면 「소비자만 있고 생산자 없는 값」이 또 생긴다.</td></tr>
+</table>
+
+<h3>결재판 항목의 승인·반려가 무엇을 일으키나 (생산자 → 소비자)</h3>
+<table>
+<tr><th style="width:150px">원장</th><th style="width:180px">담당자 조작</th><th>일어나는 일 (실코드)</th></tr>
+<tr><td rowspan="4"><b>기존</b><br><code>finding_approvals</code></td>
+  <td>승인(<code>approved</code>)</td>
+  <td><code>resolvedAt</code> 기록 · <code>isOverdueReview</code> 제외 ·
+    <code>vexexport</code> → <code>fixed</code> · SBOM 취약점에서 <b>안 빠진다</b>(반려만 뺀다)</td></tr>
+<tr><td>반려(<code>rejected</code>)</td>
+  <td><code>sbom.ts</code> 148·386줄이 <b>SBOM 문서에서 뺀다</b> ·
+    <code>vexexport</code> → <code>not_affected</code>(<b>사유가 있을 때만</b>, 없으면 <code>under_investigation</code>으로 낮춘다)</td></tr>
+<tr><td>위험수용(<code>accepted</code>)</td><td><code>vexexport</code> → <code>affected</code>(실재하므로) · <code>acceptUntil</code> 만료 시 재부상</td></tr>
+<tr><td>배정·기한</td><td><code>isUnassignedReview</code>·<code>isOverdueReview</code> 셈 · 메일 발송(<code>/notify</code>)</td></tr>
+<tr><td rowspan="4"><b>새로</b><br><code>answer_feedback</code></td>
+  <td>갈래 바꾸기</td><td><code>fixkind</code> 갱신 · 감사 기록 · <b>감독 판 집계가 그대로 따라 움직인다</b>(원천 하나)</td></tr>
+<tr><td>개발팀으로 보냄</td><td><code>status=promoted</code> ·
+  <code>feedbackAsGateCases()</code>가 <b>이미</b> 이 상태를 걸러 문항 초안을 낸다(<code>open</code>만 낸다 — ⑧ 참조)</td></tr>
+<tr><td>처리됨(자료 올림·규정 고침)</td><td><code>status=resolved</code>(신설 제안) · 감독 판 <b>열림 → 닫힘</b></td></tr>
+<tr><td>문항 감 아님</td><td><code>status=dismissed</code> · 지적은 <b>안 지운다</b>(그 파일의 설계 원칙 1)</td></tr>
+<tr><td colspan="3"><b>두 원장은 서로를 안 본다.</b> 「고칠 것」 처리가 SBOM·VEX·심각도·SLA를 <b>한 칸도</b> 바꾸지 않는다 — 이것이 표를 가른 값어치다.</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>⑥ 짝 시험 — 「그 값을 누가 넣는가」 위주</h2>
+<table>
+<tr><th style="width:280px">시험</th><th>무엇을 지키나</th></tr>
+<tr><td><code>server/test/fixboard.test.ts</code> ⓐ</td>
+  <td><b>갈래 판정 순수 함수.</b> 배너 5종이 붙은 답 → 전부 <code>doc</code>.
+    배너 없는 답 → <code>prod</code>. <code>rule</code>은 <b>어떤 입력으로도 자동으로 안 나온다</b>
+    (사람만 정한다는 계약을 코드로 못 박는다).</td></tr>
+<tr><td>〃 ⓑ <b>원천 대조</b></td>
+  <td>판정에 쓰는 배너 상수가 <code>noevidence.ts</code>의 것과 <b>같은 객체</b>인지.
+    글자를 베껴 적으면 두 곳이 따로 늙는다(✂ 사유 상수가 겪은 자리).</td></tr>
+<tr><td>〃 ⓒ <b>생산자 검사</b></td>
+  <td><code>console.js</code> 소스에 <code>attachFlag(replyEl, text, (r &amp;&amp; r.output)</code>가 <b>있는지</b> 글자로 본다.
+    이 인자가 바뀌면(예: 렌더된 HTML을 보내면) <b>배너가 앞머리에 없어져 분류가 전부 <code>prod</code>로 샌다</b> —
+    코드는 안 죽고 <b>숫자만 조용히 거짓</b>이 되는 부류라 시험이 유일한 방어다.</td></tr>
+<tr><td><code>server/test/answerfeedback.test.ts</code> 확장 ⓓ</td>
+  <td><code>recordFeedback</code>이 <code>fixkind</code>를 <b>같은 INSERT에</b> 넣는지.
+    <b>NULL로 새는 경로가 없는지</b>(넣는 자리가 하나뿐임을 확인).</td></tr>
+<tr><td>〃 ⓔ</td>
+  <td><code>fixkind</code> 라우트가 없는 id에 <b>404</b>를 준다(status 라우트와 같은 규약 — 200이면 화면이 처리된 줄 안다).
+    허용 값 밖이면 <b>400</b>.</td></tr>
+<tr><td>〃 ⓕ <b>상태 계약</b></td>
+  <td><code>resolved</code>를 더했다면 <code>feedbackAsGateCases()</code>가 그 행을 <b>안 낸다</b>(<code>open</code>만 낸다).
+    안 지키면 이미 닫은 지적이 회귀 문항으로 되살아난다.</td></tr>
+<tr><td><code>server/test/supervisionfix.test.ts</code> ⓖ</td>
+  <td><code>/api/aiteam/supervision</code> 응답에 <code>fixboard</code> 칸이 있고,
+    그 안의 열림 수 = <code>listFeedback(days,"open")</code>의 갈래별 수와 <b>정확히 같은지</b>.
+    <b>「200 OK」로 통과시키지 않는다</b> — 값을 대조한다(scope 사고 계열).</td></tr>
+<tr><td>〃 ⓗ <b>잣대 하나</b></td>
+  <td>감독 판 집계와 결재판 칩 숫자가 <b>같은 함수</b>(<code>고칠것요약</code>)에서 나오는지.
+    두 곳에서 따로 세면 「위에는 3인데 아래는 605줄」이 재발한다(approvals.ts 435줄 주석의 그 사고).</td></tr>
+<tr><td><code>server/test/wiringcontract.test.ts</code> ⓘ</td>
+  <td><b>손대지 않는다.</b> 새 <code>.html</code>이 없으므로 선택 배선 대장이 안 바뀐다 —
+    <b>이 시험이 초록인 채로 지나가는 것 자체가 「새 화면 안 만들었다」의 증거</b>다.</td></tr>
+<tr><td><code>server/test/screenguide.test.ts</code> ⓙ</td>
+  <td>새 <code>panels</code> 항목이 <b>실제 화면에 있는 것</b>만 말하는지.
+    「저절로 펼쳐집니다」라고 적었으면 화면의 펼침 조건에 그 값이 실제로 있어야 한다
+    (<code>supervisioncite.test</code> ⓕ④와 같은 방식).</td></tr>
+<tr><td><code>server/test/approvals.test.ts</code> 확장 ⓚ</td>
+  <td><b>오염 없음.</b> <code>answer_feedback</code>에 행을 잔뜩 넣어도
+    <code>/api/approvals</code>의 <code>summary</code>·<code>reviews</code> 수가 <b>한 칸도 안 변하는지</b>.
+    <code>isFindingRejected</code>·<code>vexSummary</code>도 그대로인지.</td></tr>
+<tr><td><b>클라 소스 감시</b> ⓛ</td>
+  <td><code>supervision.html</code>이 <code>fold.js</code>를 <b>싣는지</b>를 글자로 본다.
+    <code>data-gijo-fold</code>를 쓰면서 부품을 안 실으면 <b>조용히 아무 일도 안 한다</b>
+    (5화면 거짓 초록 전례 — 세 번째면 소스 감시).</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>⑦ 라이트 / 표준 영향</h2>
+<p>
+  <b>라이트: 영향 없음(이번엔).</b> <code>lite-screens.json</code>에 <code>supervision.html</code>·<code>approvals.html</code>이
+  없고 라이트 대화창에는 지적 버튼 흐름이 안 붙는다. 다만 <b>뿌리가 공용 파일</b>이다
+  (<code>answerfeedback.ts</code>·<code>noevidence.ts</code>·<code>llmactivity.ts</code>) — 라이트를 켤 때
+  <code>answer_feedback</code> 표는 그대로 생기므로 <b>스키마 변경은 라이트에도 간다</b>(빈 칸 하나 느는 것뿐).
+  <b>표준: 그대로 얻는다</b> — 두 화면 다 표준에 있고 프로는 카드/도킹으로 같은 화면을 연다.
+  프로 셸 기준으로 설계했고(카드 계약 안 건드림), 표준은 <b>같은 화면을 그대로</b> 쓴다.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>⑧ 결재판 항목 종류 — 기존 것과 같은 꼴인가</h2>
+<p>코드에서 확인한 <b>기존 종류·상태</b>와 나란히 놓는다.</p>
+<table>
+<tr><th style="width:170px">축</th><th style="width:330px">기존(<code>approvals.ts</code>)</th><th>새로(<code>answerfeedback.ts</code>)</th></tr>
+<tr><td><b>항목 키</b></td><td><code>(assetId, findingKey)</code> — 내용 해시</td><td><code>id</code> — AUTOINCREMENT <b>(다른 꼴)</b></td></tr>
+<tr><td><b>「종류」 칸</b></td><td><b>없다.</b> 종류 대신 <code>rejectReason</code>(<code>false_positive</code>·<code>compensating_control</code>)</td>
+  <td><code>kind</code>(wrong·missing·style)가 <b>이미 있고</b>,
+    이 시안이 더하는 것은 <b><code>fixkind</code>(doc·rule·prod) 하나</b></td></tr>
+<tr><td><b>상태</b></td><td><code>ApprovalStatus</code> 6종<br><code>pending → in_progress → verifying → approved</code> / <code>rejected</code> / <code>accepted</code></td>
+  <td><code>open → promoted</code> / <code>dismissed</code> (+ <code>resolved</code> 제안)<br><b>3~4종 — 더 짧다</b></td></tr>
+<tr><td><b>승인의 뜻</b></td><td>「고쳤다·해결됐다」 — 재스캔으로 <b>사라져야</b> 완료</td>
+  <td>「받아들여 처리했다」 — <b>재스캔 개념이 없다</b></td></tr>
+<tr><td><b>SLA(담당·기한)</b></td><td>있다(<code>assignee</code>·<code>dueDate</code>·<code>overdue</code>)</td><td><b>없다.</b> 이번에 안 만든다 — 없는 SLA를 흉내 내면 「지연 0건」이 거짓말이 된다</td></tr>
+<tr><td><b>바깥으로 나가나</b></td><td>나간다 — SBOM·VEX·메일</td><td><b>안 나간다.</b> 회귀 문항 초안만(사람이 옮긴다)</td></tr>
+</table>
+<div class="warn">
+  <b>정직한 답: 「완전히 같은 꼴」은 아니다.</b> 둘은 <b>화면 언어</b>(칩으로 거르고 · 왼쪽 목록 · 오른쪽 상세 ·
+  버튼으로 상태 바꾸기 · 감사 기록)는 같지만, <b>항목 모델은 다르다</b>.
+  <br>→ 그래서 이 시안은 <b>「결재판 화면의 항목 종류를 늘린다」</b>로 읽고 구현한다.
+  「결재판 표의 행 종류를 늘린다」로 읽으면 ①의 다섯 가지가 깨진다.
+  <br>→ 사장님께 드릴 결정: <b><code>resolved</code> 상태를 더할까</b>(추천: 예).
+  안 더하면 「문서를 올려 닫았다」를 <code>promoted</code>(회귀 문항 편입)라고 <b>거짓으로</b> 적게 된다.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>제품 원칙 자가점검</h2>
+<table>
+<tr><th style="width:280px">원칙</th><th style="width:70px">판정</th><th>근거</th></tr>
+<tr><td>메뉴는 보기용 — 새 화면에 입력칸 금지</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>감독 화면 새 구역에 입력칸 <b>0개</b>. 조작은 「🗔 결재판에서 처리」 <b>이동 버튼 하나</b>뿐.
+    입력은 <b>결재판</b>에서만 — 승인·수정 입력이 원래 있는 창구다.</td></tr>
+<tr><td>지시는 대화창에서만</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>지적을 <b>넣는</b> 자리는 종전대로 대화창(<code>console.js</code>)뿐. 감독 화면은 <b>새로 안 만든다</b>.
+    갈래 바꾸기는 지시가 아니라 <b>결재 판정</b>이라 결재판이 맞는 자리.</td></tr>
+<tr><td>화면 설명은 screenguide + ⓘ</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>화면엔 <b>정체성 한 줄</b>(「항목은 결재판에 있습니다 — 여기서는 보기만」)만.
+    갈래 뜻·닫는 법·왜 자동 분류를 안 하는지는 전부 <code>screenguide.ts</code> <code>panels</code>로.</td></tr>
+<tr><td>프로 셸 우선</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>두 화면 다 프로 셸이 카드·도킹으로 여는 자산. <b>카드 계약(11종)·dock 5곳을 안 건드린다</b> —
+    새 카드도 새 <code>screenCard</code>도 만들지 않는다.</td></tr>
+<tr><td>엑셀처럼 촘촘</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>행 <span class="mnum" id="pRow">–</span>px — 화면에서 <b>가장 촘촘한 행</b>(실동작 기록 23.75px) 이하.
+    최근은 <b>5행 고정</b>.</td></tr>
+<tr><td>새 색 토큰 금지</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>새 CSS 변수 <b>0개</b>. <code>--teal</code>·<code>--purple(-ink)</code>·<code>--amber</code>를
+    <code>.tag.cite</code>가 쓰는 <b>같은 rgba 패턴</b>으로 재사용.</td></tr>
+<tr><td><code>window.confirm</code> 금지</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>확인 대화 <b>0개</b>. 「개발팀으로 보냄」은 상태 바꾸기라 되돌릴 수 있다(칩으로 다시 <code>open</code>).</td></tr>
+<tr><td>가짜 UI 금지 — 모든 칸에 생산자</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>위 「생산자 → 소비자」 표. <b>생산자를 못 찾은 칸(사내 규정 자동 분류)은 만들지 않았다</b> —
+    사람이 고르게 두고, 그 사실을 화면에 적는다.</td></tr>
+<tr><td>정직 — 0건은 「없습니다」</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>0이어도 구역을 숨기지 않는다(「기능이 안 도는 것」과 구분).
+    <b>「지적 없음」과 「지적 기능이 죽음」이 화면에서 달라 보인다.</b></td></tr>
+<tr><td>LLM이 결론을 못 낸다</td><td><b style="color:var(--teal)">지킴</b></td>
+  <td>LLM 출력은 <b>사유 한 줄 + 초안</b>뿐이고 화면에 <b>🤖 표시</b>가 붙는다.
+    갈래·상태는 규칙과 사람만. 짝 시험 ⓐ가 <code>rule</code>이 자동으로 안 나오는 것을 못 박는다.</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2>다른 화면·부품 계약에 걸리나 — 소스로 확인</h2>
+<table>
+<tr><th style="width:250px">계약</th><th style="width:80px">걸리나</th><th>이유</th></tr>
+<tr><td><code>wiringcontract.test</code> 선택 배선 대장</td><td><b style="color:var(--teal)">안 걸림</b></td>
+  <td>새 <code>.html</code>이 없다. <code>supervision.html</code>은 이미 <b>"부품"</b>으로 분류돼 있고
+    팀원 카드 클릭 📌 배선을 <b>안 건드린다</b>.</td></tr>
+<tr><td><code>wiringcontract</code> — <code>navigateTo</code> 동결 대장</td><td><b style="color:var(--teal)">안 걸림</b></td>
+  <td><code>navigateTo</code>를 안 쓴다. 셸 통로(<code>window.top.postMessage gijo:openTab</code>)만 쓴다 —
+    같은 화면의 <code>goRedteam</code>과 <b>같은 꼴</b>.</td></tr>
+<tr><td><code>grouppanels.js</code> 「3줄 고정」(<code>safety</code> 판)</td><td><b style="color:var(--teal)">안 걸림</b></td>
+  <td>판 카드는 <b>3줄 그대로</b> 둔다(팀·감독 / 가드레일 / 모의 공격).
+    4줄이면 <code>foot</code>가 잘린다는 검토관 하1 계약이 그대로 산다.
+    <b>「고칠 것」은 판 요약에 안 올린다</b> — 무대(화면)에서만 보인다.</td></tr>
+<tr><td><code>datacard.ts</code> AI 팀 감독 카드 KPI 4칸</td><td><b style="color:var(--teal)">안 걸림</b></td>
+  <td>골든 시그널 4칸을 <b>안 늘린다</b>. 「고칠 것」은 <b>기존 도구</b>
+    <code>answer_feedback_status</code>가 답한다.</td></tr>
+<tr><td><code>llmactivity.ts</code> <code>kind</code> 연접 감시</td><td><b style="color:var(--teal)">안 걸림</b></td>
+  <td><code>kind</code>에 새 값을 <b>안 넣는다</b>. 응답 <b>칸</b>만 는다(<code>citeReasons</code> 선례).</td></tr>
+<tr><td><code>nav.js</code> <code>TAB_REDIRECT</code></td><td><b style="color:var(--teal)">안 걸림</b></td>
+  <td>표를 <b>한 줄도 안 고친다</b>. <code>?fix=</code> 쿼리가 붙으면 1714줄 규칙이 흡수를 건너뛴다.</td></tr>
+<tr><td><code>vexexport</code>·<code>sbom</code>·심각도 셈</td><td><b style="color:var(--teal)">안 걸림</b></td>
+  <td>두 원장을 안 합치기 때문. 짝 시험 ⓚ가 <b>값으로</b> 지킨다.</td></tr>
+<tr><td>게시 관문(실화면 9227)</td><td><b>영향 있음</b></td>
+  <td>감독 화면·결재판 <b>둘 다</b> 실화면 확인 대상이다.
+    <b>순서: 서버 배포 → 클라 게시</b>(<code>screenguide</code> 안내가 화면 동작에 의존).</td></tr>
+<tr><td><code>fold.js</code> 접기 계약</td><td><b>쓴다(새 규칙 없음)</b></td>
+  <td>「위험 신호가 있으면 접힌 구역도 다시 펼친다」를 <b>그대로 이용</b>한다.
+    ⚠ <code>supervision.html</code>에 <code>fold.js</code> <code>&lt;script&gt;</code>를 <b>추가해야 한다</b>(지금 없다).</td></tr>
+</table>
+
+<p class="note" style="margin-top:26px">
+  시안 끝. 승인해 주시면 <b>설계관(gijo-architect)</b>에 태운 뒤 구현합니다
+  (사슬: 시안 → 설계관 → 구현 → 병렬 검토관 → 수리 → 게이트 → 배포 → 관문 → 게시).
+</p>
+
+</div>
+
+<script>
+/* 이 스크립트는 **자기 높이를 재는 것**만 한다 — 제품 동작 흉내 없음, 외부 자원 0. */
+(function () {
+  function h(el) { return el ? Math.round(el.getBoundingClientRect().height * 10) / 10 : 0; }
+  function put(id, v, unit) { var e = document.getElementById(id); if (e) e.textContent = v + (unit === undefined ? "px" : unit); }
+
+  var supH = h(document.getElementById("probeSupLine"));
+  var rowH = h(document.querySelector("#fxRows .fx-row"));
+  var headH = h(document.getElementById("fxHead"));
+  // 접힘 = 머리 + 아래 여백(fold.js .gjf-h margin-bottom:5px)
+  var foldClosed = Math.round((headH + 5) * 10) / 10;
+  var foldOpen = h(document.getElementById("fxSection"));
+  var nowH = h(document.getElementById("nowPanel"));
+  var newOpen = Math.round((nowH + 12 + foldOpen) * 10) / 10;   // 12 = 판 사이 여백
+  var newClosed = Math.round((nowH + 12 + foldClosed) * 10) / 10;
+  var chipRow = document.querySelector(".real .fchip");
+  var chipBox = chipRow ? chipRow.parentNode : null;
+  var chipsHeight = h(chipBox);
+  var oneChip = h(chipRow);
+
+  put("mSup", supH);
+  put("mRow", rowH);
+  put("mFoldClosed", foldClosed);
+  put("mFoldOpen", foldOpen);
+  put("mNow", nowH);
+  put("mNew", newOpen);
+  put("mNewClosed", newClosed);
+  put("mChips", chipsHeight);
+  put("pRow", rowH, "");
+
+  var d1 = Math.round((newOpen - nowH) * 10) / 10;
+  var d2 = Math.round((newClosed - nowH) * 10) / 10;
+  put("mDelta", "+" + d1 + "px (" + Math.round(d1 / nowH * 100) + "%) — 없던 정보가 생긴 몫");
+  put("mDeltaClosed", "+" + d2 + "px (" + Math.round(d2 / nowH * 100) + "%) — 평소 상태");
+
+  var v = document.getElementById("mRowVerdict");
+  if (v) {
+    v.textContent = rowH <= 23.75
+      ? "→ " + rowH + "px ≤ 23.75px · 목표 충족(목업 값)"
+      : "→ " + rowH + "px > 23.75px · 목표 미달 — 구현 때 line-height를 더 줄인다";
+    v.style.color = rowH <= 23.75 ? "var(--teal)" : "var(--amber)";
+  }
+  var w = document.getElementById("mChipWrap");
+  if (w && chipBox && oneChip > 0) {
+    // 칩 한 개 높이로 나눠 줄 수를 센다 — 상수(32)로 나누면 칩 padding이 바뀔 때 조용히 틀린다.
+    var lines = Math.max(1, Math.round(chipsHeight / oneChip));
+    w.textContent = lines <= 1 ? "한 줄에 들어간다(줄바꿈 없음 · 칩 " + oneChip + "px)" : "약 " + lines + "줄로 감긴다 — 구현 때 확인";
+    w.style.color = lines <= 1 ? "var(--teal)" : "var(--amber)";
+  }
+})();
+</script>
+</body>
+</html>

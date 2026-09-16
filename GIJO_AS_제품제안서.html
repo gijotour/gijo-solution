@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIJO AS — 제품 제안서 (AI Security Manager US)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <style>
+    :root {
+      --bg: #070b14;
+      --bg-card: #0e172a;
+      --bg-card-hover: #131f38;
+      --border: rgba(255, 255, 255, 0.1);
+      --border-blue: rgba(59, 130, 246, 0.4);
+      --blue: #3b82f6;
+      --blue-light: #60a5fa;
+      --cyan: #38bdf8;
+      --teal: #14b8a6;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
+        radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 24px 24px;
+    }
+
+    .container {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(180deg, rgba(14, 23, 42, 0.9) 0%, rgba(10, 15, 30, 0.95) 100%);
+      border: 1px solid var(--border-blue);
+      border-radius: 24px;
+      padding: 36px 40px;
+      margin-bottom: 28px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand-tag {
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--blue-light);
+      background: rgba(59, 130, 246, 0.15);
+      padding: 7px 16px;
+      border-radius: 100px;
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+    }
+
+    .meta-tag {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--green);
+      background: rgba(16, 185, 129, 0.12);
+      padding: 7px 16px;
+      border-radius: 100px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .meta-tag::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    .title {
+      font-size: 36px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Main Slogan Banner */
+    .slogan-banner {
+      background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.15), transparent), linear-gradient(135deg, #0b1329 0%, #0f172a 100%);
+      border: 1.5px solid var(--border-blue);
+      border-radius: 18px;
+      padding: 26px 32px;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .slogan-main {
+      font-size: 25px;
+      font-weight: 900;
+      color: var(--cyan);
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slogan-sub-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .slogan-box {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 18px 22px;
+      font-size: 14.5px;
+      line-height: 1.6;
+      transition: all 0.2s;
+    }
+
+    .slogan-box:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: var(--border-blue);
+    }
+
+    .slogan-box strong {
+      color: #ffffff;
+      font-size: 16px;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .slogan-box span {
+      color: var(--text-muted);
+    }
+
+    /* Tabs Navigation */
+    .tabs-wrapper {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 28px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      background: rgba(14, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 14px 26px;
+      border-radius: 14px 14px 0 0;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.25s;
+      white-space: nowrap;
+      margin-bottom: -1px;
+      backdrop-filter: blur(8px);
+    }
+
+    .tab-btn:hover {
+      border-color: var(--blue-light);
+      color: var(--blue-light);
+      background: rgba(30, 41, 59, 0.8);
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+      border-color: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 -4px 16px rgba(37, 99, 235, 0.4);
+    }
+
+    /* Content Layout */
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 28px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+    }
+
+    /* Grid & Cards */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      gap: 22px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 22px;
+    }
+
+    .sub-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      transition: all 0.25s ease;
+    }
+
+    .sub-card:hover {
+      border-color: var(--border-blue);
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .sub-card-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sub-card-desc {
+      font-size: 14.5px;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .tag-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .badge-blue { background: rgba(59, 130, 246, 0.2); color: var(--blue-light); border: 1px solid rgba(59, 130, 246, 0.4); }
+    .badge-amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-teal { background: rgba(20, 184, 166, 0.2); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.4); }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-purple { background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4); }
+
+    /* UI Screenshot Preview Card (DARK LUXURY UI) */
+    .screenshot-card {
+      background: #060b17;
+      border: 1.5px solid var(--border-blue);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    .screenshot-header {
+      background: #0c1427;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .screenshot-body {
+      padding: 20px;
+      text-align: center;
+      background: #020611;
+    }
+
+    .screenshot-body img {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    .screenshot-desc {
+      padding: 22px 28px;
+      background: #091021;
+      color: var(--text);
+      font-size: 14.5px;
+      line-height: 1.7;
+      border-top: 1px solid var(--border);
+    }
+
+    .screenshot-desc strong {
+      color: var(--cyan);
+    }
+
+    /* Interactive Menu Badges Grid */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .menu-item {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .menu-item:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--blue-light);
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+
+    /* Comparison Box */
+    .compare-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      margin-top: 18px;
+    }
+
+    .compare-item {
+      padding: 24px;
+      border-radius: 16px;
+    }
+
+    .compare-before {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .compare-after {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .compare-head {
+      font-size: 17px;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .compare-before .compare-head { color: #f87171; }
+    .compare-after .compare-head { color: #34d399; }
+
+    /* Custom Dark Table */
+    .custom-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 14.5px;
+    }
+
+    .custom-table th {
+      background: rgba(30, 41, 59, 0.8);
+      color: #f1f5f9;
+      font-weight: 800;
+      text-align: left;
+      padding: 16px 18px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .custom-table td {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .custom-table tr:hover td {
+      background: rgba(255, 255, 255, 0.03);
+      color: #ffffff;
+    }
+
+    .table-badge {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+
+    .tb-check { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .tb-cross { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
+    .tb-highlight { background: rgba(59, 130, 246, 0.2); color: var(--blue-light); font-weight: 900; border: 1px solid rgba(59, 130, 246, 0.4); }
+
+    /* Visual Flow Console Box */
+    .example-box {
+      background: #030712;
+      border: 1px solid var(--border);
+      color: #f8fafc;
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-top: 18px;
+      font-family: 'Fira Code', monospace, sans-serif;
+      font-size: 14.5px;
+      line-height: 1.8;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+    }
+
+    .example-box .hl-yellow { color: #facc15; font-weight: bold; }
+    .example-box .hl-green { color: #4ade80; font-weight: bold; }
+    .example-box .hl-blue { color: #60a5fa; font-weight: bold; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 32px 24px;
+      color: var(--text-dim);
+      font-size: 13.5px;
+      font-weight: 600;
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-top">
+        <span class="brand-tag">GIJO AS — AI Security Manager US</span>
+        <span class="meta-tag">LIVE UI VERIFIED · 1인 보안팀 완벽 지원</span>
+      </div>
+      <div>
+        <h1 class="title">GIJO AS — 한 명의 보안담당자가 여러 명 몫을 해내도록</h1>
+        <p class="subtitle">보안 지휘 콘솔, AI 팀 진용 라이프 오피스, 통합 관제 및 3계층 통합 아키텍처를 탑재한 완전 온프레미스 AI 보안 운영 플랫폼</p>
+      </div>
+
+      <!-- Core Slogan Highlight (매뉴얼 핵심 메시지) -->
+      <div class="slogan-banner">
+        <div class="slogan-main">
+          💡 "새로운 보안장비 도입이 아닙니다. 새로운 보안인력이 필요 없습니다!"
+        </div>
+        <div class="slogan-sub-grid">
+          <div class="slogan-box">
+            <strong>🚫 새로운 보안장비를 사라는 것이 아닙니다</strong>
+            <span>사내에서 이미 운용 중인 방화벽, EDR, 백신, DLP, Nessus 등에서 쏟아지는 로그와 리포트를 그대로 수집·분석합니다.</span>
+          </div>
+          <div class="slogan-box">
+            <strong>🚫 새로운 보안인력을 채용하라는 것이 아닙니다</strong>
+            <span>복잡한 눈 대조, 엑셀 정렬, 임원 보고서 생성을 <strong>GIJO AS 8종 Agent AI 팀</strong>이 대신하므로 인원 추가 없이 완벽 통제합니다.</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-wrapper">
+      <button class="tab-btn active" onclick="openTab(event, 'tab-screen-analysis')">🖥️ 메인 제품 화면 실측 분석</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-slogan')">🔥 핵심 가치 & 1인 보안팀</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-manual-daily')">📋 보안담당자 실무 워크플로우</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-agents')">🤖 8종 AI 에이전트팀 & 기능</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-flow')">🔗 데이터 자동 엮음 실사례</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-tech')">🛡️ 완전 온프레미스 & 기술력</button>
+      <button class="tab-btn" onclick="openTab(event, 'tab-compare')">⚖️ 시장 차별성 & 경쟁 비교</button>
+    </nav>
+
+    <!-- TAB 1: 메인 제품 화면 실측 분석 (다크 럭셔리 스타일 적용) -->
+    <div id="tab-screen-analysis" class="tab-content active">
+      <div class="card">
+        <div class="card-title"><span class="icon">🖥️</span> 실제 제품 화면 분석: GIJO AS — AI Security Manager US 메인 대시보드</div>
+        <p class="sub-card-desc" style="font-size:15px; margin-bottom:24px;">
+          실제 구동 중인 <strong>GIJO AS (GIJO AS Desktop v10.8.0.4050 연동)</strong>의 3계층 통합 인터페이스 분석 결과입니다. 좌측 데이터 탐색기, 가운데 메인 내 업무 바로가기 및 AI 팀 라이프 오피스, 우측 작업 세션 타임라인으로 구성되어 있습니다.
+        </p>
+
+        <div class="screenshot-card">
+          <div class="screenshot-header">
+            <span>📷 GIJO AS 메인 보안 지휘 콘솔 실측 화면 (2026.07.22 11:35:45 LIVE)</span>
+            <span style="color:#10b981; display:flex; align-items:center; gap:6px;">● 운영중 LIVE</span>
+          </div>
+          <div class="screenshot-body">
+            <img src="screenshots/13-메인대시보드-지휘콘솔.png" alt="GIJO AS 메인 대시보드 및 지휘 콘솔 화면">
+          </div>
+          <div class="screenshot-desc">
+            <strong>[화면 3분할 구조 상세 분석]</strong><br><br>
+            • <strong>좌측 레이아웃 (탐색기):</strong> PC 작업 폴더 탐색 및 'AS 탐색기(리포트 2건, 문서 39건)'가 결합되어 사내 보안 가이드(FCSS, Anthropic, 세크포인트 등)를 <code>🧠 분석해 올리기</code> 버튼 클릭 1번으로 장기기억(RAG)에 즉시 인입시킵니다.<br><br>
+            • <strong>중앙 상단 (내 업무 바로가기 - 24개 핵심 컨트롤):</strong> 아래 24개 핵심 메뉴를 통해 전체 보안 체계를 제어합니다.
+            <div class="menu-grid">
+              <div class="menu-item">🛡️ 자산 허브</div>
+              <div class="menu-item">✅ 조치·승인</div>
+              <div class="menu-item">🎯 위협 인텔</div>
+              <div class="menu-item">🔍 보안 분석</div>
+              <div class="menu-item">⚠️ 취약점</div>
+              <div class="menu-item">⚙️ 설정</div>
+              <div class="menu-item">📦 자산 목록</div>
+              <div class="menu-item">🧰 보안제품</div>
+              <div class="menu-item">🔧 원격 정기점검</div>
+              <div class="menu-item">💻 터미널</div>
+              <div class="menu-item">🤖 AI-BOM</div>
+              <div class="menu-item">📜 작업 기록</div>
+              <div class="menu-item">📄 리포트</div>
+              <div class="menu-item">📋 컴플라이언스</div>
+              <div class="menu-item">🛠️ 유지보수</div>
+              <div class="menu-item">🚨 레드팀·가드레일</div>
+              <div class="menu-item">📊 보안 KPI</div>
+              <div class="menu-item">🗂️ 작업 세션</div>
+              <div class="menu-item">🤖 에이전트 AI</div>
+              <div class="menu-item">🧬 LLM 합성</div>
+              <div class="menu-item">🧠 기억·학습(RAG)</div>
+              <div class="menu-item">🕸️ 온톨로지</div>
+              <div class="menu-item">🔄 학습 루프</div>
+              <div class="menu-item">📝 로그</div>
+            </div>
+            <br>
+            • <strong>중앙 하단 (🏢 AI 팀 · AI 진용 라이프 오피스 + 🧭 지휘 콘솔):</strong> 오케스트레이터, 자산 탐색, CTI 모니터링 에이전트들의 실시간 상태(대기/상주) 및 자연어 지시 입력창을 제공합니다.<br><br>
+            • <strong>우측 레이아웃 (🗂️ 작업 세션):</strong> 하드닝 준수율 악화 감지(KISA), 클라이언트 배포 패키지 게이트(v2.7.0 등), CLI 정기점검 완료 이력이 실시간 타임라인으로 기록되어 완벽한 감사(Audit) 추적을 보장합니다.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: 핵심 가치 & 1인 보안팀 -->
+    <div id="tab-slogan" class="tab-content">
+      <div class="card">
+        <div class="card-title"><span class="icon">🚨</span> 보안담당자의 현실 vs GIJO AS 혁신</div>
+        <p class="sub-card-desc" style="font-size:15px; margin-bottom:18px;">
+          보안팀의 인원은 항상 부족한데, 관리해야 할 장비와 로그는 걷잡을 수 없이 폭증하고 있습니다. 데이터 간 연결이 끊겨 수작업 매칭에만 의존하던 기존 한계를 완전히 해소합니다.
+        </p>
+
+        <div class="compare-box">
+          <div class="compare-item compare-before">
+            <div class="compare-head">❌ 기존의 힘든 방식 (인력 부족의 악순환)</div>
+            <ul style="padding-left:18px; font-size:14.5px; color:#fca5a5; line-height:1.8;">
+              <li>새 장비를 들여올 때마다 로그 대조할 **보안 인력 추가 채용 압박**</li>
+              <li>수백 건의 취약점 스캐너 리포트를 매일 아침 눈으로 정렬 및 대조</li>
+              <li>"이 보안 위협이 우리 어느 서버/서비스 문제지?" 엑셀 찾아가며 대조</li>
+              <li>임원 보고서, 주간 보안 리포트를 매주 손으로 데이터 취합해 작성</li>
+              <li>AI 자산(모델, 프롬프트)까지 추가되어 관리 업무 한계 도달</li>
+            </ul>
+          </div>
+
+          <div class="compare-item compare-after">
+            <div class="compare-head">✅ GIJO AS 도입 후 (인력 추가 없이 1인 완결)</div>
+            <ul style="padding-left:18px; font-size:14.5px; color:#6ee7b7; line-height:1.8;">
+              <li><strong>추가 장비 구매 0원, 추가 인력 채용 0명!</strong> 기존 로그 완벽 활용</li>
+              <li>AI가 위협-자산-서비스를 **자동으로 엮어서** P0~P3 긴급도 정렬</li>
+              <li><code>"오늘 뭐부터 조치해야 해?"</code> 자연어 한 줄로 업무 우선순위 파악</li>
+              <li><code>"주간 보안 보고서 만들어줘"</code> 지시로 양식 맞춤 DOCX 자동 완성</li>
+              <li>외부 반출 위험 없는 **사내 전용 GPU(온프레미스)** 폐쇄망 작동</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: 보안담당자 실무 워크플로우 -->
+    <div id="tab-manual-daily" class="tab-content">
+      <div class="card">
+        <div class="card-title"><span class="icon">📋</span> GIJO AS 보안담당자 일일 & 주간 실무 가이드</div>
+        <div class="grid-2">
+          <div class="sub-card" style="border-left:4px solid var(--blue);">
+            <div class="sub-card-title">☀️ 매일 아침 5분 업무 (Daily)</div>
+            <ul style="padding-left:18px; font-size:14.5px; color:var(--text-muted); line-height:1.8;">
+              <li><strong>1. 출근 후 GIJO AS 접속:</strong> 우상단 `● 운영중 LIVE` 확인.</li>
+              <li><strong>2. 지휘 콘솔 지시:</strong> <code>"오늘 뭐부터 조치해야 해?"</code> 입력.</li>
+              <li><strong>3. P0 긴급 항목 확인:</strong> CISA KEV 및 실제 악용확률(EPSS) 기반 Top 위험 항목 결재.</li>
+              <li><strong>4. 밤사이 로그 업로드:</strong> 방화벽/EDR 로그를 드롭존에 올리면 자동 정규화.</li>
+            </ul>
+          </div>
+
+          <div class="sub-card" style="border-left:4px solid var(--green);">
+            <div class="sub-card-title">📅 매주 / 매달 보고 업무 (Weekly & Monthly)</div>
+            <ul style="padding-left:18px; font-size:14.5px; color:var(--text-muted); line-height:1.8;">
+              <li><strong>1. 손작성 없는 보고서 생성:</strong> <code>"주간 보안 리포트 작성해줘"</code> 지시 한 줄로 DOCX 문서 즉시 생성.</li>
+              <li><strong>2. 조치 완료 자동 검증 (Closed-loop):</strong> 조치 후 재스캔으로 성공 여부 자동 판정.</li>
+              <li><strong>3. 보안장비 하드닝 점검:</strong> CCE/KISA 기준 보안장비 점검 자동 수행.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: 8종 AI 에이전트팀 -->
+    <div id="tab-agents" class="tab-content">
+      <div class="card">
+        <div class="card-title"><span class="icon">👥</span> 8종 보안 특화 AI 에이전트 팀</div>
+        <div class="grid-3">
+          <div class="sub-card">
+            <div class="sub-card-title">1. 오케스트레이터 <span class="tag-badge badge-blue">팀장 AI</span></div>
+            <div class="sub-card-desc">자연어 지시를 이해하고 각 에이전트에게 작업을 배분하여 총괄 지휘합니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">2. 스캔 에이전트 <span class="tag-badge badge-teal">진단 AI</span></div>
+            <div class="sub-card-desc">AI 모델 파일이나 코드의 보안 취약점을 정적으로 스캔하여 수집합니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">3. 침투테스트 에이전트 <span class="tag-badge badge-amber">검증 AI</span></div>
+            <div class="sub-card-desc">실제 공격 시나리오(PoC)를 바탕으로 실질적 악용 가능성을 검증합니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">4. 분석 에이전트 <span class="tag-badge badge-purple">우선순위 AI</span></div>
+            <div class="sub-card-desc">KEV 및 EPSS 지표를 통해 무엇부터 조치할지 긴급도 우선순위를 결정합니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">5. SBOM 에이전트 <span class="tag-badge badge-blue">명세서 AI</span></div>
+            <div class="sub-card-desc">소프트웨어 및 AI 모델의 CycloneDX/SPDX 명세서를 자동 생성 관리합니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">6. CTI 에이전트 <span class="tag-badge badge-red">위협 감시 AI</span></div>
+            <div class="sub-card-desc">외부 최신 위협 및 다크웹 유출 정보를 수집하여 사내 자산과 매칭합니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">7. 리포트 에이전트 <span class="tag-badge badge-teal">문서 작성 AI</span></div>
+            <div class="sub-card-desc">임원/팀장 보고용 보안 요약 리포트를 DOCX/PDF로 정식 작성합니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">8. 모델 진화 에이전트 <span class="tag-badge badge-purple">자가 학습 AI</span></div>
+            <div class="sub-card-desc">담당자의 조치 내역을 폐쇄망 내에서 정제하여 로컬 LLM을 자가 학습시킵니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: 데이터 자동 엮음 실사례 -->
+    <div id="tab-flow" class="tab-content">
+      <div class="card">
+        <div class="card-title"><span class="icon">⚡</span> 데이터가 자동으로 엮이는 실제 흐름 (백데이터 증명)</div>
+        <div class="example-box">
+          <div class="hl-yellow">[1단계: 외부 CTI 위협 수집 (5건 도착)]</div>
+          - 위협 A: Qwen2.5 모델 가중치 변조 위협 발견<br>
+          - 위협 B: bge-m3 임베딩 패키지 악성코드 삽입<br>
+          - 위협 C: KoBERT 프롬프트 인젝션 공격 캠페인<br><br>
+          <div class="hl-blue">[2단계: 사내 자산 자동 매칭 (눈 대조 0초)]</div>
+          - 위협 A, B ➔ <span class="hl-green">'사내 보안 상담 챗봇'</span> 자산과 즉시 연결!<br>
+          - 위협 C ➔ <span class="hl-green">'문서 민감도 분류 AI'</span> 자산과 즉시 연결!<br><br>
+          <div class="hl-yellow">[3단계: 최종 업무 서비스 영향도 자동 롤업]</div>
+          ➔ 🚨 <span class="hl-green">'임직원 보안 포털'</span> 및 <span class="hl-green">'문서관리 시스템'</span> 서비스의 위험도가 <span style="color:#ef4444; font-weight:bold;">[높음]</span>으로 자동 변경됨!
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: 완전 온프레미스 & 기술력 -->
+    <div id="tab-tech" class="tab-content">
+      <div class="card">
+        <div class="card-title"><span class="icon">🔒</span> 폐쇄망(온프레미스) 완결형 아키텍처</div>
+        <div class="grid-3">
+          <div class="sub-card">
+            <div class="sub-card-title">데이터 반출 0% (Zero Data Leak)</div>
+            <div class="sub-card-desc">모든 대화, 문서, RAG 지식베이스가 사내 GPU 서버 안에서 완벽 소유 및 처리됩니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">720개 자동화 테스트 검증</div>
+            <div class="sub-card-desc">서버 단위 자동화 테스트 720개를 통과한 높은 구동 안정성을 검증했습니다.</div>
+          </div>
+          <div class="sub-card">
+            <div class="sub-card-title">KISA / CCE 규제 부합</div>
+            <div class="sub-card-desc">국내 주요정보통신기반시설 U-시리즈 하드닝 및 KISA 기준에 부합합니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 7: 시장 차별성 & 경쟁 비교 -->
+    <div id="tab-compare" class="tab-content">
+      <div class="card">
+        <div class="card-title"><span class="icon">📊</span> 타사 제품 vs GIJO AS 한눈에 비교</div>
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>구분</th>
+              <th style="background:rgba(59, 130, 246, 0.2); color:var(--blue-light);">GIJO AS</th>
+              <th>클라우드 AI-SPM (Wiz 등)</th>
+              <th>LLM 방화벽 (Lakera 등)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>설치 형태</strong></td>
+              <td><span class="table-badge tb-highlight">완전 온프레미스 (사내 보유)</span></td>
+              <td>클라우드 SaaS</td>
+              <td>SaaS / 외부 API</td>
+            </tr>
+            <tr>
+              <td><strong>데이터 보안</strong></td>
+              <td><span class="table-badge tb-check">사내 보관 (유출 없음)</span></td>
+              <td>외부 클라우드로 전송</td>
+              <td>프롬프트 외부 전송</td>
+            </tr>
+            <tr>
+              <td><strong>추가 인력/장비</strong></td>
+              <td><span class="table-badge tb-check">추가 장비 0개, 추가 인력 0명</span></td>
+              <td>새 솔루션 전담 인력 필요</td>
+              <td>룰관리 전담 인력 필요</td>
+            </tr>
+            <tr>
+              <td><strong>기능 범위</strong></td>
+              <td><span class="table-badge tb-check">AI-BOM + 취약점 + SOC + 하드닝 통합</span></td>
+              <td>클라우드 태세 관리 중심</td>
+              <td>LLM 프롬프트 검단에 국한</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      GIJO Technology · GIJO AS — AI Security Manager US Proposal · All rights reserved.
+    </footer>
+  </div>
+
+  <script>
+    function openTab(evt, tabName) {
+      const tabContents = document.getElementsByClassName("tab-content");
+      for (let i = 0; i < tabContents.length; i++) {
+        tabContents[i].classList.remove("active");
+      }
+
+      const tabBtns = document.getElementsByClassName("tab-btn");
+      for (let i = 0; i < tabBtns.length; i++) {
+        tabBtns[i].classList.remove("active");
+      }
+
+      document.getElementById(tabName).classList.add("active");
+      evt.currentTarget.classList.add("active");
+    }
+  </script>
+</body>
+</html>

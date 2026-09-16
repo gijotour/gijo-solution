@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 무대 「고르기 모드」(허브 다이어트) 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 프로 셸 무대(stage-on)에 「고르기 모드」 도입
+  파일: mockups/stage-picker/시안.html — 정지 그림. 제품 코드는 읽기만 했고 고치지 않았다.
+  추천 시안 1개(2026-07-25/08-09 사용자 결정) — 대안은 비교만 하고 별도로 만들지 않는다.
+
+  ■ 배경 — 2026-08-20 사장님 프로 QA 실측 피드백(원문 요지)
+    ① (자산 카드 「자산 열기」) "자산 열기를 별도 창에 띄워야 하나, 거기서 클릭된 게 대화창에
+       나오긴 하는데, 흠. 고민해줘."
+    ② (우선순위 허브) "저렇게 별도 창에서 선택하는 게 맞는지 고민이야."
+    → 요지: 무언가를 **고르러** 갈 때 허브 화면 전체(KPI·필터·탭·설명 다 달린)가 뜨는 건 과하다.
+      고르기가 목적이면 검색+목록+상세만 있으면 된다.
+
+  ■ 이번에 실제로 읽은 파일(추측 없이 코드로 확인 — 근거는 본문에 파일:줄로 인용)
+    client/src/renderer/pages/app.html      — stage-on CSS(95-109)·#dockHead(1224-1259)·
+                                               gijo:select 처리와 검토관 상1 폐지 이력(852-903)
+    client/src/renderer/pages/console.js    — readCtxFromShell(1328-1350)·setSelection·선택카드(1094-1155)
+    client/src/renderer/pages/selectnotify.js — 🎯 알리기 공용 부품(허용 키·규격)
+    client/src/renderer/pages/triage.html   — 「우선순위」 그룹허브 껍데기(발견·수집 허브와 같은 틀)
+    client/src/renderer/pages/grouppanels.js — triage 판 정의(vuln·sbom 2장, 74-111행)
+    client/src/renderer/pages/grouphub.js   — 무대 iframe(hub=1)로 판을 여는 구조(9·100·109-114행)
+    client/src/renderer/pages/vulnscan.html — 우선순위 실제 취약점 화면(호스트 표+kpi-strip+vulnDetail)
+    client/src/renderer/pages/assets.html   — ⓪ 자산 고르기(이미 검색+목록+오른쪽 패널 구조)
+    client/src/renderer/pages/nav.js        — embed 규약(1333-1391)·허브 흡수표(206-252)
+    client/src/renderer/pages/pro-white.css — 프로 흰 바탕 확정(2026-08-20, html.theme-light 토큰)
+
+  ■ 결정 — 화면 목록에 항목을 함부로 늘리지 않는다. 「고르기」 전용의 **얇은 공용 화면 1개**
+    (list/details 패턴, 아래 조사 근거)를 만들어 자산·우선순위(취약점) 두 트리거가 함께 쓴다.
+    기존 「자산 고르기」「우선순위」 허브 화면은 **그대로 둔다** — 분석·필터가 필요한 진짜 업무는
+    거기서 하고, 고르기 모드는 "대화에 값 하나를 넘기는" 짧은 용무 전용이다(병행, 대체 아님).
+
+  ■ 설계 전 조사 — 표준·모범사례(본문 §2에 원문 인용·링크. 요지만 먼저 적는다)
+    · Microsoft Learn "List/details pattern"(2026-07 갱신) — 목록+상세 패널을 "빠르게 오갈 때"
+      쓰는 정석 패턴으로 명시. 641epx 이상에서는 side-by-side 권장.
+    · Material Design 리스트 밀도 — 고밀도 행 32dp / 기본 40dp. 우리 기존 pk-row(assets.html)는
+      이미 34px/행으로 고밀도 쪽에 근접해 있다(발명 없이 그대로 재사용).
+    · NN/g "Progressive Disclosure" — 1차 화면은 핵심만, 상세는 요청 시. KPI·필터·탭을
+      고르기 화면에서 빼는 근거.
+
+  이 파일은 결정을 위한 정지 그림입니다. 모든 버튼·입력창은 자리만 보여주며 클릭해도
+  동작하지 않습니다(정직한 구현 원칙 — mockups/는 시연이 아니라 결정 자료).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════════ 1) 색 토큰 — 프로 흰 바탕(pro-white.css html.theme-light, 2026-08-20 확정) 그대로 복사 ════════
+   표준 화면은 다크가 기본이지만(CLAUDE.md), **프로 셸은 이 날짜부로 흰 바탕이 확정값**이다
+   (pro-white.css:1-4 "표준은 다크 유지가 확정 … 프로 셸에서만 html.theme-light 클래스로 이 층이 이긴다").
+   이 시안은 프로 무대를 다루므로 다크 토큰이 아니라 **이 값들**을 쓴다 — 새로 지어내지 않았다. */
+:root{
+  --bg:#faf8f5; --panel:#ffffff; --panel-2:#f2efe9;
+  --border:rgba(43,38,33,0.12); --border-strong:rgba(43,38,33,0.22);
+  --text:#2b2621; --text-strong:#1f1b14; --muted:#6b6259; --muted-2:#726960;
+  --blue:#1d4f91; --teal:#086b43; --amber:#8f4d02; --red:#b3241a; --purple:#5b21b6;
+  --b-crit-bg:#fdeceb; --b-crit:#b3241a; --b-high-bg:#fdf1e2; --b-high:#8f4d02;
+  --b-med-bg:#eaf1fb; --b-med:#1d4f91; --b-ok-bg:#e3f6ec; --b-ok:#086b43;
+  --sel-bg:#fdf1e2; --sel:#8f4d02; --sel-bd:rgba(143,77,2,.35); /* .cs-sel(🎯 칩) 라이트 공식 */
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+
+/* ════════ 2) 이 문서(설명 레이어) 전용 CSS — 흰 바탕 스펙 문서 ════════ */
+.docwrap{max-width:1180px;margin:0 auto;padding:28px 32px 100px;}
+h1{font-size:21px;font-weight:800;color:var(--text-strong);margin-bottom:6px;}
+.lead{font-size:12.75px;color:var(--muted);max-width:1020px;line-height:1.8;margin-bottom:18px;}
+.quote-box{border:1px solid var(--border-strong);background:var(--panel);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:13px;line-height:1.85;color:var(--text);}
+.quote-box .who{font-size:11.5px;color:var(--muted-2);font-weight:700;margin-bottom:6px;}
+.quote-box q{color:var(--text-strong);}
+.summary-box{border:1px solid var(--blue);background:var(--b-med-bg);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:12.85px;line-height:1.85;}
+.summary-box b{color:var(--text-strong);}
+.summary-box ol{margin-left:18px;margin-top:4px;}
+h2{font-size:15px;font-weight:800;color:var(--text-strong);margin:36px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+h2 .n{color:var(--blue);font-size:11px;font-weight:700;letter-spacing:.4px;border:1px solid var(--blue);border-radius:4px;padding:2px 7px;}
+h3{font-size:13.5px;font-weight:800;color:var(--text-strong);margin:20px 0 8px;}
+.note{font-size:12.4px;color:var(--muted);line-height:1.8;margin-bottom:10px;max-width:1020px;}
+.note b.hi{color:var(--text-strong);}
+.note b.bad{color:var(--red);}
+.note b.ok{color:var(--teal);}
+table.t{width:100%;border-collapse:collapse;font-size:12.25px;margin:8px 0 10px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:7px 10px;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
+table.t td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+table.t tr:nth-child(even) td{background:rgba(43,38,33,.025);}
+code{background:var(--panel-2);border-radius:4px;padding:1px 6px;font-size:11.5px;color:#5b21b6;border:1px solid var(--border);}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;line-height:1.75;}
+.meas b{color:var(--teal);}
+.evid-box{border:1px solid rgba(29,79,145,.35);border-radius:10px;padding:12px 15px;background:var(--b-med-bg);margin:10px 0;font-size:12.25px;line-height:1.75;color:var(--text);}
+.evid-box .cap{font-size:11.5px;color:var(--blue);font-weight:800;margin-bottom:6px;}
+.warn-box{border:1px solid rgba(143,77,2,.4);border-radius:10px;padding:12px 15px;background:var(--b-high-bg);margin:10px 0;font-size:12.25px;line-height:1.8;color:var(--text);}
+.warn-box .cap{font-size:11.5px;color:var(--amber);font-weight:800;margin-bottom:6px;}
+.ok-box{border:1px solid rgba(8,107,67,.4);border-radius:10px;padding:12px 15px;background:var(--b-ok-bg);margin:10px 0;font-size:12.25px;line-height:1.8;color:var(--text);}
+.ok-box .cap{font-size:11.5px;color:var(--teal);font-weight:800;margin-bottom:6px;}
+.verdict{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:.2px;}
+.verdict.go{color:var(--teal);background:var(--b-ok-bg);}
+.verdict.hold{color:var(--amber);background:var(--b-high-bg);}
+footer.docfoot{margin-top:54px;padding-top:16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);line-height:1.8;}
+
+/* 구성 재현 다이어그램 — 각 구간의 "존재·순서·상대적 많고 적음"은 실제와 같지만, 문서 폭에 맞추려고
+   가로는 줄이고 세로도 일부 구간(특히 큰 값)은 축약했다. **정확한 px 값은 표로만 주장한다** —
+   그림은 "이렇게 겹겹이 쌓인다"는 구조를 보여주는 용도, 자로 재는 근거는 각 절의 실측 표. */
+.scaledia-row{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;margin:14px 0 10px;}
+.scaledia-col{flex:0 0 auto;}
+.scaledia-tag{font-size:11.5px;font-weight:800;letter-spacing:.3px;color:var(--muted-2);margin-bottom:8px;}
+.scaledia-tag.bad{color:var(--amber);}
+.scaledia-tag.good{color:var(--teal);}
+.blk{width:400px;border-left:3px solid var(--border-strong);position:relative;padding-left:12px;font-size:11px;color:var(--muted-2);display:flex;align-items:center;}
+.blk b{color:var(--text-strong);font-weight:800;margin-right:6px;}
+.blk .px{margin-left:auto;font-weight:800;color:var(--text);white-space:nowrap;padding-right:2px;}
+.blk.dockhead{background:var(--panel-2);border-left-color:var(--muted-2);}
+.blk.spacer{border-left-color:transparent;color:var(--muted-2);font-style:italic;}
+.blk.chrome{background:var(--b-high-bg);border-left-color:var(--amber);}
+.blk.card{background:var(--panel);border-left-color:var(--border-strong);}
+.blk.row{background:var(--panel);border-left-color:var(--blue);}
+.blk.pickrow{background:var(--panel);border-left-color:var(--teal);}
+.blk.search{background:var(--panel-2);border-left-color:var(--blue);}
+.divider-note{width:400px;font-size:11px;color:var(--muted-2);text-align:center;padding:4px 0;background:repeating-linear-gradient(90deg,var(--border-strong) 0 6px,transparent 6px 12px);background-size:100% 1px;background-repeat:no-repeat;background-position:center;}
+.divider-note span{background:var(--bg);padding:0 8px;}
+.total-tag{display:inline-block;margin-top:8px;font-size:12px;font-weight:800;padding:4px 11px;border-radius:6px;}
+.total-tag.bad{color:var(--amber);background:var(--b-high-bg);border:1px solid rgba(143,77,2,.35);}
+.total-tag.good{color:var(--teal);background:var(--b-ok-bg);border:1px solid rgba(8,107,67,.35);}
+
+/* ════════ 3) 무대 부품 재현 CSS — 실제 값(app.html) 그대로 ════════ */
+.mockshell{border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;background:var(--panel);width:400px;}
+.m-dockhead{display:flex;align-items:center;gap:8px;padding:4px 10px;background:var(--panel-2);border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}
+.m-dockhead .tbbtn{font-size:12.25px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:4px 9px;}
+.m-dockhead b{color:var(--text-strong);}
+.m-gh-strip{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 10px;}
+.m-gh-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:9px 10px;height:110px;}
+.m-gh-head{font-size:11px;font-weight:800;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between;}
+.m-gh-bars{display:flex;align-items:flex-end;gap:8px;height:34px;margin:4px 0;}
+.m-gh-bcol{width:22px;border-radius:3px 3px 0 0;}
+.m-gh-foot{font-size:10.5px;color:var(--muted-2);}
+.m-kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:0 10px;}
+.m-kpi{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:6px 7px;}
+.m-kpi .l{font-size:9.5px;color:var(--muted);}
+.m-kpi .v{font-size:12px;font-weight:800;color:var(--text-strong);}
+.m-th{display:flex;padding:0 10px;font-size:10px;color:var(--muted-2);font-weight:700;text-transform:uppercase;}
+.m-th span{flex:1;}
+.m-hostrow{display:flex;align-items:center;padding:0 10px;font-size:11px;gap:8px;border-top:1px solid var(--border);}
+.m-hostrow .car{color:var(--muted-2);font-size:10px;}
+.m-hostrow .nm{flex:1;font-weight:700;color:var(--text-strong);}
+.m-hostrow .sevdots{display:flex;gap:3px;}
+.dot{width:6px;height:6px;border-radius:50%;}
+.dot.crit{background:var(--b-crit);} .dot.high{background:var(--b-high);} .dot.med{background:var(--b-med);} .dot.ok{background:var(--b-ok);}
+
+/* 고르기 모드 — TO-BE */
+.pick-search{margin:0 10px 0;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted-2);}
+.pick-meta{padding:0 10px;font-size:11px;color:var(--muted-2);}
+.pick-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--border);font-size:12px;cursor:default;}
+.pick-row.on{background:var(--b-med-bg);}
+.pick-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-strong);}
+.pick-row .asset{color:var(--muted-2);font-size:10.5px;flex:0 0 auto;}
+.pick-row .badge{font-size:9.75px;font-weight:800;padding:1px 6px;border-radius:5px;flex:0 0 auto;}
+.badge.crit{color:var(--b-crit);background:var(--b-crit-bg);}
+.badge.kev{color:#fff;background:var(--b-crit);}
+
+/* 상세 패널(오른쪽, 얇게) */
+.pk-detail{width:210px;border:1px solid var(--border);border-radius:10px;padding:12px 13px;background:var(--panel);font-size:11.5px;}
+.pk-detail .t{font-size:13px;font-weight:800;color:var(--text-strong);line-height:1.35;margin-bottom:6px;}
+.pk-detail .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;margin-right:4px;}
+.pk-detail .m{color:var(--muted);margin-top:5px;line-height:1.6;}
+.pk-detail .plain{color:var(--muted);margin-top:6px;line-height:1.6;}
+.pk-detail .cta{margin-top:10px;width:100%;background:var(--blue);color:#fff;border:none;border-radius:6px;padding:6px 0;font-size:11.5px;font-weight:700;}
+
+/* 🎯 카드(대화창) 재현 — console.js 선택카드() 구조 그대로 */
+.chatcard{width:400px;border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:10px 12px;font-size:12px;}
+.chatcard .h{font-weight:800;color:var(--text-strong);font-size:12px;margin-bottom:6px;}
+.chatcard .as{color:var(--muted-2);font-size:11px;}
+.chatcard .ti{margin:2px 0;}
+.chatcard .ti b{font-weight:800;}
+.chatcard .mt{color:var(--muted);font-size:11px;}
+.chatcard .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.chatcard .chip{font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--border-strong);color:var(--muted);background:var(--panel-2);}
+.selchip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;background:var(--sel-bg);color:var(--sel);border:1px solid var(--sel-bd);}
+
+.arrow-flow{display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted-2);width:60px;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1>무대 「고르기 모드」 — 자산·우선순위 「선택」 작업의 허브 다이어트</h1>
+<p class="lead">
+  프로 셸 무대(<code>stage-on</code>)에 자산·우선순위 허브를 그대로 띄우면, 「하나 고르기」라는 짧은 용무에
+  KPI·필터·탭이 딸린 업무 화면 전체가 따라온다. 이 시안은 <b>고르기 전용의 얇은 공용 화면</b>
+  (검색 1줄 + 목록 + 얇은 상세)을 만들고, 고르는 순간 <b>대화로 자동 복귀</b>시키는 안 1개를 제안한다.
+  기존 「자산 고르기」「우선순위」 허브는 <b>그대로 둔다</b> — 분석·필터가 필요한 업무는 거기서 하고,
+  이 화면은 "대화에 값 하나를 넘기는" 짧은 용무 전용이다.
+</p>
+
+<div class="quote-box">
+  <div class="who">2026-08-20 사장님 프로 QA 실측 — 원문 요지</div>
+  ① (자산 카드 「자산 열기」) <q>"자산 열기를 별도 창에 띄워야 하나, 거기서 클릭된 게 대화창에 나오긴
+  하는데, 흠. 고민해줘."</q><br>
+  ② (우선순위 허브) <q>"저렇게 별도 창에서 선택하는 게 맞는지 고민이야."</q>
+</div>
+
+<div class="summary-box">
+  <b>결론 3줄</b>
+  <ol>
+    <li>별도 <b>OS 창</b>은 이미 이 저장소가 같은 날 걷어낸 패턴이다(app.html:1233-1236 — "팝업 및 옆에
+      붙는 메뉴를 없애는" 사장님 지시로 무대 머리의 ⧉ 창으로 버튼을 삭제) — 되살리지 않는다.</li>
+    <li>지금 무대는 「고르기」에도 <b>허브 전체</b>가 뜬다 — 우선순위는 첫 행을 보기까지 <b>458px</b>의
+      KPI·탭·표머리를 지나야 한다(아래 §3 실측). 고르기 모드는 이걸 <b>110px</b>로 줄인다.</li>
+    <li>고르는 순간 대화로 자동 복귀한다 — 단, <b>2026-08-20 검토관 상1이 이미 한 번 막은
+      "자동 무대 내림"과 같은 사고를 피하려고</b> 기존 <code>gijo:select</code> 채널(18개 발신처, 그중
+      확인창 등 10곳)은 손대지 않고, 고르기 화면만 쓰는 <b>새 신호 하나</b>로 좁힌다(§6).</li>
+  </ol>
+</div>
+
+<h2><span class="n">1</span>설계 전 조사 — 표준·모범사례(직접 확인)</h2>
+<table class="t">
+  <tr><th style="width:230px">출처</th><th style="width:380px">확인한 내용(원문 인용)</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>Microsoft Learn — List/details pattern<br>
+      <span style="color:var(--muted-2)">learn.microsoft.com/windows/apps/design/controls/list-details<br>(2026-07-10 갱신본, WebFetch 직접 확인)</span></td>
+    <td><i>"The list/detail pattern displays a list of items and the details for the currently selected
+      item."</i> · 적합한 경우: <i>"Locate and prioritize a large collection of content"</i>·
+      <i>"Allow the quick addition and removal of items from a list while working
+      back-and-forth between contexts."</i> · 641epx 이상은 side-by-side 권장.</td>
+    <td><b>핵심 근거</b> — "짧게 오갔다 원래 맥락(대화)으로 돌아온다"는 이 패턴이 원래 상정하는 쓰임이다.
+      검색+목록+상세 side-by-side 구조를 그대로 채택.</td>
+  </tr>
+  <tr>
+    <td>Material Design — 리스트 밀도<br>
+      <span style="color:var(--muted-2)">m1.material.io/components/lists.html(재확인) +
+      밀도 가이드(WebSearch 확인)</span></td>
+    <td>고밀도(high-density) 행 <b>32dp</b> / 기본(default) 행 40dp. 터치 타깃 최소 48dp도 함께 명시.</td>
+    <td>기존 <code>.pk-row</code>(assets.html:59-64)가 이미 <b>34px/행</b> — 발명 없이 그대로 재사용
+      (고밀도 32dp에 근접, 새 값을 만들지 않는다).</td>
+  </tr>
+  <tr>
+    <td>NN/g — Progressive Disclosure<br>
+      <span style="color:var(--muted-2)">nngroup.com/articles/progressive-disclosure(WebFetch 직접 확인)</span></td>
+    <td><i>"Initially, show users only a few of the most important options. Offer a larger set of
+      specialized options upon request."</i></td>
+    <td>1차 목록엔 KPI·필터·탭을 안 두고 핵심(이름·심각도·자산)만, 상세는 상세 패널로만 넘긴다.</td>
+  </tr>
+</table>
+
+<h2><span class="n">2</span>오늘 — 「우선순위」에서 취약점 하나 고르기(실측)</h2>
+<p class="note">
+  사이드바 <b>「우선순위」</b>를 누르면 triage.html이 열리고, <code>initial="vuln"</code>(triage.html:76)이라
+  <b>클릭 한 번 없이</b> 취약점 판(vulnscan.html, hub=1 무대 안 무대)까지 바로 뜬다. 아래는 <b>실제 CSS 값을
+  그대로 합산</b>한 것 — 창 높이 900px(흔한 노트북 해상도) · 프로 상단바 46px · 무대 머리 34px를 뺀
+  <b>화면 실사용 영역 810px</b>를 기준으로 한다(app.html:19,58,106-107 실측치).
+</p>
+<div class="scaledia-row">
+  <div class="scaledia-col">
+    <div class="scaledia-tag bad">오늘 — 클릭 없이 바로 이만큼</div>
+    <div class="mockshell">
+      <div class="m-dockhead"><span class="tbbtn">← 대화로</span><b>우선순위</b></div>
+      <div style="padding:8px 10px 0"><div style="font-size:10.5px;color:var(--muted)">우선순위 — 무엇부터 손댈지 한 줄로 보고, 누르면 그 메뉴가 아래에 열립니다</div></div>
+      <div style="padding:8px 10px 6px">
+        <div class="m-gh-strip">
+          <div class="m-gh-card"><div class="m-gh-head">🔍 취약점<span style="color:var(--b-crit)">KEV 3</span></div>
+            <div class="m-gh-bars"><div class="m-gh-bcol" style="height:26px;background:var(--b-crit)"></div><div class="m-gh-bcol" style="height:16px;background:var(--amber)"></div><div class="m-gh-bcol" style="height:10px;background:var(--b-med)"></div></div>
+            <div class="m-gh-foot">미조치 41건</div></div>
+          <div class="m-gh-card"><div class="m-gh-head">📦 AI-BOM · 구성</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:8px">구성 명세 있음 27<br>아직 없음 14<br>AI 자산 6</div>
+            <div class="m-gh-foot">전체 자산 41</div></div>
+        </div>
+      </div>
+      <div class="divider-note"><span>↓ 무대 안에 또 다른 화면(vulnscan.html)이 열림</span></div>
+      <div style="padding:10px 10px 0"><div style="font-size:15px;font-weight:800;color:var(--text-strong)">취약 자산관리</div></div>
+      <div style="padding:8px 10px 0">
+        <div class="m-kpi-strip">
+          <div class="m-kpi"><div class="l">스캔 호스트</div><div class="v">18</div></div>
+          <div class="m-kpi"><div class="l">Critical</div><div class="v" style="color:var(--b-crit)">7</div></div>
+          <div class="m-kpi"><div class="l">High</div><div class="v" style="color:var(--b-high)">14</div></div>
+          <div class="m-kpi"><div class="l">Medium</div><div class="v" style="color:var(--amber)">20</div></div>
+          <div class="m-kpi"><div class="l">Low/Info</div><div class="v" style="color:var(--muted)">5</div></div>
+        </div>
+      </div>
+      <div style="padding:8px 10px 4px;text-align:right"><span style="font-size:10px;border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--muted)">목록 · 🗺 히트맵</span></div>
+      <div class="m-th"><span>호스트/IP</span><span>출처</span><span>취약점(심각도별)</span><span>최근 스캔</span></div>
+      <div class="m-hostrow"><span class="car">▸</span><span class="nm">web-01.internal</span><span class="sevdots"><span class="dot crit"></span><span class="dot high"></span></span><span style="color:var(--muted-2)">오늘</span></div>
+      <div class="m-hostrow"><span class="car">▸</span><span class="nm">db-02.internal</span><span class="sevdots"><span class="dot high"></span><span class="dot med"></span></span><span style="color:var(--muted-2)">오늘</span></div>
+      <div style="padding:6px 10px;font-size:10px;color:var(--muted-2);border-top:1px dashed var(--border)">…호스트 행을 눌러야 아래에 vulnDetail 패널이 <b>또</b> 열리고, 거기서 취약점을 눌러야 한다(2번째 클릭) — vulnscan.html:200-218</div>
+    </div>
+    <span class="total-tag bad">첫 취약점 행까지 458px · 클릭 2회(호스트→취약점)</span>
+  </div>
+  <div class="arrow-flow">≠</div>
+</div>
+
+<h3>실측 산식(코드 값 그대로 합산)</h3>
+<table class="t">
+  <tr><th style="width:280px">구간</th><th style="width:90px">값</th><th>근거(파일:줄)</th></tr>
+  <tr><td>무대 머리 #dockHead</td><td>34px</td><td>app.html:1230-1232 (padding 4px + .tb-btn 4px9px/12.25px + border1)</td></tr>
+  <tr><td>triage.html 본문 위 여백</td><td>14px</td><td>triage.html:21 <code>.main{padding:14px 18px 0}</code></td></tr>
+  <tr><td>.scr-id 안내줄</td><td>28px</td><td>triage.html:22 <code>font-size:12.5px;margin-bottom:10px</code></td></tr>
+  <tr><td>.gh-strip(판 2장)</td><td>138px</td><td>triage.html:31 <code>height:138px</code> · grouppanels.js:73-111(vuln·sbom 2장)</td></tr>
+  <tr><td>.gh-stage 위 여백</td><td>12px</td><td>triage.html:46 <code>margin-top:12px</code></td></tr>
+  <tr><td>vulnscan.html 본문 위 여백</td><td>28px</td><td>vulnscan.html:44 <code>.main{padding:28px 32px 48px}</code></td></tr>
+  <tr><td>제목줄(취약 자산관리)</td><td>45px</td><td>vulnscan.html:45-46,152-155 (21px+margin20)</td></tr>
+  <tr><td>.kpi-strip(5칸)</td><td>92px</td><td>vulnscan.html:51-54,162-168</td></tr>
+  <tr><td>목록⇄히트맵 토글줄</td><td>28px</td><td>vulnscan.html:180-183</td></tr>
+  <tr><td>표 머리(thead)</td><td>39px</td><td>vulnscan.html:57,186</td></tr>
+  <tr><td><b>합계 — 창 맨 위부터 첫 호스트 행까지</b></td><td><b>458px</b></td><td>810px 실사용 영역의 <b>57%</b>(무대 머리+두 겹 화면의 chrome을 이어 붙인 거리)</td></tr>
+  <tr><td>호스트 표에서 스크롤 없이 보이는 행 수</td><td><b>9행</b></td><td>2단 중첩이라 계산도 2단이다: 바깥(triage.html)은 810px 예산에서 자기 chrome 192px(14+28+138+12)를 빼고 남은 <b>618px</b>를 안쪽 iframe(vulnscan.html)에 준다. 안쪽은 그 618px에서 <b>자기 chrome 232px</b>(28+45+92+28+39)를 빼면 386px → 386÷42px(td 13px×2+13px 줄높이+테두리1px)=9.19 → <b>9행</b>. <b>이마저 취약점이 아니라 호스트</b>, 취약점은 한 번 더 눌러야</td></tr>
+</table>
+<div class="warn-box">
+  <div class="cap">⚠ 밀도만의 문제가 아니다 — 계층도 2단</div>
+  오늘 취약점 "하나"를 고르려면 ① 우선순위 화면 진입(자동으로 취약점 판·호스트 표까지 뜸) →
+  ② 호스트 행 클릭(<code>vulnscan.html</code> 툴팁: "클릭하면 이 호스트의 취약점 목록이 열립니다") →
+  ③ 아래 새로 열리는 <code>#vulnDetail</code> 패널에서 취약점 행 클릭, 총 <b>클릭 2회</b>가 필요하다.
+  고르기 모드는 취약점을 **처음부터 평평한 목록**으로 보여줘 클릭 1회로 줄인다.
+</div>
+
+<h2><span class="n">3</span>오늘 — 「자산 열기」(비교적 가벼운 편)</h2>
+<p class="note">
+  assets.html(⓪ 자산 고르기)은 이미 검색+목록 구조라 위 사례보다 가볍다 — <b>여기서 문제는 밀도가 아니라
+  행동</b>이다: 고른 뒤에도 무대가 안 내려가고, 오른쪽엔 픽 대상과 상관없는 <b>5단계 진행현황 대시보드</b>가 뜬다.
+</p>
+<table class="t">
+  <tr><th style="width:280px">항목</th><th style="width:190px">값</th><th>근거</th></tr>
+  <tr><td>첫 행까지 chrome(무대 머리 포함)</td><td>151px</td><td>dockHead34+main pad14+scr-id27+panel pad14+.ph25+검색37(assets.html:32,33,48,49,55-57)</td></tr>
+  <tr><td>목록(.plist) 행 수</td><td>정확히 18행</td><td><code>max-height:612px</code> ÷ <code>34px/행</code>(주석 그대로) — assets.html:59-64</td></tr>
+  <tr><td>고른 뒤 오른쪽 패널</td><td>≈214px, <b>픽 대상 무관</b>한 5단계 대시보드</td><td>.ph25+.stages 카드83+.st-why78+패딩28(assets.html:74-84,246-267)</td></tr>
+  <tr><td>고른 뒤 무대</td><td><b>안 내려감</b> — "← 대화로"만 2.6초 반짝(📌 골랐습니다)</td><td>app.html:895-901</td></tr>
+</table>
+
+<h2><span class="n">4</span>제안 — 고르기 모드(추천 시안)</h2>
+<p class="note">검색 1줄(필터 전용) + 목록(엑셀형 한 줄) + 얇은 상세. 자산·우선순위(취약점) 두 트리거가 같은 부품을 쓴다.</p>
+<div class="scaledia-row">
+  <div class="scaledia-col">
+    <div class="scaledia-tag good">고르기 모드 — 810px 예산 그대로</div>
+    <div class="mockshell" style="width:590px">
+      <div class="m-dockhead"><span class="tbbtn">← 대화로</span><b>우선순위 · 취약점 고르기</b></div>
+      <div class="pick-search" style="margin-top:8px">🔎 취약점명 · CVE · 자산명으로 좁히기… <span style="color:var(--muted-2);font-size:10px">(필터 전용 — 지시가 아닙니다)</span></div>
+      <div class="pick-meta" style="margin-top:6px">41건 · 위험도 순</div>
+      <div style="display:flex;margin-top:6px">
+        <div style="flex:1">
+          <div class="pick-row on"><span class="badge kev">KEV</span><span class="badge crit">critical</span><span class="nm">Netlogon Elevation of Privilege (CVE-2020-1472)</span><span class="asset">web-01</span></div>
+          <div class="pick-row"><span class="badge crit">critical</span><span class="nm">Apache Log4j RCE (CVE-2021-44228)</span><span class="asset">db-02</span></div>
+          <div class="pick-row"><span class="badge" style="color:var(--b-high);background:var(--b-high-bg)">high</span><span class="nm">VMware ESXi Multiple Vulnerabilities</span><span class="asset">esxi-01</span></div>
+          <div class="pick-row"><span class="badge" style="color:var(--b-high);background:var(--b-high-bg)">high</span><span class="nm">OpenSSH 8.x 취약점 다수</span><span class="asset">bastion</span></div>
+          <div class="pick-row"><span class="badge" style="color:var(--b-med);background:var(--b-med-bg)">medium</span><span class="nm">TLS 1.0/1.1 활성화됨</span><span class="asset">lb-01</span></div>
+          <div style="padding:8px 10px;font-size:10.5px;color:var(--muted-2);border-top:1px dashed var(--border)">…스크롤 없이 21행까지(§5 산식) — 이하 생략</div>
+        </div>
+        <div style="padding:0 10px 10px 0;flex:0 0 auto">
+          <div class="pk-detail">
+            <span class="tag" style="color:#fff;background:var(--b-crit)">KEV</span><span class="tag" style="color:var(--b-crit);background:var(--b-crit-bg)">critical</span>
+            <div class="t">Netlogon Elevation of Privilege (CVE-2020-1472)</div>
+            <div class="m">web-01.internal · 진행중 · 담당 미배정</div>
+            <div class="plain">→ 일반 권한으로 들어온 공격자가 <b>관리자 권한을 얻을 수 있습니다.</b></div>
+            <button class="cta" disabled>행을 누르면 대화로 넘어갑니다</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="total-tag good">첫 행까지 110px · 21행 · 클릭 1회</span>
+  </div>
+  <div class="arrow-flow">→</div>
+  <div class="scaledia-col">
+    <div class="scaledia-tag good">클릭 즉시 — 무대 내려가고 🎯 카드</div>
+    <div class="chatcard">
+      <div class="h"><span class="selchip">🎯 지금 다루는 것 ✕ 풀기</span></div>
+      <div class="as">web-01.internal</div>
+      <div class="ti"><span class="tag" style="color:#fff;background:var(--b-crit);font-size:10px;padding:1px 6px;border-radius:5px;margin-right:4px">KEV</span><span class="tag" style="color:var(--b-crit);background:var(--b-crit-bg);font-size:10px;padding:1px 6px;border-radius:5px;margin-right:4px">critical</span><b>Netlogon Elevation of Privilege (CVE-2020-1472)</b></div>
+      <div class="mt">진행중 · 담당 미배정</div>
+      <div class="mt">→ 일반 권한으로 들어온 공격자가 <b>관리자 권한을 얻을 수 있습니다.</b></div>
+      <div class="chips">
+        <span class="chip">이거 쉽게 설명해줘</span>
+        <span class="chip">이거 담당자 배정해줘</span>
+        <span class="chip">이거 반려할게</span>
+      </div>
+    </div>
+    <p class="meas" style="max-width:400px">console.js:1109-1155의 <b>선택카드()</b>가 이미 그리는 것과 같은 카드 — 새 카드 종류를
+      만들지 않는다. fields 규격은 selectnotify.js 허용 키(asset·title·severity·status·owner·due·plain·
+      kev·assetId·findingKey, 10개 전부) 그대로.</p>
+  </div>
+</div>
+
+<h3>실측 산식 — 고르기 모드</h3>
+<table class="t">
+  <tr><th style="width:280px">구간</th><th style="width:90px">값</th><th>근거</th></tr>
+  <tr><td>무대 머리 #dockHead</td><td>34px</td><td>기존 부품 그대로(app.html:1224-1259, 한 글자도 안 바꿈)</td></tr>
+  <tr><td>본문 위 여백</td><td>12px</td><td>이 시안 지정(기존 화면들의 14px보다 살짝 촘촘히)</td></tr>
+  <tr><td>검색줄(필터 전용)</td><td>38px</td><td>assets.html:55-57 <code>.search</code> 값 그대로 재사용(패딩6px2·테두리1px2+margin8)</td></tr>
+  <tr><td>메타줄("N건 · 정렬")</td><td>26px</td><td>11.5px 텍스트 한 줄 + 여백 — 새 값이지만 기존 <code>.cnt</code>류와 같은 크기대</td></tr>
+  <tr><td><b>합계 — 창 맨 위부터 첫 행까지</b></td><td><b>110px</b></td><td>810px의 <b>14%</b>(오늘 57% 대비)</td></tr>
+  <tr><td>목록 행 수(810px 예산)</td><td><b>21행</b></td><td>단일 화면이라 중첩이 없다 — 810px는 이미 무대 머리(34px)를 뺀 값이므로, 그 810px에서 <b>이 화면 자체 chrome 76px</b>(본문 위 여백12+검색38+메타26, 무대 머리는 810px 밖이라 중복 차감 안 함)만 빼면 734px → 734÷34px/행(assets.html의 기존 pk-row 그대로, 새로 만들지 않음)=21.6 → <b>21행</b></td></tr>
+</table>
+
+<h2><span class="n">5</span>밀도 숫자 — 최종 정리</h2>
+<table class="t">
+  <tr><th style="width:260px">지표</th><th style="width:200px">오늘(우선순위→취약점)</th><th style="width:200px">고르기 모드</th><th>증감</th></tr>
+  <tr><td>첫 행까지 chrome</td><td>458px</td><td>110px</td><td><b class="ok" style="color:var(--teal)">−348px · −76%</b></td></tr>
+  <tr><td>스크롤 없이 보이는 행 수(810px 예산)</td><td>9행(그나마 <b>호스트</b>, 취약점 아님)</td><td>21행(<b>취약점 자체</b>)</td><td><b style="color:var(--teal)">+12행 · 약 2.3배</b></td></tr>
+  <tr><td>취약점 하나 고르기 클릭 수</td><td>2회(호스트→취약점)</td><td>1회(행)</td><td><b style="color:var(--teal)">−1회</b></td></tr>
+  <tr><td>행 높이</td><td>≈42px(vulnscan td)</td><td>34px(기존 pk-row 재사용)</td><td><b style="color:var(--teal)">−8px · −19%</b>, Material 고밀도 32dp에 근접</td></tr>
+  <tr><td>고른 뒤</td><td>무대 유지, "← 대화로" 2.6초 반짝(app.html:895-901)</td><td>무대 자동 하강 + 🎯 카드(§6 안전장치)</td><td>맥락 복귀 0클릭</td></tr>
+  <tr><td>자산 열기 — 첫 행까지 chrome</td><td>151px(이미 가벼움)</td><td>110px(동일 부품 재사용)</td><td><b style="color:var(--teal)">−41px</b>(작음 — 원래 이득은 아래 §7)</td></tr>
+  <tr><td>자산 열기 — 상세 패널</td><td>214px 5단계 대시보드(픽 대상과 무관)</td><td>≈150px 이 자산 사실 카드(픽 대상 직결)</td><td>내용이 유의미해짐(크기보다 <b>관련성</b>)</td></tr>
+</table>
+
+<h2><span class="n">6</span>왜 이번엔 자동 무대 내림이 안전한가 — 검토관 상1 재발 방지</h2>
+<div class="warn-box">
+  <div class="cap">⚠ 이미 한 번 막힌 패턴이다(app.html:890-902)</div>
+  원문: <i>"자동 복귀(고르면 무대 내림)는 폐지(검토관 상1) — gijo:select는 「행 클릭」 전용이 아니라서,
+  결재 확인창(점검 승인)·모달·상세 열기 직후에도 온다(발신 18곳 중 10곳 실증). 그때 무대를 내리면
+  방금 연 것이 통째로 숨는다 — 승인을 눌렀는데 확인창을 못 본 채 「됐다」고 오인하는 최악 부류."</i>
+</div>
+<div class="ok-box">
+  <div class="cap">✓ 이 시안이 같은 함정을 피하는 방식</div>
+  <b>기존 <code>gijo:select</code> 채널은 한 글자도 안 건드린다</b> — 18곳(확인창 10곳 포함)은 지금처럼
+  📌 칩과 2.6초 반짝만 그대로 받는다. 고르기 모드 화면은 <b>애초에 확인창·모달이 없는, 행 클릭이 유일한
+  동작인 새 화면</b>이라 별도의 좁은 신호(가칭 <code>gijo:pickdone</code>)를 쓴다 — 이 신호는 고르기 화면
+  <b>말고는 아무도 보내지 않으므로</b>, "여러 뜻을 가진 신호를 하나로 해석"했던 원래 사고 원인이 구조적으로
+  생기지 않는다. 셸의 처리는 <code>무대숨김=true; 대화홈갱신();</code>(app.html:1244-1247, #stageBack이
+  쓰는 것과 <b>같은 함수</b> — 새 상태를 만들지 않는다) 그대로 재사용한다.
+</div>
+
+<h2><span class="n">7</span>왜 이 안인가 — 대안 비교</h2>
+<table class="t">
+  <tr><th style="width:200px">안</th><th style="width:340px">문제</th><th>판정</th></tr>
+  <tr>
+    <td>① 허브 그대로 띄우기(오늘)</td>
+    <td>§2·§3에서 실측한 458px chrome·클릭 2회. KPI·탭·필터는 "고르기"에 무관한 정보라 오히려
+      원하는 항목을 찾는 시간을 늘린다(NN/g Progressive Disclosure 위반 — §1).</td>
+    <td><span class="verdict hold">기각</span></td>
+  </tr>
+  <tr>
+    <td>② 별도 OS 창(팝업)</td>
+    <td>같은 날(2026-08-20) 사장님 지시로 무대의 ⧉ 창으로 버튼이 <b>이미 삭제됐다</b>(app.html:1233-1236,
+      "팝업 및 옆에 붙는 메뉴를 없애는"). 창 관리 부담이 추가되고, "거기서 클릭된 게 대화창에 나오긴
+      하는데" — 별도 창에서 고른 결과가 대화로 오는 우회 경로 자체가 배경 피드백 ①의 불편함이다.</td>
+    <td><span class="verdict hold">기각(이미 걷어낸 패턴)</span></td>
+  </tr>
+  <tr>
+    <td>③ 고르기 모드(이 시안)</td>
+    <td>기존 무대·탭 모델·iframe embed·선택카드 규격을 <b>한 글자도 안 바꾸고</b> 그 위에 얇은 화면
+      1개를 얹는다. Microsoft List/details 패턴이 상정하는 정확한 쓰임("빠르게 오가며 맥락으로 복귀")과
+      일치한다.</td>
+    <td><span class="verdict go">추천</span></td>
+  </tr>
+</table>
+
+<h2><span class="n">8</span>무엇을 포기했는가</h2>
+<ul style="margin-left:20px;font-size:12.4px;color:var(--muted);line-height:2;">
+  <li><b style="color:var(--text-strong)">한눈에 훑어보기(KPI)</b> — 고르기 화면엔 없다. 현황을 보려면 여전히
+    「우선순위」 허브를 연다(대체가 아니라 <b>병행</b>이므로, 화면이 하나 더 생기는 비용을 감수).</li>
+  <li><b style="color:var(--text-strong)">한 화면이 두 역할(분석+선택)을 다 하는 단순함</b> — 지금은
+    triage/assets가 "보다가 고르는" 한 화면이었다. 이 시안은 그걸 "보는 화면"과 "고르는 화면" 둘로
+    가른다 — 진입점을 잘못 고르면(예: 카드 버튼 문구) 사용자가 헷갈릴 여지가 새로 생긴다(§9에서
+    구현 시 재검토 필요로 표기).</li>
+  <li><b style="color:var(--text-strong)">목록 안 풍부한 정보</b> — vulnscan 표의 EPSS·VPR·상태 칩 등은
+    행에서 뺐다(Progressive Disclosure). 필요하면 상세 패널이나 원래 화면에서 본다.</li>
+  <li><b style="color:var(--text-strong)">검색칸의 편리한 확장</b> — "이 안에서 바로 지시까지 치면 편하지
+    않을까"는 명시적으로 포기한다. 「메뉴는 보기용, 지시는 대화창에서만」 원칙을 지키려고 검색칸은
+    <b>필터 전용</b>으로 못 박는다(Enter를 눌러도 지시가 나가지 않음).</li>
+</ul>
+
+<h2><span class="n">9</span>제품 원칙 자가점검</h2>
+<table class="t">
+  <tr><th style="width:260px">원칙</th><th>이 시안에서</th></tr>
+  <tr><td>메뉴는 보기용 · 지시는 대화창에서만</td><td>검색칸은 필터 전용(§4 배지로 명시), 새 입력칸·전송 버튼 없음.</td></tr>
+  <tr><td>화면 설명은 챗봇+ⓘ로</td><td>고르기 화면엔 설명 문장을 두지 않는다 — 정체성은 무대 머리
+    <code>#dockName</code>이 이미 표시(기존 부품). 필요 안내는 ⓘ로 대화창에서.</td></tr>
+  <tr><td>제품 룩앤필(색 토큰 실제 화면에서)</td><td>다크가 기본이지만, <b>프로는 흰 바탕이 확정값</b>
+    (pro-white.css, 2026-08-20) — 이 시안은 그 토큰을 그대로 복사했다(§1 명시, 지어내지 않음).</td></tr>
+  <tr><td>자체완결 HTML(폐쇄망)</td><td>외부 CDN·웹폰트·원격 이미지 없음 — 더블클릭으로 열림.</td></tr>
+  <tr><td>정직한 구현</td><td>모든 버튼·입력창은 클릭해도 동작하지 않음(위 CTA 버튼 <code>disabled</code>로
+    명시).</td></tr>
+  <tr><td>선택 카드 단일 출처(selectnotify.js)</td><td>새 필드를 발명하지 않는다 — 허용 키 10개(asset·title·
+    severity·status·owner·due·plain·kev·assetId·findingKey) 안에서만 채운다.</td></tr>
+  <tr><td>검토관 상1 재발 방지</td><td>§6에서 설계로 반영했으나, <b style="color:var(--amber)">실제 구현·
+    게시 전 검토관 재확인이 반드시 필요</b>하다(자가점검이 검토를 대신하지 않는다).</td></tr>
+</table>
+
+<h2><span class="n">10</span>구현 메모(승인 후 참고 — 이 시안이 정하지 않는 것)</h2>
+<p class="note">
+  이 문서는 그림이다. 아래는 승인 시 구현자가 참고할 자리일 뿐, 이 시안이 코드를 정하지 않는다.
+</p>
+<ul style="margin-left:20px;font-size:12.25px;color:var(--muted);line-height:1.9;">
+  <li>새 화면(가칭 <code>pick.html?kind=vuln|asset</code>)을 열 때 「카드는 dock 5곳」 계약
+    (wiringcontract.test) 표에 <b>새 진입 경로가 등록돼야 한다</b> — 안 하면 <code>screenCard</code>
+    이중 열림 부류의 사고가 재현될 수 있다(MEMORY: 프로 확정 계약 5.41.0).</li>
+  <li>대화창의 "🗔 자산 열기"/"🗔 취약점 열기" 카드 버튼이 <code>pick=1</code> 트리거를 쓸지, 별도
+    문구("🎯 고르기")로 분기할지는 진입점 UX를 별도로 확인해야 한다(§8의 "역할 두 갈래" 비용과 직결).</li>
+  <li>API는 새로 만들지 않는다 — 자산은 <code>window.gijo.assetHub()</code>(assets.html:288 그대로),
+    취약점은 <code>listAssets()</code>를 평탄화(현재 vulnscan/triage가 이미 쓰는 자료 재사용).</li>
+</ul>
+
+<footer class="docfoot">
+  정직한 구현 고지 — 각 절의 <b>실측 산식 표</b>(§2·§3·§4)는 client/src/renderer/pages의 실제 CSS 수치
+  (패딩·마진·폰트 크기·border 두께)를 그대로 계산·합산한 값이다. 바로 위 <b>구성 재현 그림</b>은 같은
+  값을 문서 폭에 맞춰 압축해 그린 것이라 그림 자체의 픽셀은 자로 잰 근거가 <b>아니다</b> — 근거는
+  항상 표다. 클릭 가능해 보이는 요소는 전부 정지 그림이다. 제품 코드는 이 작업에서 <b>읽기만 했고
+  한 줄도 고치지 않았다</b>. 900px 기준 창 높이 가정 등 계산 전제는 각 표에 명시했다 — 실제 화면
+  배율·해상도에 따라 절대값은 달라질 수 있으나, 오늘 대비 <b>줄어드는 방향과 비율</b>은 같은 CSS
+  규칙을 쓰는 한 유지된다.
+</footer>
+
+</div>
+</body>
+</html>
